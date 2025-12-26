@@ -1,7 +1,7 @@
 """
-JobState 和 ExecutionRecord 类
+JobState and ExecutionRecord classes.
 
-用于记录 flow 的执行状态。
+Used for recording flow execution state.
 """
 import uuid
 from datetime import datetime
@@ -12,10 +12,10 @@ import json
 
 @register_serializable
 class ExecutionRecord(Serializable):
-    """
-    执行记录
+    """Execution record for a single routine execution.
     
-    记录一次 routine 的执行
+    Captures information about when and how a routine was executed,
+    including parameters, timestamp, and event information.
     """
     
     def __init__(
@@ -25,14 +25,13 @@ class ExecutionRecord(Serializable):
         data: Optional[Dict[str, Any]] = None,
         timestamp: Optional[datetime] = None
     ):
-        """
-        初始化 ExecutionRecord
-        
+        """Initialize ExecutionRecord.
+
         Args:
-            routine_id: Routine ID
-            event_name: 事件名称
-            data: 传递的数据
-            timestamp: 时间戳（如果为 None 则使用当前时间）
+            routine_id: Routine identifier.
+            event_name: Event name.
+            data: Transmitted data.
+            timestamp: Timestamp (uses current time if None).
         """
         super().__init__()
         self.routine_id: str = routine_id
@@ -40,24 +39,24 @@ class ExecutionRecord(Serializable):
         self.data: Dict[str, Any] = data or {}
         self.timestamp: datetime = timestamp or datetime.now()
         
-        # 注册可序列化字段
+        # Register serializable fields
         self.add_serializable_fields(["routine_id", "event_name", "data", "timestamp"])
     
     def __repr__(self) -> str:
-        """返回对象的字符串表示"""
+        """Return string representation of the ExecutionRecord."""
         return f"ExecutionRecord[{self.routine_id}.{self.event_name}@{self.timestamp}]"
     
     def serialize(self) -> Dict[str, Any]:
-        """序列化，处理 datetime"""
+        """Serialize, handling datetime conversion."""
         data = super().serialize()
-        # 将 datetime 转换为字符串
+        # Convert datetime to string
         if isinstance(data.get("timestamp"), datetime):
             data["timestamp"] = data["timestamp"].isoformat()
         return data
     
     def deserialize(self, data: Dict[str, Any]) -> None:
-        """反序列化，处理 datetime"""
-        # 将字符串转换为 datetime
+        """Deserialize, handling datetime conversion."""
+        # Convert string to datetime
         if isinstance(data.get("timestamp"), str):
             data["timestamp"] = datetime.fromisoformat(data["timestamp"])
         super().deserialize(data)
@@ -65,60 +64,57 @@ class ExecutionRecord(Serializable):
 
 @register_serializable
 class JobState(Serializable):
-    """
-    作业状态
+    """Job state for tracking flow execution.
     
-    记录 flow 的执行状态
+    Maintains comprehensive state information about flow execution including
+    routine states, execution history, pause points, and status tracking.
     """
     
     def __init__(self, flow_id: str = ""):
-        """
-        初始化 JobState
-        
+        """Initialize JobState.
+
         Args:
-            flow_id: Flow ID
+            flow_id: Flow identifier.
         """
         super().__init__()
         self.flow_id: str = flow_id
         self.job_id: str = str(uuid.uuid4())
         self.status: str = "pending"  # pending, running, paused, completed, failed, cancelled
-        self.pause_points: List[Dict[str, Any]] = []  # 暂停点列表
-        self.current_routine_id: Optional[str] = None  # 当前执行的 routine
-        self.routine_states: Dict[str, Dict[str, Any]] = {}  # routine_id -> state
-        self.execution_history: List[ExecutionRecord] = []  # 执行历史
+        self.pause_points: List[Dict[str, Any]] = []
+        self.current_routine_id: Optional[str] = None
+        self.routine_states: Dict[str, Dict[str, Any]] = {}
+        self.execution_history: List[ExecutionRecord] = []
         self.created_at: datetime = datetime.now()
         self.updated_at: datetime = datetime.now()
         
-        # 注册可序列化字段
+        # Register serializable fields
         self.add_serializable_fields([
             "flow_id", "job_id", "status", "current_routine_id",
             "routine_states", "execution_history", "created_at", "updated_at", "pause_points"
         ])
     
     def __repr__(self) -> str:
-        """返回对象的字符串表示"""
+        """Return string representation of the JobState."""
         return f"JobState[{self.job_id}:{self.status}]"
     
     def update_routine_state(self, routine_id: str, state: Dict[str, Any]) -> None:
-        """
-        更新某个 routine 的状态
-        
+        """Update state for a routine.
+
         Args:
-            routine_id: Routine ID
-            state: 状态字典
+            routine_id: Routine identifier.
+            state: State dictionary.
         """
         self.routine_states[routine_id] = state.copy()
         self.updated_at = datetime.now()
     
     def get_routine_state(self, routine_id: str) -> Optional[Dict[str, Any]]:
-        """
-        获取某个 routine 的状态
-        
+        """Get state for a routine.
+
         Args:
-            routine_id: Routine ID
-        
+            routine_id: Routine identifier.
+
         Returns:
-            状态字典，如果不存在则返回 None
+            State dictionary if found, None otherwise.
         """
         return self.routine_states.get(routine_id)
     
@@ -128,13 +124,12 @@ class JobState(Serializable):
         event_name: str,
         data: Dict[str, Any]
     ) -> None:
-        """
-        记录执行历史
-        
+        """Record execution history.
+
         Args:
-            routine_id: Routine ID
-            event_name: 事件名称
-            data: 传递的数据
+            routine_id: Routine identifier.
+            event_name: Event name.
+            data: Transmitted data.
         """
         record = ExecutionRecord(routine_id, event_name, data)
         self.execution_history.append(record)
@@ -144,14 +139,13 @@ class JobState(Serializable):
         self,
         routine_id: Optional[str] = None
     ) -> List[ExecutionRecord]:
-        """
-        获取执行历史
-        
+        """Get execution history.
+
         Args:
-            routine_id: 如果指定，只返回该 routine 的历史
-        
+            routine_id: If specified, only return history for this routine.
+
         Returns:
-            执行历史列表（按时间排序）
+            List of execution records sorted by time.
         """
         if routine_id is None:
             history = self.execution_history
@@ -161,16 +155,15 @@ class JobState(Serializable):
                 if r.routine_id == routine_id
             ]
         
-        # 按时间排序
+        # Sort by time
         return sorted(history, key=lambda x: x.timestamp)
     
     def _set_paused(self, reason: str = "", checkpoint: Optional[Dict[str, Any]] = None) -> None:
-        """
-        内部方法：设置暂停状态（由 Flow 调用）
-        
+        """Internal method: Set paused state (called by Flow).
+
         Args:
-            reason: 暂停原因
-            checkpoint: 检查点数据
+            reason: Reason for pausing.
+            checkpoint: Checkpoint data.
         """
         self.status = "paused"
         pause_point = {
@@ -183,19 +176,16 @@ class JobState(Serializable):
         self.updated_at = datetime.now()
     
     def _set_running(self) -> None:
-        """
-        内部方法：设置运行状态（由 Flow 调用）
-        """
+        """Internal method: Set running state (called by Flow)."""
         if self.status == "paused":
             self.status = "running"
             self.updated_at = datetime.now()
     
     def _set_cancelled(self, reason: str = "") -> None:
-        """
-        内部方法：设置取消状态（由 Flow 调用）
-        
+        """Internal method: Set cancelled state (called by Flow).
+
         Args:
-            reason: 取消原因
+            reason: Reason for cancellation.
         """
         self.status = "cancelled"
         self.updated_at = datetime.now()
@@ -203,18 +193,17 @@ class JobState(Serializable):
             self.routine_states.setdefault("_cancellation", {})["reason"] = reason
     
     def save(self, filepath: str) -> None:
-        """
-        持久化状态到文件
-        
+        """Persist state to file.
+
         Args:
-            filepath: 文件路径
+            filepath: File path.
         """
         import os
-        # 确保目录存在
+        # Ensure directory exists
         os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else ".", exist_ok=True)
         
         data = self.serialize()
-        # 处理 datetime
+        # Handle datetime
         if isinstance(data.get("created_at"), datetime):
             data["created_at"] = data["created_at"].isoformat()
         if isinstance(data.get("updated_at"), datetime):
@@ -225,18 +214,17 @@ class JobState(Serializable):
     
     @classmethod
     def load(cls, filepath: str) -> 'JobState':
-        """
-        从文件恢复状态
-        
+        """Load state from file.
+
         Args:
-            filepath: 文件路径
-        
+            filepath: File path.
+
         Returns:
-            JobState 对象
-        
+            JobState object.
+
         Raises:
-            FileNotFoundError: 如果文件不存在
-            ValueError: 如果文件格式不正确
+            FileNotFoundError: If file does not exist.
+            ValueError: If file format is incorrect.
         """
         import os
         if not os.path.exists(filepath):
@@ -245,15 +233,15 @@ class JobState(Serializable):
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        # 验证数据格式
+        # Validate data format
         if "_type" not in data or data["_type"] != "JobState":
             raise ValueError(f"Invalid JobState file format: {filepath}")
         
-        # 创建对象
+        # Create object
         job_state = cls(data.get("flow_id", ""))
         job_state.deserialize(data)
         
-        # 处理 datetime
+        # Handle datetime
         if isinstance(job_state.created_at, str):
             job_state.created_at = datetime.fromisoformat(job_state.created_at)
         if isinstance(job_state.updated_at, str):
@@ -262,9 +250,9 @@ class JobState(Serializable):
         return job_state
     
     def serialize(self) -> Dict[str, Any]:
-        """序列化，处理 datetime 和 ExecutionRecord"""
+        """Serialize, handling datetime and ExecutionRecord."""
         data = super().serialize()
-        # 处理 datetime
+        # Handle datetime
         if isinstance(data.get("created_at"), datetime):
             data["created_at"] = data["created_at"].isoformat()
         if isinstance(data.get("updated_at"), datetime):
@@ -272,14 +260,14 @@ class JobState(Serializable):
         return data
     
     def deserialize(self, data: Dict[str, Any]) -> None:
-        """反序列化，处理 datetime 和 ExecutionRecord"""
-        # 处理 datetime
+        """Deserialize, handling datetime and ExecutionRecord."""
+        # Handle datetime
         if isinstance(data.get("created_at"), str):
             data["created_at"] = datetime.fromisoformat(data["created_at"])
         if isinstance(data.get("updated_at"), str):
             data["updated_at"] = datetime.fromisoformat(data["updated_at"])
         
-        # 处理 ExecutionRecord 列表
+        # Handle ExecutionRecord list
         if "execution_history" in data and isinstance(data["execution_history"], list):
             records = []
             for record_data in data["execution_history"]:

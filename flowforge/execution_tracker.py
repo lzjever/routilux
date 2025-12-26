@@ -1,7 +1,7 @@
 """
-执行跟踪器
+Execution tracker.
 
-用于跟踪 flow 的执行状态和性能。
+Tracks flow execution state and performance metrics.
 """
 from __future__ import annotations
 from typing import Dict, Any, List, Optional
@@ -11,37 +11,35 @@ from flowforge.utils.serializable import register_serializable, Serializable
 
 @register_serializable
 class ExecutionTracker(Serializable):
-    """
-    执行跟踪器
+    """Execution tracker for monitoring flow execution state and performance.
     
-    跟踪 flow 的执行状态、性能和事件流
+    Tracks routine executions, event flow, and performance metrics to provide
+    insights into flow behavior and optimization opportunities.
     """
     
     def __init__(self, flow_id: str = ""):
-        """
-        初始化 ExecutionTracker
-        
+        """Initialize ExecutionTracker.
+
         Args:
-            flow_id: Flow ID
+            flow_id: Flow identifier.
         """
         super().__init__()
         self.flow_id: str = flow_id
-        self.routine_executions: Dict[str, List[Dict[str, Any]]] = {}  # routine_id -> 执行记录列表
-        self.event_flow: List[Dict[str, Any]] = []  # 事件流记录
-        self.performance_metrics: Dict[str, Any] = {}  # 性能指标
+        self.routine_executions: Dict[str, List[Dict[str, Any]]] = {}
+        self.event_flow: List[Dict[str, Any]] = []
+        self.performance_metrics: Dict[str, Any] = {}
         
-        # 注册可序列化字段
+        # Register serializable fields
         self.add_serializable_fields([
             "flow_id", "routine_executions", "event_flow", "performance_metrics"
         ])
     
     def record_routine_start(self, routine_id: str, params: Dict[str, Any] = None) -> None:
-        """
-        记录 routine 开始执行
-        
+        """Record the start of routine execution.
+
         Args:
-            routine_id: Routine ID
-            params: 执行参数
+            routine_id: Routine identifier.
+            params: Execution parameters.
         """
         if routine_id not in self.routine_executions:
             self.routine_executions[routine_id] = []
@@ -61,14 +59,13 @@ class ExecutionTracker(Serializable):
         result: Any = None,
         error: Optional[str] = None
     ) -> None:
-        """
-        记录 routine 执行结束
-        
+        """Record the end of routine execution.
+
         Args:
-            routine_id: Routine ID
-            status: 状态 ("completed", "failed")
-            result: 执行结果
-            error: 错误信息（如果有）
+            routine_id: Routine identifier.
+            status: Execution status ("completed", "failed").
+            result: Execution result.
+            error: Error message if execution failed.
         """
         if routine_id not in self.routine_executions:
             return
@@ -86,7 +83,7 @@ class ExecutionTracker(Serializable):
         if error is not None:
             execution["error"] = error
         
-        # 计算执行时间
+        # Calculate execution time
         if "start_time" in execution and "end_time" in execution:
             start = datetime.fromisoformat(execution["start_time"])
             end = datetime.fromisoformat(execution["end_time"])
@@ -99,14 +96,13 @@ class ExecutionTracker(Serializable):
         target_routine_id: Optional[str] = None,
         data: Dict[str, Any] = None
     ) -> None:
-        """
-        记录事件触发
-        
+        """Record an event emission.
+
         Args:
-            source_routine_id: 源 Routine ID
-            event_name: 事件名称
-            target_routine_id: 目标 Routine ID（如果有）
-            data: 传递的数据
+            source_routine_id: Source routine identifier.
+            event_name: Event name.
+            target_routine_id: Target routine identifier if applicable.
+            data: Transmitted data.
         """
         event_record = {
             "timestamp": datetime.now().isoformat(),
@@ -118,14 +114,13 @@ class ExecutionTracker(Serializable):
         self.event_flow.append(event_record)
     
     def get_routine_performance(self, routine_id: str) -> Optional[Dict[str, Any]]:
-        """
-        获取 routine 的性能指标
-        
+        """Get performance metrics for a routine.
+
         Args:
-            routine_id: Routine ID
-        
+            routine_id: Routine identifier.
+
         Returns:
-            性能指标字典，如果不存在则返回 None
+            Dictionary containing performance metrics, or None if routine not found.
         """
         if routine_id not in self.routine_executions:
             return None
@@ -134,7 +129,7 @@ class ExecutionTracker(Serializable):
         if not executions:
             return None
         
-        # 计算统计信息
+        # Calculate statistics
         total_executions = len(executions)
         completed = sum(1 for e in executions if e.get("status") == "completed")
         failed = sum(1 for e in executions if e.get("status") == "failed")
@@ -160,11 +155,10 @@ class ExecutionTracker(Serializable):
         }
     
     def get_flow_performance(self) -> Dict[str, Any]:
-        """
-        获取整个 flow 的性能指标
-        
+        """Get performance metrics for the entire flow.
+
         Returns:
-            性能指标字典
+            Dictionary containing overall flow performance metrics.
         """
         total_routines = len(self.routine_executions)
         total_events = len(self.event_flow)

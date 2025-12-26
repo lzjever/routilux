@@ -76,6 +76,31 @@ Execute the flow with entry parameters:
    # Check statistics
    print(processor1.stats())  # {"processed_count": 1}
 
+Concurrent Execution (Optional)
+--------------------------------
+
+For I/O-bound operations, you can use concurrent execution to run multiple routines in parallel:
+
+.. code-block:: python
+
+   # Create a concurrent flow
+   flow = Flow(
+       execution_strategy="concurrent",
+       max_workers=5
+   )
+   
+   try:
+       # Routines that can run in parallel will execute concurrently
+       job_state = flow.execute(id1, entry_params={"data": "test"})
+       
+       # Wait for all concurrent tasks to complete
+       flow.wait_for_completion(timeout=10.0)
+   finally:
+       # Always clean up resources
+       flow.shutdown(wait=True)
+
+See :doc:`user_guide/flows` for more details on concurrent execution.
+
 Next Steps
 ----------
 

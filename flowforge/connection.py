@@ -1,7 +1,7 @@
 """
-Connection 类
+Connection class.
 
-连接对象，表示一个 event 到 slot 的连接。
+Represents a connection from an event to a slot.
 """
 from __future__ import annotations
 from typing import Dict, Optional, Any, TYPE_CHECKING
@@ -15,10 +15,10 @@ from flowforge.utils.serializable import register_serializable, Serializable
 
 @register_serializable
 class Connection(Serializable):
-    """
-    连接对象
+    """Connection object representing a link from an event to a slot.
     
-    表示一个 event 到 slot 的连接
+    A Connection establishes a data flow path from a source Event to a target Slot,
+    with optional parameter mapping to transform the data during transmission.
     """
     
     def __init__(
@@ -27,36 +27,35 @@ class Connection(Serializable):
         target_slot: Optional['Slot'] = None,
         param_mapping: Optional[Dict[str, str]] = None
     ):
-        """
-        初始化 Connection
-        
+        """Initialize a Connection.
+
         Args:
-            source_event: 源 Event 对象
-            target_slot: 目标 Slot 对象
-            param_mapping: 参数映射字典，将 source 的参数名映射到 target 的参数名
+            source_event: Source Event object.
+            target_slot: Target Slot object.
+            param_mapping: Parameter mapping dictionary that maps source parameter
+                names to target parameter names.
         """
         super().__init__()
         self.source_event: Optional['Event'] = source_event
         self.target_slot: Optional['Slot'] = target_slot
-        self.param_mapping: Dict[str, str] = param_mapping or {}  # 参数映射
+        self.param_mapping: Dict[str, str] = param_mapping or {}
         
-        # 建立连接（如果提供了 event 和 slot）
+        # Establish connection if both event and slot are provided
         if source_event is not None and target_slot is not None:
             source_event.connect(target_slot)
         
-        # 注册可序列化字段
+        # Register serializable fields
         self.add_serializable_fields(["param_mapping"])
     
     def serialize(self) -> Dict[str, Any]:
-        """
-        序列化 Connection
-        
+        """Serialize the Connection.
+
         Returns:
-            序列化后的字典
+            Serialized dictionary containing connection data and references.
         """
         data = super().serialize()
         
-        # 保存引用信息（通过 routine_id + event/slot name）
+        # Save reference information (via routine_id + event/slot name)
         if self.source_event and self.source_event.routine:
             data["_source_routine_id"] = self.source_event.routine._id
             data["_source_event_name"] = self.source_event.name
@@ -68,22 +67,21 @@ class Connection(Serializable):
         return data
     
     def deserialize(self, data: Dict[str, Any]) -> None:
-        """
-        反序列化 Connection
-        
+        """Deserialize the Connection.
+
         Args:
-            data: 序列化数据
+            data: Serialized data dictionary.
         """
-        # 保存引用信息以便后续恢复
+        # Save reference information for later restoration
         source_routine_id = data.pop("_source_routine_id", None)
         source_event_name = data.pop("_source_event_name", None)
         target_routine_id = data.pop("_target_routine_id", None)
         target_slot_name = data.pop("_target_slot_name", None)
         
-        # 反序列化基本字段
+        # Deserialize basic fields
         super().deserialize(data)
         
-        # 保存引用信息，在 Flow 恢复时重建
+        # Save reference information to be restored when Flow is reconstructed
         if source_routine_id:
             self._source_routine_id = source_routine_id
         if source_event_name:
@@ -94,34 +92,32 @@ class Connection(Serializable):
             self._target_slot_name = target_slot_name
     
     def __repr__(self) -> str:
-        """返回对象的字符串表示"""
+        """Return string representation of the Connection."""
         return f"Connection[{self.source_event} -> {self.target_slot}]"
     
     def activate(self, data: Dict[str, Any]) -> None:
-        """
-        激活连接，传递数据
-        
+        """Activate the connection and transmit data.
+
         Args:
-            data: 要传递的数据字典
+            data: Data dictionary to transmit.
         """
-        # 应用参数映射
+        # Apply parameter mapping
         mapped_data = self._apply_mapping(data)
         
-        # 传递到目标 slot
+        # Transmit to target slot
         self.target_slot.receive(mapped_data)
     
     def _apply_mapping(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        应用参数映射
-        
+        """Apply parameter mapping to transform data.
+
         Args:
-            data: 原始数据
-        
+            data: Original data dictionary.
+
         Returns:
-            映射后的数据
+            Mapped data dictionary with transformed parameter names.
         """
         if not self.param_mapping:
-            # 没有映射，直接返回
+            # No mapping, return as is
             return data
         
         mapped_data = {}
@@ -129,16 +125,17 @@ class Connection(Serializable):
             if source_key in data:
                 mapped_data[target_key] = data[source_key]
         
-        # 对于没有映射的参数，如果目标 slot 的 handler 需要，也传递
-        # 这里简化处理：传递所有未映射的参数（如果目标参数名与源参数名相同）
+        # For unmapped parameters, also pass them if the target slot's handler needs them
+        # Simplified handling: pass all unmapped parameters if target parameter name
+        # matches source parameter name
         for key, value in data.items():
             if key not in self.param_mapping.values() and key not in mapped_data:
-                # 检查是否与目标参数名匹配（这里简化，实际应该检查 handler 签名）
+                # Check if it matches target parameter name (simplified, should check handler signature)
                 mapped_data[key] = value
         
         return mapped_data
     
     def disconnect(self) -> None:
-        """断开连接"""
+        """Disconnect the connection."""
         self.source_event.disconnect(self.target_slot)
 

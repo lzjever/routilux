@@ -1,7 +1,7 @@
 """
-Slot 类
+Slot class.
 
-输入插槽，用于接收来自其他 routine 的数据。
+Input slot for receiving data from other routines.
 """
 from __future__ import annotations
 from typing import Callable, Optional, List, Dict, Any, TYPE_CHECKING
@@ -16,10 +16,54 @@ from flowforge.serialization_utils import serialize_callable, deserialize_callab
 
 @register_serializable
 class Slot(Serializable):
-    """
-    输入插槽
+    """Input slot for receiving data from other routines.
     
-    一个 slot 可以连接到多个 events（多对多关系）
+    A slot can be connected to multiple events (many-to-many relationship),
+    allowing data to be received from multiple sources. When data is received,
+    it is merged with existing data according to the merge_strategy, then
+    passed to the handler function.
+    
+    Merge Strategy Behavior:
+        - "override" (default): Each new data completely replaces the previous
+          data. The handler receives only the latest data. This is suitable for
+          scenarios where only the most recent data is needed.
+        
+        - "append": New data values are appended to lists. If a key doesn't
+          exist, it's initialized as an empty list. If the existing value is not
+          a list, it's converted to a list first. The handler receives the
+          accumulated data each time. This is useful for aggregation scenarios
+          where you need to collect multiple data points over time.
+        
+        - Custom function: A callable that takes (old_data, new_data) and
+          returns the merged result. This allows for custom merge logic such
+          as deep merging, averaging, or other domain-specific operations.
+    
+    Important Notes:
+        - The merge_strategy affects both what data is stored in self._data
+          and what data is passed to the handler.
+        - In concurrent execution scenarios, merge operations are not atomic.
+          If multiple events send data simultaneously, race conditions may occur.
+        - The handler is called immediately after each receive() call with
+          the merged data, not deferred until all data is collected.
+    
+    Examples:
+        Override strategy (default):
+            >>> slot = routine.define_slot("input", merge_strategy="override")
+            >>> slot.receive({"value": 1})  # handler receives {"value": 1}
+            >>> slot.receive({"value": 2})  # handler receives {"value": 2}
+            >>> # slot._data is {"value": 2}
+        
+        Append strategy:
+            >>> slot = routine.define_slot("input", merge_strategy="append")
+            >>> slot.receive({"value": 1})  # handler receives {"value": [1]}
+            >>> slot.receive({"value": 2})  # handler receives {"value": [1, 2]}
+            >>> # slot._data is {"value": [1, 2]}
+        
+        Custom merge function:
+            >>> def custom_merge(old, new):
+            ...     return {**old, **new, "merged": True}
+            >>> slot = routine.define_slot("input", merge_strategy=custom_merge)
+            >>> slot.receive({"a": 1})  # handler receives {"a": 1, "merged": True}
     """
     
     def __init__(
@@ -29,90 +73,131 @@ class Slot(Serializable):
         handler: Optional[Callable] = None,
         merge_strategy: str = "override"
     ):
-        """
-        初始化 Slot
-        
+        """Initialize Slot.
+
         Args:
-            name: 插槽名称
-            routine: 所属的 Routine 对象
-            handler: 处理函数
-            merge_strategy: 合并策略 ("override", "append", 或自定义函数)
+            name: Slot name. Used to identify the slot within its parent routine.
+            routine: Parent Routine object that owns this slot.
+            handler: Handler function called when data is received. The function
+                signature can be flexible:
+                - If it accepts **kwargs, all merged data is passed as keyword arguments
+                - If it accepts a single 'data' parameter, the entire merged dict is passed
+                - If it accepts a single parameter with a different name, the matching
+                  value from merged data is passed, or the entire dict if no match
+                - If it accepts multiple parameters, matching values are passed as kwargs
+                If None, no handler is called when data is received.
+            merge_strategy: Strategy for merging new data with existing data.
+                - "override" (default): New data completely replaces old data.
+                  Each receive() call passes only the new data to the handler.
+                  Use this when you only need the latest data.
+                - "append": New values are appended to lists. Existing non-list
+                  values are converted to lists first. The handler receives
+                  accumulated data each time. Use this for aggregation scenarios.
+                - Callable: A function(old_data: Dict, new_data: Dict) -> Dict
+                  that implements custom merge logic. The function should return
+                  the merged result. Use this for complex merge requirements like
+                  deep merging, averaging, or domain-specific operations.
+        
+        Note:
+            The merge_strategy determines how data accumulates in self._data and
+            what data is passed to the handler. See the class docstring for
+            detailed examples and behavior descriptions.
         """
         super().__init__()
         self.name: str = name
         self.routine: 'Routine' = routine
         self.handler: Optional[Callable] = handler
         self.merge_strategy: Any = merge_strategy
-        self.connected_events: List['Event'] = []  # 连接的 events
-        self._data: Dict[str, Any] = {}  # 存储的数据
+        self.connected_events: List['Event'] = []
+        self._data: Dict[str, Any] = {}
         
-        # 注册可序列化字段
+        # Register serializable fields
         self.add_serializable_fields(["name", "_data", "merge_strategy"])
     
     def __repr__(self) -> str:
-        """返回对象的字符串表示"""
-        return f"Slot[{self.routine._id}.{self.name}]"
+        """Return string representation of the Slot."""
+        if self.routine:
+            return f"Slot[{self.routine._id}.{self.name}]"
+        else:
+            return f"Slot[{self.name}]"
     
     def connect(self, event: 'Event', param_mapping: Optional[Dict[str, str]] = None) -> None:
-        """
-        连接到一个 event
-        
+        """Connect to an event.
+
         Args:
-            event: 要连接的 Event 对象
-            param_mapping: 参数映射字典，将 event 的参数名映射到 slot 的参数名
+            event: Event object to connect to.
+            param_mapping: Parameter mapping dictionary mapping event parameter names to slot parameter names.
         """
         if event not in self.connected_events:
             self.connected_events.append(event)
-            # 双向连接
+            # Bidirectional connection
             if self not in event.connected_slots:
                 event.connected_slots.append(self)
     
     def disconnect(self, event: 'Event') -> None:
-        """
-        断开与 event 的连接
-        
+        """Disconnect from an event.
+
         Args:
-            event: 要断开的 Event 对象
+            event: Event object to disconnect from.
         """
         if event in self.connected_events:
             self.connected_events.remove(event)
-            # 双向断开
+            # Bidirectional disconnection
             if self in event.connected_slots:
                 event.connected_slots.remove(self)
     
     def receive(self, data: Dict[str, Any]) -> None:
-        """
-        接收数据并调用 handler
-        
+        """Receive data and call handler.
+
+        This method is called when an event connected to this slot emits data.
+        The received data is merged with existing data according to the
+        merge_strategy, then passed to the handler function if one is defined.
+
+        Process flow:
+            1. Merge new data with existing self._data using merge_strategy
+            2. Update self._data with the merged result
+            3. Call handler with the merged data (if handler is defined)
+            4. Handle any exceptions from the handler without interrupting flow
+
         Args:
-            data: 接收到的数据字典
+            data: Received data dictionary from the connected event. This will
+                be merged with any existing data in self._data according to
+                the merge_strategy before being passed to the handler.
+        
+        Note:
+            - The handler is called synchronously and immediately after merging.
+            - If the handler raises an exception, it's logged but doesn't stop
+              the execution flow.
+            - In concurrent execution, multiple receive() calls may happen
+              simultaneously, which can cause race conditions in merge operations.
         """
-        # 合并数据
+        # Merge new data with existing data according to merge_strategy
+        # This updates self._data and returns the merged result
         merged_data = self._merge_data(data)
         
-        # 调用 handler
+        # Call handler with merged data if handler is defined
         if self.handler is not None:
             try:
                 import inspect
                 sig = inspect.signature(self.handler)
                 params = list(sig.parameters.keys())
                 
-                # 如果 handler 接受 **kwargs，直接传递所有数据
+                # If handler accepts **kwargs, pass all data directly
                 if self._is_kwargs_handler(self.handler):
                     self.handler(**merged_data)
                 elif len(params) == 1 and params[0] == 'data':
-                    # handler 只接受一个 'data' 参数，传递整个字典
+                    # Handler only accepts one 'data' parameter, pass entire dictionary
                     self.handler(merged_data)
                 elif len(params) == 1:
-                    # handler 只接受一个参数，尝试传递匹配的值
+                    # Handler only accepts one parameter, try to pass matching value
                     param_name = params[0]
                     if param_name in merged_data:
                         self.handler(merged_data[param_name])
                     else:
-                        # 如果没有匹配的参数，传递整个字典
+                        # If no matching parameter, pass entire dictionary
                         self.handler(merged_data)
                 else:
-                    # 多个参数，尝试匹配
+                    # Multiple parameters, try to match
                     matched_params = {}
                     for param_name in params:
                         if param_name in merged_data:
@@ -121,10 +206,10 @@ class Slot(Serializable):
                     if matched_params:
                         self.handler(**matched_params)
                     else:
-                        # 如果没有匹配，传递整个字典作为第一个参数
+                        # If no match, pass entire dictionary as first parameter
                         self.handler(merged_data)
             except Exception as e:
-                # 记录异常但不中断流程
+                # Record exception but don't interrupt flow
                 import logging
                 logging.exception(f"Error in slot {self} handler: {e}")
                 self.routine._stats.setdefault("errors", []).append({
@@ -133,48 +218,116 @@ class Slot(Serializable):
                 })
     
     def _merge_data(self, new_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        合并新数据到现有数据
-        
+        """Merge new data into existing data according to merge_strategy.
+
+        This method implements the core merge logic based on the configured
+        merge_strategy. It updates self._data with the merged result and
+        returns the merged data to be passed to the handler.
+
+        Merge Strategy Implementations:
+            - "override": Completely replaces self._data with new_data.
+              Previous data is discarded. This is the simplest and most
+              common strategy, suitable when only the latest data matters.
+            
+            - "append": Accumulates values in lists. For each key in new_data:
+              - If key doesn't exist in self._data: initialize as empty list
+              - If existing value is not a list: convert to list [old_value]
+              - Append new value to the list
+              This allows collecting multiple data points over time.
+            
+            - Custom function: Calls the function with (self._data, new_data)
+              and uses the return value. The function is responsible for:
+              - Reading from self._data (old state)
+              - Merging with new_data
+              - Returning the merged result
+              Note: The function should NOT modify self._data directly;
+              this method will update it with the return value.
+
         Args:
-            new_data: 新数据
-        
+            new_data: New data dictionary received from an event. This will be
+                merged with the existing self._data according to merge_strategy.
+
         Returns:
-            合并后的数据
+            Merged data dictionary. This is what will be passed to the handler
+            function. The format depends on the merge_strategy:
+            - "override": Returns new_data (previous data discarded)
+            - "append": Returns dict with lists containing accumulated values
+            - Custom: Returns whatever the custom function returns
+
+        Side Effects:
+            Updates self._data with the merged result. This state persists
+            across multiple receive() calls, allowing data accumulation.
+
+        Examples:
+            Override behavior:
+                >>> slot._data = {"a": 1, "b": 2}
+                >>> merged = slot._merge_data({"a": 10, "c": 3})
+                >>> merged  # {"a": 10, "c": 3}
+                >>> slot._data  # {"a": 10, "c": 3} (b is lost)
+            
+            Append behavior:
+                >>> slot._data = {"a": 1}
+                >>> merged = slot._merge_data({"a": 2, "b": 3})
+                >>> merged  # {"a": [1, 2], "b": [3]}
+                >>> slot._data  # {"a": [1, 2], "b": [3]}
+                >>> merged = slot._merge_data({"a": 4})
+                >>> merged  # {"a": [1, 2, 4], "b": [3]}
         """
         if self.merge_strategy == "override":
-            # 覆盖策略：新数据覆盖旧数据
+            # Override strategy: new data completely replaces old data
+            # Previous data in self._data is discarded
+            # This is the default and most common strategy
             self._data = new_data.copy()
             return self._data
+        
         elif self.merge_strategy == "append":
-            # 追加策略：数据追加到列表
+            # Append strategy: accumulate values in lists
+            # This allows collecting multiple data points over time
             merged = {}
             for key, value in new_data.items():
+                # Initialize as empty list if key doesn't exist
                 if key not in self._data:
                     self._data[key] = []
+                
+                # Convert existing value to list if it's not already a list
+                # This handles the case where first receive() had a non-list value
                 if not isinstance(self._data[key], list):
                     self._data[key] = [self._data[key]]
+                
+                # Append new value to the list
                 self._data[key].append(value)
+                
+                # Return the accumulated list for this key
                 merged[key] = self._data[key]
             return merged
+        
         elif callable(self.merge_strategy):
-            # 自定义合并函数
-            return self.merge_strategy(self._data, new_data)
+            # Custom merge function: delegate to user-provided function
+            # The function receives (old_data, new_data) and should return merged result
+            # Note: The function should not modify self._data directly
+            merged_result = self.merge_strategy(self._data, new_data)
+            
+            # Update self._data with the merged result
+            # This ensures state consistency for future merges
+            self._data = merged_result.copy() if isinstance(merged_result, dict) else merged_result
+            
+            return merged_result
+        
         else:
-            # 默认覆盖
+            # Fallback: treat unknown strategy as "override"
+            # This handles cases where merge_strategy is set to an invalid value
             self._data = new_data.copy()
             return self._data
     
     @staticmethod
     def _is_kwargs_handler(handler: Callable) -> bool:
-        """
-        检查 handler 是否接受 **kwargs
-        
+        """Check if handler accepts **kwargs.
+
         Args:
-            handler: 处理函数
-        
+            handler: Handler function.
+
         Returns:
-            如果接受 **kwargs 返回 True
+            True if handler accepts **kwargs.
         """
         import inspect
         sig = inspect.signature(handler)
@@ -184,25 +337,24 @@ class Slot(Serializable):
         return False
     
     def serialize(self) -> Dict[str, Any]:
-        """
-        序列化 Slot
-        
+        """Serialize Slot.
+
         Returns:
-            序列化后的字典
+            Serialized dictionary.
         """
         data = super().serialize()
         
-        # 保存 routine 引用（通过 routine_id）
+        # Save routine reference (via routine_id)
         if self.routine:
             data["_routine_id"] = self.routine._id
         
-        # 保存 handler 元数据（不直接序列化函数）
+        # Save handler metadata (don't serialize function directly)
         if self.handler:
             handler_data = serialize_callable(self.handler)
             if handler_data:
                 data["_handler_metadata"] = handler_data
         
-        # 处理 merge_strategy（如果是函数，也需要序列化元数据）
+        # Handle merge_strategy (if function, also serialize metadata)
         if callable(self.merge_strategy) and self.merge_strategy not in ["override", "append"]:
             strategy_data = serialize_callable(self.merge_strategy)
             if strategy_data:
@@ -212,22 +364,21 @@ class Slot(Serializable):
         return data
     
     def deserialize(self, data: Dict[str, Any]) -> None:
-        """
-        反序列化 Slot
-        
+        """Deserialize Slot.
+
         Args:
-            data: 序列化数据
+            data: Serialized data dictionary.
         """
-        # 保存 routine_id 以便后续恢复引用
+        # Save routine_id for later reference restoration
         routine_id = data.pop("_routine_id", None)
         handler_metadata = data.pop("_handler_metadata", None)
         strategy_metadata = data.pop("_merge_strategy_metadata", None)
         
-        # 反序列化基本字段
+        # Deserialize basic fields
         super().deserialize(data)
         
-        # routine 引用需要在 Flow 恢复时重建
-        # handler 和 merge_strategy 也需要在恢复时重建
+        # Routine reference needs to be restored when Flow is reconstructed
+        # Handler and merge_strategy also need to be restored
         if handler_metadata:
             self._handler_metadata = handler_metadata
         if strategy_metadata:

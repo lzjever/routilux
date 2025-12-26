@@ -10,4 +10,5 @@ This section contains practical examples demonstrating flowforge usage.
    data_processing
    error_handling_example
    state_management_example
+   concurrent_flow_demo
 

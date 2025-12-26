@@ -1,7 +1,7 @@
 """
-错误处理策略
+Error handling strategies.
 
-定义错误处理策略和重试机制。
+Defines error handling strategies and retry mechanisms.
 """
 from __future__ import annotations
 from typing import Callable, Optional, Dict, Any, List, TYPE_CHECKING
@@ -18,19 +18,19 @@ logger = logging.getLogger(__name__)
 
 
 class ErrorStrategy(Enum):
-    """错误处理策略"""
-    STOP = "stop"  # 停止执行
-    CONTINUE = "continue"  # 继续执行下一个
-    RETRY = "retry"  # 重试
-    SKIP = "skip"  # 跳过
+    """Error handling strategy enumeration."""
+    STOP = "stop"  # Stop execution
+    CONTINUE = "continue"  # Continue to next routine
+    RETRY = "retry"  # Retry the operation
+    SKIP = "skip"  # Skip the routine
 
 
 @register_serializable
 class ErrorHandler(Serializable):
-    """
-    错误处理器
+    """Error handler for managing error handling strategies and retry mechanisms.
     
-    定义错误处理策略和重试机制
+    Provides configurable error handling strategies including stop, continue, retry,
+    and skip. Supports configurable retry delays and backoff strategies.
     """
     
     def __init__(
@@ -41,18 +41,17 @@ class ErrorHandler(Serializable):
         retry_backoff: float = 2.0,
         retryable_exceptions: Optional[tuple] = None
     ):
-        """
-        初始化 ErrorHandler
-        
+        """Initialize ErrorHandler.
+
         Args:
-            strategy: 错误处理策略
-            max_retries: 最大重试次数
-            retry_delay: 初始重试延迟（秒）
-            retry_backoff: 重试延迟增长倍数
-            retryable_exceptions: 可重试的异常类型
+            strategy: Error handling strategy (string or ErrorStrategy enum).
+            max_retries: Maximum number of retry attempts.
+            retry_delay: Initial retry delay in seconds.
+            retry_backoff: Retry delay backoff multiplier.
+            retryable_exceptions: Tuple of exception types that can be retried.
         """
         super().__init__()
-        # 支持字符串或枚举
+        # Support both string and enum
         if isinstance(strategy, str):
             self.strategy: ErrorStrategy = ErrorStrategy(strategy)
         else:
@@ -63,7 +62,7 @@ class ErrorHandler(Serializable):
         self.retryable_exceptions: tuple = retryable_exceptions or (Exception,)
         self.retry_count: int = 0
         
-        # 注册可序列化字段
+        # Register serializable fields
         self.add_serializable_fields([
             "strategy", "max_retries", "retry_delay", "retry_backoff", "retry_count"
         ])
@@ -76,18 +75,17 @@ class ErrorHandler(Serializable):
         flow: 'Flow',
         context: Optional[Dict[str, Any]] = None
     ) -> bool:
-        """
-        处理错误
-        
+        """Handle an error according to the configured strategy.
+
         Args:
-            error: 异常对象
-            routine: 出错的 Routine
-            routine_id: Routine ID
-            flow: Flow 对象
-            context: 上下文信息
-        
+            error: Exception object that occurred.
+            routine: Routine where the error occurred.
+            routine_id: ID of the routine.
+            flow: Flow object managing the execution.
+            context: Optional context information.
+
         Returns:
-            如果应该继续执行返回 True，否则返回 False
+            True if execution should continue, False otherwise.
         """
         context = context or {}
         
@@ -97,7 +95,7 @@ class ErrorHandler(Serializable):
         
         elif self.strategy == ErrorStrategy.CONTINUE:
             logger.warning(f"Error in routine {routine_id}: {error}. Continuing execution.")
-            # 记录错误但继续执行
+            # Record error but continue execution
             if flow.job_state:
                 flow.job_state.record_execution(routine_id, "error_continued", {
                     "error": str(error),
@@ -114,7 +112,7 @@ class ErrorHandler(Serializable):
                     f"Retrying ({self.retry_count}/{self.max_retries}) after {delay}s..."
                 )
                 time.sleep(delay)
-                return True  # 返回 True 表示应该重试
+                return True  # Return True to indicate retry should occur
             else:
                 logger.error(
                     f"Error in routine {routine_id}: {error}. "
@@ -124,7 +122,7 @@ class ErrorHandler(Serializable):
         
         elif self.strategy == ErrorStrategy.SKIP:
             logger.warning(f"Error in routine {routine_id}: {error}. Skipping routine.")
-            # 标记为跳过
+            # Mark as skipped
             if flow.job_state:
                 flow.job_state.update_routine_state(routine_id, {
                     "status": "skipped",
@@ -135,30 +133,28 @@ class ErrorHandler(Serializable):
         return False
     
     def reset(self) -> None:
-        """重置重试计数"""
+        """Reset the retry count."""
         self.retry_count = 0
 
     def serialize(self) -> Dict[str, Any]:
-        """
-        序列化 ErrorHandler
-        
+        """Serialize the ErrorHandler.
+
         Returns:
-            序列化后的字典
+            Serialized dictionary containing error handler configuration.
         """
         data = super().serialize()
-        # ErrorStrategy 枚举需要转换为字符串
+        # ErrorStrategy enum needs to be converted to string
         if isinstance(data.get("strategy"), ErrorStrategy):
             data["strategy"] = data["strategy"].value
         return data
     
     def deserialize(self, data: Dict[str, Any]) -> None:
-        """
-        反序列化 ErrorHandler
-        
+        """Deserialize the ErrorHandler.
+
         Args:
-            data: 序列化数据
+            data: Serialized data dictionary.
         """
-        # ErrorStrategy 需要从字符串转换为枚举
+        # ErrorStrategy needs to be converted from string to enum
         if "strategy" in data and isinstance(data["strategy"], str):
             data["strategy"] = ErrorStrategy(data["strategy"])
         super().deserialize(data)

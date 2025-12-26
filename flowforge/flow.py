@@ -1,11 +1,14 @@
 """
-Flow 类
+Flow class.
 
-Flow 管理器，负责管理多个 Routine 节点和执行流程。
+Flow manager responsible for managing multiple Routine nodes and execution flow.
 """
 from __future__ import annotations
 import uuid
-from typing import Dict, Optional, Any, List, TYPE_CHECKING
+import threading
+from datetime import datetime
+from typing import Dict, Optional, Any, List, Set, Tuple, TYPE_CHECKING
+from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 
 if TYPE_CHECKING:
     from flowforge.routine import Routine
@@ -27,74 +30,173 @@ from flowforge.serialization_utils import (
 
 @register_serializable
 class Flow(Serializable):
-    """
-    Flow 管理器
+    """Flow manager for orchestrating workflow execution.
     
-    负责：
-    - 管理多个 Routine 节点
-    - 管理节点之间的连接
-    - 执行流程
-    - 持久化和恢复
+    Responsibilities:
+    - Manage multiple Routine nodes
+    - Manage connections between nodes
+    - Execute workflow
+    - Persistence and restoration
     """
     
-    def __init__(self, flow_id: Optional[str] = None):
-        """
-        初始化 Flow
-        
+    def __init__(
+        self, 
+        flow_id: Optional[str] = None,
+        execution_strategy: str = "sequential",
+        max_workers: int = 5
+    ):
+        """Initialize Flow.
+
         Args:
-            flow_id: Flow ID（如果为 None 则自动生成）
+            flow_id: Flow identifier (auto-generated if None).
+            execution_strategy: Execution strategy, "sequential" or "concurrent".
+            max_workers: Maximum number of worker threads for concurrent execution.
         """
         super().__init__()
         self.flow_id: str = flow_id or str(uuid.uuid4())
-        self.routines: Dict[str, 'Routine'] = {}  # routine_id -> Routine
-        self.connections: List['Connection'] = []  # 连接列表
-        self.job_state: Optional['JobState'] = None  # 当前作业状态
-        self._current_flow: Optional['Flow'] = None  # 当前执行的 flow（用于上下文）
-        self.execution_tracker: Optional['ExecutionTracker'] = None  # 执行跟踪器
-        self.error_handler: Optional['ErrorHandler'] = None  # 错误处理器
-        self._paused: bool = False  # 是否暂停
+        self.routines: Dict[str, 'Routine'] = {}
+        self.connections: List['Connection'] = []
+        self.job_state: Optional['JobState'] = None
+        self._current_flow: Optional['Flow'] = None
+        self.execution_tracker: Optional['ExecutionTracker'] = None
+        self.error_handler: Optional['ErrorHandler'] = None
+        self._paused: bool = False
         
-        # 注册可序列化字段
-        # 注意：routines 和 connections 的序列化需要特殊处理（在 serialize 方法中）
+        # Concurrent execution related
+        self.execution_strategy: str = execution_strategy
+        self.max_workers: int = max_workers
+        self._concurrent_executor: Optional[ThreadPoolExecutor] = None
+        self._execution_lock: threading.Lock = threading.Lock()
+        self._dependency_graph: Optional[Dict[str, Set[str]]] = None
+        self._active_futures: Set[Future] = set()
+        
+        # Register serializable fields
+        # Note: routines and connections require special handling in serialize method
         self.add_serializable_fields([
-            "flow_id", "routines", "connections", "job_state", "_paused"
+            "flow_id", "routines", "connections", "job_state", "_paused",
+            "execution_strategy", "max_workers"
         ])
         
-        # 维护 event -> connection 的映射，用于快速查找
-        # 注意：_event_slot_connections 不需要持久化，可以从 connections 重建
-        self._event_slot_connections: Dict[tuple, 'Connection'] = {}  # (event, slot) -> Connection
+        # Maintain event -> connection mapping for fast lookup
+        # Note: _event_slot_connections doesn't need persistence, can be rebuilt from connections
+        self._event_slot_connections: Dict[tuple, 'Connection'] = {}
     
     def __repr__(self) -> str:
-        """返回对象的字符串表示"""
+        """Return string representation of the Flow."""
         return f"Flow[{self.flow_id}]"
     
-    def _find_connection(self, event: 'Event', slot: 'Slot') -> Optional['Connection']:
-        """
-        查找 event 到 slot 的 Connection
-        
+    def set_execution_strategy(self, strategy: str, max_workers: Optional[int] = None) -> None:
+        """Set execution strategy.
+
         Args:
-            event: Event 对象
-            slot: Slot 对象
+            strategy: Execution strategy, "sequential" or "concurrent".
+            max_workers: Maximum number of worker threads (only effective in concurrent mode).
+        """
+        if strategy not in ["sequential", "concurrent"]:
+            raise ValueError(f"Invalid execution strategy: {strategy}. Must be 'sequential' or 'concurrent'")
         
+        self.execution_strategy = strategy
+        if max_workers is not None:
+            self.max_workers = max_workers
+        
+        # If switching to concurrent mode, ensure thread pool is created
+        if strategy == "concurrent" and self._concurrent_executor is None:
+            self._get_executor()
+    
+    def _get_executor(self) -> ThreadPoolExecutor:
+        """Get or create thread pool executor.
+
         Returns:
-            Connection 对象，如果不存在则返回 None
+            ThreadPoolExecutor instance.
+        """
+        if self._concurrent_executor is None:
+            self._concurrent_executor = ThreadPoolExecutor(max_workers=self.max_workers)
+        return self._concurrent_executor
+    
+    def _get_routine_id(self, routine: 'Routine') -> Optional[str]:
+        """Find the ID of a Routine object within this Flow.
+
+        Args:
+            routine: Routine object.
+
+        Returns:
+            Routine ID if found, None otherwise.
+        """
+        for rid, r in self.routines.items():
+            if r is routine:
+                return rid
+        return None
+    
+    def _build_dependency_graph(self) -> Dict[str, Set[str]]:
+        """Build routine dependency graph.
+
+        Determines dependencies by analyzing connections:
+        - If A.event -> B.slot, then B depends on A (B must wait for A to complete).
+
+        Returns:
+            Dependency graph dictionary: {routine_id: {dependent routine_ids}}.
+        """
+        graph = {rid: set() for rid in self.routines.keys()}
+        
+        for conn in self.connections:
+            source_rid = self._get_routine_id(conn.source_event.routine)
+            target_rid = self._get_routine_id(conn.target_slot.routine)
+            
+            if source_rid and target_rid and source_rid != target_rid:
+                graph[target_rid].add(source_rid)
+        
+        return graph
+    
+    def _get_ready_routines(
+        self, 
+        completed: Set[str], 
+        dependency_graph: Dict[str, Set[str]],
+        running: Set[str]
+    ) -> List[str]:
+        """Get routines ready for execution (all dependencies completed and not running).
+
+        Args:
+            completed: Set of completed routine IDs.
+            dependency_graph: Dependency graph.
+            running: Set of currently running routine IDs.
+
+        Returns:
+            List of routine IDs ready for execution.
+        """
+        ready = []
+        for routine_id, dependencies in dependency_graph.items():
+            # Check: all dependencies completed, and currently not running
+            if (dependencies.issubset(completed) and 
+                routine_id not in completed and 
+                routine_id not in running):
+                ready.append(routine_id)
+        return ready
+    
+    def _find_connection(self, event: 'Event', slot: 'Slot') -> Optional['Connection']:
+        """Find Connection from event to slot.
+
+        Args:
+            event: Event object.
+            slot: Slot object.
+
+        Returns:
+            Connection object if found, None otherwise.
         """
         key = (event, slot)
         return self._event_slot_connections.get(key)
     
     def add_routine(self, routine: 'Routine', routine_id: Optional[str] = None) -> str:
-        """
-        添加一个 routine 到 flow
-        
+        """Add a routine to the flow.
+
         Args:
-            routine: Routine 对象
-            routine_id: Routine ID（如果为 None 则使用 routine._id）
-        
+            routine: Routine object.
+            routine_id: Routine ID (uses routine._id if None).
+
         Returns:
-            Routine ID
-        
+            Routine ID.
+
         Raises:
-            ValueError: 如果 routine_id 已存在
+            ValueError: If routine_id already exists.
         """
         rid = routine_id or routine._id
         if rid in self.routines:
@@ -111,23 +213,22 @@ class Flow(Serializable):
         target_slot: str,
         param_mapping: Optional[Dict[str, str]] = None
     ) -> 'Connection':
-        """
-        连接两个 routine
-        
+        """Connect two routines.
+
         Args:
-            source_routine_id: 源 Routine ID
-            source_event: 源 Event 名称
-            target_routine_id: 目标 Routine ID
-            target_slot: 目标 Slot 名称
-            param_mapping: 参数映射字典
-        
+            source_routine_id: Source routine identifier.
+            source_event: Source event name.
+            target_routine_id: Target routine identifier.
+            target_slot: Target slot name.
+            param_mapping: Parameter mapping dictionary.
+
         Returns:
-            Connection 对象
-        
+            Connection object.
+
         Raises:
-            ValueError: 如果 routine、event 或 slot 不存在
+            ValueError: If routine, event, or slot does not exist.
         """
-        # 验证源 routine
+        # Validate source routine
         if source_routine_id not in self.routines:
             raise ValueError(f"Source routine '{source_routine_id}' not found in flow")
         
@@ -136,7 +237,7 @@ class Flow(Serializable):
         if source_event_obj is None:
             raise ValueError(f"Event '{source_event}' not found in routine '{source_routine_id}'")
         
-        # 验证目标 routine
+        # Validate target routine
         if target_routine_id not in self.routines:
             raise ValueError(f"Target routine '{target_routine_id}' not found in flow")
         
@@ -145,38 +246,37 @@ class Flow(Serializable):
         if target_slot_obj is None:
             raise ValueError(f"Slot '{target_slot}' not found in routine '{target_routine_id}'")
         
-        # 创建连接
+        # Create connection
         from flowforge.connection import Connection
         connection = Connection(source_event_obj, target_slot_obj, param_mapping)
         self.connections.append(connection)
         
-        # 维护映射关系
+        # Maintain mapping
         key = (source_event_obj, target_slot_obj)
         self._event_slot_connections[key] = connection
         
         return connection
     
     def set_error_handler(self, error_handler: 'ErrorHandler') -> None:
-        """
-        设置错误处理器
-        
+        """Set error handler.
+
         Args:
-            error_handler: ErrorHandler 对象
+            error_handler: ErrorHandler object.
         """
         self.error_handler = error_handler
     
     def pause(self, reason: str = "", checkpoint: Optional[Dict[str, Any]] = None) -> None:
-        """
-        暂停执行
-        
-        这是暂停执行的主要入口点。JobState 只负责状态记录，执行控制由 Flow 负责。
-        
+        """Pause execution.
+
+        This is the main entry point for pausing execution. JobState is only
+        responsible for state recording, while execution control is managed by Flow.
+
         Args:
-            reason: 暂停原因
-            checkpoint: 检查点数据（可选）
-        
+            reason: Reason for pausing.
+            checkpoint: Optional checkpoint data.
+
         Raises:
-            ValueError: 如果没有正在执行的 job_state
+            ValueError: If there is no active job_state.
         """
         if not self.job_state:
             raise ValueError("No active job_state to pause. Flow must be executing.")
@@ -187,25 +287,49 @@ class Flow(Serializable):
     def execute(
         self,
         entry_routine_id: str,
-        entry_params: Optional[Dict[str, Any]] = None
+        entry_params: Optional[Dict[str, Any]] = None,
+        execution_strategy: Optional[str] = None
     ) -> 'JobState':
-        """
-        执行 flow
-        
+        """Execute the flow.
+
         Args:
-            entry_routine_id: 入口 Routine ID
-            entry_params: 入口参数
-        
+            entry_routine_id: Entry routine identifier.
+            entry_params: Entry parameters.
+            execution_strategy: Execution strategy (optional, overrides default).
+
         Returns:
-            JobState 对象
-        
+            JobState object.
+
         Raises:
-            ValueError: 如果 entry_routine_id 不存在
+            ValueError: If entry_routine_id does not exist.
         """
         if entry_routine_id not in self.routines:
             raise ValueError(f"Entry routine '{entry_routine_id}' not found in flow")
         
-        # 创建 JobState
+        # Determine execution strategy to use
+        strategy = execution_strategy or self.execution_strategy
+        
+        # Select execution method based on strategy
+        if strategy == "concurrent":
+            return self._execute_concurrent(entry_routine_id, entry_params)
+        else:
+            return self._execute_sequential(entry_routine_id, entry_params)
+    
+    def _execute_sequential(
+        self,
+        entry_routine_id: str,
+        entry_params: Optional[Dict[str, Any]] = None
+    ) -> 'JobState':
+        """Execute Flow sequentially (original logic).
+
+        Args:
+            entry_routine_id: Entry routine identifier.
+            entry_params: Entry parameters.
+
+        Returns:
+            JobState object.
+        """
+        # Create JobState
         from flowforge.job_state import JobState
         from flowforge.execution_tracker import ExecutionTracker
         
@@ -214,33 +338,33 @@ class Flow(Serializable):
         job_state.current_routine_id = entry_routine_id
         self.job_state = job_state
         
-        # 创建执行跟踪器
+        # Create execution tracker
         self.execution_tracker = ExecutionTracker(self.flow_id)
         
         entry_params = entry_params or {}
         
         try:
-            # 执行入口 routine（传递 flow 以便事件可以通过 Connection 传递）
+            # Execute entry routine (pass flow so events can be transmitted via Connection)
             entry_routine = self.routines[entry_routine_id]
             
-            # 设置 flow 上下文到所有 routines，让 emit 可以访问
+            # Set flow context to all routines so emit can access it
             for routine in self.routines.values():
                 routine._current_flow = self
             
-            # 记录开始执行
+            # Record execution start
             from datetime import datetime
             start_time = datetime.now()
             job_state.record_execution(entry_routine_id, "start", entry_params)
             self.execution_tracker.record_routine_start(entry_routine_id, entry_params)
             
-            # 执行入口 routine
+            # Execute entry routine
             entry_routine(**entry_params)
             
-            # 计算执行时间
+            # Calculate execution time
             end_time = datetime.now()
             execution_time = (end_time - start_time).total_seconds()
             
-            # 更新状态
+            # Update state
             job_state.update_routine_state(entry_routine_id, {
                 "status": "completed",
                 "stats": entry_routine.stats(),
@@ -249,7 +373,7 @@ class Flow(Serializable):
                 "end_time": end_time.isoformat()
             })
             
-            # 记录完成
+            # Record completion
             job_state.record_execution(entry_routine_id, "completed", {
                 "execution_time": execution_time
             })
@@ -258,13 +382,13 @@ class Flow(Serializable):
             job_state.status = "completed"
             
         except Exception as e:
-            # 使用错误处理器处理错误
+            # Use error handler to process error
             if self.error_handler:
                 should_continue = self.error_handler.handle_error(
                     e, entry_routine, entry_routine_id, self
                 )
                 
-                # 如果是继续策略，标记为完成
+                # If continue strategy, mark as completed
                 if self.error_handler.strategy.value == "continue":
                     job_state.status = "completed"
                     job_state.update_routine_state(entry_routine_id, {
@@ -274,17 +398,17 @@ class Flow(Serializable):
                     })
                     return job_state
                 
-                # 如果是跳过策略，标记为完成
+                # If skip strategy, mark as completed
                 if self.error_handler.strategy.value == "skip":
                     job_state.status = "completed"
                     return job_state
                 
-                # 如果是重试策略
+                # If retry strategy
                 if should_continue and self.error_handler.strategy.value == "retry":
-                    # 重试逻辑（handle_error 已经增加了 retry_count，这里继续重试）
-                    # max_retries 表示最大重试次数，所以总共尝试次数 = 1 + max_retries
+                    # Retry logic (handle_error already incremented retry_count, continue retrying here)
+                    # max_retries represents maximum retry count, so total attempts = 1 + max_retries
                     retry_success = False
-                    # 已经尝试了 1 次（初始调用），还需要重试 max_retries 次
+                    # Already attempted once (initial call), need to retry max_retries more times
                     remaining_retries = self.error_handler.max_retries
                     for attempt in range(remaining_retries):
                         try:
@@ -292,7 +416,7 @@ class Flow(Serializable):
                             retry_success = True
                             break
                         except Exception as retry_error:
-                            # 每次重试失败时，再次调用 handle_error 来更新 retry_count
+                            # On each retry failure, call handle_error again to update retry_count
                             if attempt < remaining_retries - 1:
                                 should_continue_retry = self.error_handler.handle_error(
                                     retry_error, entry_routine, entry_routine_id, self
@@ -301,12 +425,12 @@ class Flow(Serializable):
                                     e = retry_error
                                     break
                             else:
-                                # 最后一次重试失败
+                                # Last retry failed
                                 e = retry_error
                                 break
                     
                     if retry_success:
-                        # 重试成功，继续正常流程
+                        # Retry succeeded, continue normal flow
                         end_time = datetime.now()
                         execution_time = (end_time - start_time).total_seconds()
                         job_state.update_routine_state(entry_routine_id, {
@@ -323,9 +447,9 @@ class Flow(Serializable):
                             self.execution_tracker.record_routine_end(entry_routine_id, "completed")
                         job_state.status = "completed"
                         return job_state
-                    # 重试失败，继续错误处理（会执行下面的默认错误处理）
+                    # Retry failed, continue error handling (will execute default error handling below)
             
-            # 默认错误处理（如果没有错误处理器或策略是 STOP）
+            # Default error handling (if no error handler or strategy is STOP)
             from datetime import datetime
             error_time = datetime.now()
             job_state.status = "failed"
@@ -334,7 +458,7 @@ class Flow(Serializable):
                 "error": str(e),
                 "error_time": error_time.isoformat()
             })
-            # 记录错误到执行历史
+            # Record error to execution history
             job_state.record_execution(entry_routine_id, "error", {
                 "error": str(e),
                 "error_type": type(e).__name__
@@ -348,20 +472,80 @@ class Flow(Serializable):
         
         return job_state
     
-    def resume(self, job_state: Optional['JobState'] = None) -> 'JobState':
-        """
-        恢复执行（从暂停或保存的状态）
-        
-        这是恢复执行的主要入口点。JobState 只负责状态记录，执行控制由 Flow 负责。
-        
+    def _execute_concurrent(
+        self,
+        entry_routine_id: str,
+        entry_params: Optional[Dict[str, Any]] = None
+    ) -> 'JobState':
+        """Execute Flow concurrently.
+
+        In concurrent mode, routines triggered by Event.emit execute concurrently.
+        Entry routine still executes synchronously to trigger event flow.
+
         Args:
-            job_state: 要恢复的 JobState（如果为 None 则使用当前的 job_state）
-        
+            entry_routine_id: Entry routine identifier.
+            entry_params: Entry parameters.
+
         Returns:
-            更新后的 JobState
+            JobState object.
+        """
+        # Concurrent execution is mainly implemented by modifying Event.emit behavior
+        # Here we just ensure Flow is in concurrent mode, then use sequential execution logic
+        # Actual concurrency is handled in Event.emit
         
+        # Temporarily use sequential execution but mark as concurrent mode
+        # Event.emit will check flow.execution_strategy to decide whether to execute concurrently
+        return self._execute_sequential(entry_routine_id, entry_params)
+    
+    def _execute_routine_safe(
+        self,
+        routine_id: str,
+        routine: 'Routine',
+        params: Dict[str, Any],
+        start_time: 'datetime'
+    ) -> Tuple[str, Any, Optional[Exception], float]:
+        """Execute routine in a thread-safe manner.
+
+        Args:
+            routine_id: Routine identifier.
+            routine: Routine object.
+            params: Execution parameters.
+            start_time: Start time.
+
+        Returns:
+            Tuple of (routine_id, result, error, execution_time).
+        """
+        from datetime import datetime
+        
+        result = None
+        error = None
+        
+        try:
+            # Execute routine (outside lock to avoid blocking)
+            result = routine(**params)
+        except Exception as e:
+            error = e
+        
+        # Calculate execution time
+        end_time = datetime.now()
+        execution_time = (end_time - start_time).total_seconds()
+        
+        return (routine_id, result, error, execution_time)
+    
+    def resume(self, job_state: Optional['JobState'] = None) -> 'JobState':
+        """Resume execution from paused or saved state.
+
+        This is the main entry point for resuming execution. JobState is only
+        responsible for state recording, while execution control is managed by Flow.
+
+        Args:
+            job_state: JobState to resume (uses current job_state if None).
+
+        Returns:
+            Updated JobState.
+
         Raises:
-            ValueError: 如果 job_state 的 flow_id 不匹配或 routine 不存在
+            ValueError: If job_state flow_id doesn't match or routine doesn't exist.
         """
         if job_state is None:
             job_state = self.job_state
@@ -372,33 +556,33 @@ class Flow(Serializable):
         if job_state.flow_id != self.flow_id:
             raise ValueError(f"JobState flow_id '{job_state.flow_id}' does not match Flow flow_id '{self.flow_id}'")
         
-        # 验证当前 routine 存在
+        # Validate current routine exists
         if job_state.current_routine_id and job_state.current_routine_id not in self.routines:
             raise ValueError(f"Current routine '{job_state.current_routine_id}' not found in flow")
         
-        # 恢复状态（由 Flow 控制）
+        # Restore state (controlled by Flow)
         job_state._set_running()
         self._paused = False
         self.job_state = job_state
         
-        # 恢复 routine 状态
+        # Restore routine states
         for routine_id, routine_state in job_state.routine_states.items():
             if routine_id in self.routines:
                 routine = self.routines[routine_id]
-                # 恢复 routine 的状态
+                # Restore routine state
                 if "stats" in routine_state:
                     routine._stats.update(routine_state["stats"])
         
-        # 从当前 routine 继续执行
+        # Continue execution from current routine
         if job_state.current_routine_id:
             try:
                 routine = self.routines[job_state.current_routine_id]
                 
-                # 设置 flow 上下文
+                # Set flow context
                 for r in self.routines.values():
                     r._current_flow = self
                 
-                # 执行 routine
+                # Execute routine
                 routine()
                 
                 job_state.status = "completed"
@@ -407,7 +591,7 @@ class Flow(Serializable):
                     "stats": routine.stats()
                 })
             except Exception as e:
-                # 使用错误处理器
+                # Use error handler
                 if self.error_handler:
                     should_continue = self.error_handler.handle_error(
                         e, routine, job_state.current_routine_id, self
@@ -425,38 +609,139 @@ class Flow(Serializable):
         return job_state
     
     def cancel(self, reason: str = "") -> None:
-        """
-        取消执行
-        
-        这是取消执行的主要入口点。JobState 只负责状态记录，执行控制由 Flow 负责。
-        
+        """Cancel execution.
+
+        This is the main entry point for canceling execution. JobState is only
+        responsible for state recording, while execution control is managed by Flow.
+
         Args:
-            reason: 取消原因
-        
+            reason: Reason for cancellation.
+
         Raises:
-            ValueError: 如果没有正在执行的 job_state
+            ValueError: If there is no active job_state.
         """
         if not self.job_state:
             raise ValueError("No active job_state to cancel. Flow must be executing.")
         
         self.job_state._set_cancelled(reason=reason)
-        self._paused = False  # 取消时清除暂停标志
+        self._paused = False  # Clear pause flag when canceling
+        
+        # If in concurrent mode, cancel all running tasks
+        if self.execution_strategy == "concurrent":
+            with self._execution_lock:
+                for future in self._active_futures.copy():
+                    future.cancel()
+                self._active_futures.clear()
+    
+    def wait_for_completion(self, timeout: Optional[float] = None) -> bool:
+        """Wait for all concurrent tasks to complete.
+
+        In concurrent execution mode, this method waits for all active futures to complete.
+        This is useful for ensuring all asynchronous tasks complete before program exit.
+
+        Args:
+            timeout: Timeout in seconds (infinite wait if None).
+
+        Returns:
+            True if all tasks completed before timeout, False otherwise.
+        """
+        if self.execution_strategy != "concurrent":
+            return True  # Sequential execution mode doesn't need to wait
+        
+        import time as time_module
+        
+        start_time = time_module.time() if timeout else None
+        check_interval = 0.05  # Check interval in seconds
+        max_empty_checks = 5  # Consecutive empty checks before considering complete
+        empty_check_count = 0
+        
+        # Loop until all futures complete
+        while True:
+            # Check timeout
+            if start_time and timeout:
+                elapsed = time_module.time() - start_time
+                if elapsed >= timeout:
+                    # Timeout, check if any remain incomplete
+                    with self._execution_lock:
+                        remaining = [f for f in self._active_futures if not f.done()]
+                    return len(remaining) == 0
+            
+            # Get all currently active futures and check completion status
+            with self._execution_lock:
+                futures_to_wait = list(self._active_futures)
+            
+            if not futures_to_wait:
+                # No active futures
+                empty_check_count += 1
+                if empty_check_count >= max_empty_checks:
+                    # Multiple consecutive empty checks, all tasks completed
+                    return True
+                # Brief wait in case new futures are being added
+                time_module.sleep(check_interval)
+                continue
+            
+            # Active futures exist, reset empty check count
+            empty_check_count = 0
+            
+            # Check if all futures are completed
+            all_done = True
+            for future in futures_to_wait:
+                if not future.done():
+                    all_done = False
+                    break
+            
+            if all_done:
+                # All futures completed, but new ones might be added
+                # Wait a bit longer to ensure no new futures
+                time_module.sleep(check_interval)
+                # Check again
+                with self._execution_lock:
+                    futures_to_wait = list(self._active_futures)
+                    if not futures_to_wait:
+                        return True
+            else:
+                # Still have incomplete futures, wait and check again
+                time_module.sleep(check_interval)
+    
+    def shutdown(self, wait: bool = True, timeout: Optional[float] = None) -> None:
+        """Shutdown Flow's concurrent executor.
+
+        In concurrent mode, this method waits for all tasks to complete (if wait=True),
+        then shuts down the thread pool. This is important for proper resource cleanup
+        before program exit.
+
+        Args:
+            wait: Whether to wait for all tasks to complete.
+            timeout: Wait timeout in seconds (only effective when wait=True).
+        """
+        if self.execution_strategy != "concurrent" or self._concurrent_executor is None:
+            return
+        
+        if wait:
+            self.wait_for_completion(timeout=timeout)
+        
+        # Shutdown thread pool
+        self._concurrent_executor.shutdown(wait=wait)
+        self._concurrent_executor = None
+        
+        # Clear futures set
+        with self._execution_lock:
+            self._active_futures.clear()
     
     def serialize(self) -> Dict[str, Any]:
-        """
-        序列化 Flow，包括所有 routines 和 connections
-        
+        """Serialize Flow, including all routines and connections.
+
         Returns:
-            序列化后的字典
+            Serialized dictionary containing flow data.
         """
-        # 先调用父类的 serialize，这会处理注册的字段
-        # 但我们需要特殊处理 routines 和 connections
+        # First call parent serialize, which handles registered fields
+        # But we need special handling for routines and connections
         data = {}
         
-        # 序列化基本字段
+        # Serialize basic fields
         for field in self.fields_to_serialize:
             if field in ["routines", "connections"]:
-                continue  # 这些字段需要特殊处理
+                continue  # These fields require special handling
             value = getattr(self, field, None)
             if isinstance(value, Serializable):
                 data[field] = value.serialize()
@@ -473,10 +758,10 @@ class Flow(Serializable):
             else:
                 data[field] = value
         
-        # 添加类型信息
+        # Add type information
         data["_type"] = type(self).__name__
         
-        # 序列化 routines（完整信息）
+        # Serialize routines (complete information)
         routines_data = {}
         for routine_id, routine in self.routines.items():
             routine_data = routine.serialize()
@@ -485,12 +770,12 @@ class Flow(Serializable):
         
         data["routines"] = routines_data
         
-        # 序列化 connections（需要保存 Flow 中的 routine_id，而不是 routine._id）
+        # Serialize connections (need to save Flow's routine_id, not routine._id)
         connections_data = []
         for connection in self.connections:
             conn_data = connection.serialize()
             
-            # 查找 Flow 中的 routine_id
+            # Find routine_id in Flow
             source_routine_id = None
             target_routine_id = None
             
@@ -500,7 +785,7 @@ class Flow(Serializable):
                 if routine == connection.target_slot.routine:
                     target_routine_id = rid
             
-            # 使用 Flow 中的 routine_id 覆盖
+            # Override with Flow's routine_id
             if source_routine_id:
                 conn_data["_source_routine_id"] = source_routine_id
             if target_routine_id:
@@ -513,23 +798,22 @@ class Flow(Serializable):
         return data
     
     def deserialize(self, data: Dict[str, Any]) -> None:
-        """
-        反序列化 Flow，恢复所有 routines 和 connections
-        
+        """Deserialize Flow, restoring all routines and connections.
+
         Args:
-            data: 序列化数据
+            data: Serialized data dictionary.
         """
-        # 先反序列化基本字段（排除需要特殊处理的字段）
+        # First deserialize basic fields (excluding fields requiring special handling)
         basic_data = {k: v for k, v in data.items() if k not in ["routines", "connections", "job_state", "_type"]}
         
-        # 处理 job_state（如果存在）
+        # Handle job_state if present
         if "job_state" in data and data["job_state"]:
             from flowforge.job_state import JobState
             from datetime import datetime
             
             job_state_data = data["job_state"].copy()
             
-            # 处理 datetime
+            # Handle datetime
             if isinstance(job_state_data.get("created_at"), str):
                 job_state_data["created_at"] = datetime.fromisoformat(job_state_data["created_at"])
             if isinstance(job_state_data.get("updated_at"), str):
@@ -539,33 +823,40 @@ class Flow(Serializable):
             job_state.deserialize(job_state_data)
             basic_data["job_state"] = job_state
         
-        # 调用父类的 deserialize 处理基本字段
+        # Call parent deserialize to handle basic fields
         super().deserialize(basic_data)
         
-        # 恢复 routines
+        # Restore concurrent execution related (if deserialized as concurrent mode, need to reinitialize)
+        if self.execution_strategy == "concurrent":
+            self._execution_lock = threading.Lock()
+            self._dependency_graph = None
+            self._active_futures = set()  # Initialize futures tracking set
+            # Thread pool will be created when needed, not here
+        
+        # Restore routines
         if "routines" in data:
             routines_data = data["routines"]
             self.routines = {}
             
-            # 第一遍：创建所有 routine 实例
+            # First pass: create all routine instances
             for routine_id, routine_data in routines_data.items():
                 class_info = routine_data.get("_class_info", {})
                 routine_class = load_routine_class(class_info)
                 
                 if routine_class:
-                    # 创建 routine 实例
+                    # Create routine instance
                     routine = routine_class()
-                    # 反序列化 routine（不包括 slots 和 events 的引用）
+                    # Deserialize routine (excluding slots and events references)
                     routine.deserialize(routine_data)
                     self.routines[routine_id] = routine
                 else:
-                    # 如果无法加载类，创建一个基本的 Routine 实例
-                    # 但仍然尝试恢复 slots 和 events
+                    # If class cannot be loaded, create a basic Routine instance
+                    # But still try to restore slots and events
                     from flowforge.routine import Routine
                     routine = Routine()
                     routine._id = routine_data.get("_id", routine_id)
                     routine._stats = routine_data.get("_stats", {})
-                    # 恢复 slots 和 events 的基本结构
+                    # Restore basic structure of slots and events
                     if "_slots" in routine_data:
                         from flowforge.slot import Slot
                         for slot_name, slot_data in routine_data["_slots"].items():
@@ -586,18 +877,18 @@ class Flow(Serializable):
                             routine._events[event_name] = event
                     self.routines[routine_id] = routine
             
-            # 第二遍：恢复 slots 的 handler 和 merge_strategy
+            # Second pass: restore slots' handlers and merge_strategy
             for routine_id, routine_data in routines_data.items():
                 routine = self.routines.get(routine_id)
                 if not routine:
                     continue
                 
-                # 恢复 slots 的 handler
+                # Restore slots' handlers
                 if "_slots" in routine_data:
                     for slot_name, slot_data in routine_data["_slots"].items():
                         slot = routine._slots.get(slot_name)
                         if slot:
-                            # 恢复 handler
+                            # Restore handler
                             if "_handler_metadata" in slot_data:
                                 handler = deserialize_callable(
                                     slot_data["_handler_metadata"],
@@ -606,7 +897,7 @@ class Flow(Serializable):
                                 if handler:
                                     slot.handler = handler
                             
-                            # 恢复 merge_strategy
+                            # Restore merge_strategy
                             if "_merge_strategy_metadata" in slot_data:
                                 strategy = deserialize_callable(
                                     slot_data["_merge_strategy_metadata"],
@@ -615,11 +906,11 @@ class Flow(Serializable):
                                 if strategy:
                                     slot.merge_strategy = strategy
                             
-                            # 清理临时数据
+                            # Clean up temporary data
                             if hasattr(slot, "_serialized_data"):
                                 delattr(slot, "_serialized_data")
         
-        # 恢复 connections
+        # Restore connections
         if "connections" in data:
             from flowforge.connection import Connection
             
@@ -629,7 +920,7 @@ class Flow(Serializable):
                 connection = Connection()
                 connection.deserialize(conn_data)
                 
-                # 重建引用关系
+                # Rebuild reference relationships
                 source_routine_id = getattr(connection, "_source_routine_id", None)
                 source_event_name = getattr(connection, "_source_event_name", None)
                 target_routine_id = getattr(connection, "_target_routine_id", None)
@@ -649,16 +940,16 @@ class Flow(Serializable):
                         if target_slot:
                             connection.target_slot = target_slot
                 
-                # 如果成功重建引用，添加到 connections
+                # If successfully rebuilt references, add to connections
                 if connection.source_event and connection.target_slot:
-                    # 建立双向连接（如果还没有建立）
+                    # Establish bidirectional connection (if not already established)
                     if connection.target_slot not in connection.source_event.connected_slots:
                         connection.source_event.connect(connection.target_slot)
                     if connection.source_event not in connection.target_slot.connected_events:
                         connection.target_slot.connect(connection.source_event)
                     
                     self.connections.append(connection)
-                    # 重建映射
+                    # Rebuild mapping
                     key = (connection.source_event, connection.target_slot)
                     self._event_slot_connections[key] = connection
 

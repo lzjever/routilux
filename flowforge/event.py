@@ -1,7 +1,7 @@
 """
-Event 类
+Event class.
 
-输出事件，用于向其他 routine 发送数据。
+Output events for sending data to other routines.
 """
 from __future__ import annotations
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
@@ -16,10 +16,10 @@ from flowforge.utils.serializable import register_serializable, Serializable
 
 @register_serializable
 class Event(Serializable):
-    """
-    输出事件
+    """Output event for transmitting data to other routines.
     
-    一个 event 可以连接到多个 slots（多对多关系）
+    An Event can be connected to multiple Slots (many-to-many relationship),
+    allowing data to be broadcast to multiple receivers simultaneously.
     """
     
     def __init__(
@@ -28,106 +28,153 @@ class Event(Serializable):
         routine: Optional['Routine'] = None,
         output_params: Optional[List[str]] = None
     ):
-        """
-        初始化 Event
-        
+        """Initialize an Event.
+
         Args:
-            name: 事件名称
-            routine: 所属的 Routine 对象
-            output_params: 输出参数列表（用于文档化）
+            name: Event name.
+            routine: Parent Routine object.
+            output_params: List of output parameter names (for documentation).
         """
         super().__init__()
         self.name: str = name
         self.routine: 'Routine' = routine
-        self.output_params: List[str] = output_params or []  # 输出参数列表
-        self.connected_slots: List['Slot'] = []  # 连接的 slots
+        self.output_params: List[str] = output_params or []
+        self.connected_slots: List['Slot'] = []
         
-        # 注册可序列化字段
+        # Register serializable fields
         self.add_serializable_fields(["name", "output_params"])
     
     def serialize(self) -> Dict[str, Any]:
-        """
-        序列化 Event
-        
+        """Serialize the Event.
+
         Returns:
-            序列化后的字典
+            Serialized dictionary containing event data and references.
         """
         data = super().serialize()
         
-        # 保存 routine 引用（通过 routine_id）
+        # Save routine reference (via routine_id)
         if self.routine:
             data["_routine_id"] = self.routine._id
         
         return data
     
     def deserialize(self, data: Dict[str, Any]) -> None:
-        """
-        反序列化 Event
-        
+        """Deserialize the Event.
+
         Args:
-            data: 序列化数据
+            data: Serialized data dictionary.
         """
-        # 保存 routine_id 以便后续恢复引用
+        # Save routine_id for later reference restoration
         routine_id = data.pop("_routine_id", None)
         
-        # 反序列化基本字段
+        # Deserialize basic fields
         super().deserialize(data)
         
-        # routine 引用需要在 Flow 恢复时重建
+        # Routine reference needs to be restored when Flow is reconstructed
         if routine_id:
             self._routine_id = routine_id
     
     def __repr__(self) -> str:
-        """返回对象的字符串表示"""
-        return f"Event[{self.routine._id}.{self.name}]"
+        """Return string representation of the Event."""
+        if self.routine:
+            return f"Event[{self.routine._id}.{self.name}]"
+        else:
+            return f"Event[{self.name}]"
     
     def connect(self, slot: 'Slot', param_mapping: Optional[Dict[str, str]] = None) -> None:
-        """
-        连接到一个 slot
-        
+        """Connect to a slot.
+
         Args:
-            slot: 要连接的 Slot 对象
-            param_mapping: 参数映射字典（由 Connection 管理，这里只是建立连接）
+            slot: Slot object to connect to.
+            param_mapping: Parameter mapping dictionary (managed by Connection,
+                this method only establishes the connection).
         """
         if slot not in self.connected_slots:
             self.connected_slots.append(slot)
-            # 双向连接
+            # Bidirectional connection
             if self not in slot.connected_events:
                 slot.connected_events.append(self)
     
     def disconnect(self, slot: 'Slot') -> None:
-        """
-        断开与 slot 的连接
-        
+        """Disconnect from a slot.
+
         Args:
-            slot: 要断开的 Slot 对象
+            slot: Slot object to disconnect from.
         """
         if slot in self.connected_slots:
             self.connected_slots.remove(slot)
-            # 双向断开
+            # Bidirectional disconnection
             if self in slot.connected_events:
                 slot.connected_events.remove(self)
     
     def emit(self, flow: Optional['Flow'] = None, **kwargs) -> None:
-        """
-        触发事件，向所有连接的 slots 发送数据
+        """Emit the event and send data to all connected slots.
         
+        In concurrent mode, uses a thread pool to execute connected routines concurrently.
+
         Args:
-            flow: Flow 对象（用于查找 Connection 以应用参数映射）
-            **kwargs: 要传递的数据
+            flow: Flow object (used to find Connection for parameter mapping).
+            **kwargs: Data to transmit.
         """
-        # 向所有连接的 slots 发送数据
-        for slot in self.connected_slots:
-            # 如果提供了 flow，尝试通过 Connection 传递（应用参数映射）
-            if flow is not None:
-                connection = flow._find_connection(self, slot)
-                if connection is not None:
-                    # 通过 Connection 传递，应用参数映射
-                    connection.activate(kwargs)
+        if flow is None or flow.execution_strategy != "concurrent":
+            # Sequential execution mode
+            for slot in self.connected_slots:
+                if flow is not None:
+                    connection = flow._find_connection(self, slot)
+                    if connection is not None:
+                        connection.activate(kwargs)
+                    else:
+                        slot.receive(kwargs)
                 else:
-                    # 没有找到 Connection，直接传递
                     slot.receive(kwargs)
-            else:
-                # 没有提供 flow，直接传递
-                slot.receive(kwargs)
+        else:
+            # Concurrent execution mode
+            from concurrent.futures import ThreadPoolExecutor, Future
+            
+            executor = flow._get_executor()
+            
+            # Submit task for each connected slot (asynchronous execution, non-blocking)
+            for slot in self.connected_slots:
+                def activate_slot(s=slot, f=flow, k=kwargs.copy()):
+                    """Thread-safe slot activation function."""
+                    try:
+                        if f is not None:
+                            connection = f._find_connection(self, s)
+                            if connection is not None:
+                                connection.activate(k)
+                            else:
+                                s.receive(k)
+                        else:
+                            s.receive(k)
+                    except Exception as e:
+                        import logging
+                        logging.exception(f"Error in concurrent slot activation: {e}")
+                        # Record error to routine stats
+                        if s.routine:
+                            s.routine._stats.setdefault("errors", []).append({
+                                "slot": s.name,
+                                "error": str(e)
+                            })
+                
+                # Submit task to thread pool without waiting (avoid nested waits causing deadlock)
+                future = executor.submit(activate_slot)
+                
+                # Add future to Flow's tracking set (add immediately after submission to avoid race conditions)
+                if flow is not None and hasattr(flow, '_active_futures'):
+                    with flow._execution_lock:
+                        flow._active_futures.add(future)
+                    
+                    # Add callback to automatically remove when task completes (add callback outside lock to avoid deadlock)
+                    def remove_future(fut=future, f=flow):
+                        """Remove from tracking set when task completes."""
+                        if f is not None and hasattr(f, '_active_futures'):
+                            with f._execution_lock:
+                                f._active_futures.discard(fut)
+                    
+                    # Note: If future is already done, callback executes immediately
+                    future.add_done_callback(remove_future)
+            
+            # Note: Do not wait for futures to complete, let them execute asynchronously
+            # This avoids deadlock issues with nested concurrent execution
+            # If waiting is needed, call Flow.wait_for_completion() or Flow.shutdown()
 

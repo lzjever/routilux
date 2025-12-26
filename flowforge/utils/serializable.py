@@ -3,44 +3,56 @@ import inspect
 
 
 class SerializableRegistry:
-    """A registry for serializable classes to facilitate class lookup and instantiation."""
+    """Registry for serializable classes to facilitate class lookup and instantiation."""
 
     registry = {}
 
     @classmethod
     def register_class(cls, class_name: str, class_ref: type):
-        """
-        Register a class for serialization purposes by adding it to the registry.
+        """Register a class for serialization purposes by adding it to the registry.
 
-        :param class_name: The name of the class to register.
-        :type class_name: str
-        :param class_ref: A reference to the class being registered.
-        :type class_ref: type
+        Args:
+            class_name: The name of the class to register.
+            class_ref: A reference to the class being registered.
         """
         cls.registry[class_name] = class_ref
 
     @classmethod
     def get_class(cls, class_name: str):
-        """
-        Retrieve a class reference from the registry by its name.
+        """Retrieve a class reference from the registry by its name.
 
-        :param class_name: The name of the class to retrieve.
-        :type class_name: str
-        :return: The class reference if found, None otherwise.
-        :rtype: type, optional
+        Args:
+            class_name: The name of the class to retrieve.
+
+        Returns:
+            The class reference if found, None otherwise.
         """
         return cls.registry.get(class_name)
 
 
 def register_serializable(cls):
-    """
-    Decorator to register a class as serializable in the registry.
+    """Decorator to register a class as serializable in the registry.
 
-    :param cls: Class to be registered.
-    :type cls: type
-    :return: The same class with registration completed.
-    :rtype: type
-    :raises TypeError: If the class cannot be initialized without arguments.
+    This decorator ensures that the class can be instantiated without arguments,
+    which is required for proper deserialization. It validates that __init__
+    either accepts no parameters (except self) or all parameters have default values.
+
+    Args:
+        cls: Class to be registered.
+
+    Returns:
+        The same class with registration completed.
+
+    Raises:
+        TypeError: If the class cannot be initialized without arguments.
+            This happens when __init__ has required parameters (without defaults)
+            other than 'self'. For Routine subclasses, use _config dictionary
+            instead of constructor parameters.
+
+    Note:
+        For Routine subclasses, all configuration should be stored in _config
+        dictionary and set after object creation, not passed as constructor
+        parameters. This ensures proper serialization/deserialization support.
     """
     init_signature = inspect.signature(cls.__init__)
     parameters = init_signature.parameters.values()
@@ -52,7 +64,12 @@ def register_serializable(cls):
             and param.kind != inspect.Parameter.VAR_KEYWORD
             and param.kind != inspect.Parameter.VAR_POSITIONAL
         ):
-            error_message = f"Error: {cls.__name__} cannot be initialized without parameters. Serializable classes must support initialization with no arguments."
+            error_message = (
+                f"Error: {cls.__name__} cannot be initialized without parameters. "
+                f"Serializable classes must support initialization with no arguments.\n"
+                f"For Routine subclasses, use _config dictionary instead of constructor parameters.\n"
+                f"Example: routine.set_config(key=value) or routine._config['key'] = value"
+            )
             print(error_message)
             raise TypeError(error_message)
     SerializableRegistry.register_class(cls.__name__, cls)
@@ -67,12 +84,13 @@ class Serializable:
         self.fields_to_serialize = []
 
     def add_serializable_fields(self, fields: List[str]) -> None:
-        """
-        Add field names to the list that should be included in serialization.
+        """Add field names to the list that should be included in serialization.
 
-        :param fields: List of field names to be serialized.
-        :type fields: List[str]
-        :raises ValueError: If any provided field is not a string.
+        Args:
+            fields: List of field names to be serialized.
+
+        Raises:
+            ValueError: If any provided field is not a string.
         """
         if not all(isinstance(field, str) for field in fields):
             raise ValueError("All fields must be strings")
@@ -80,22 +98,20 @@ class Serializable:
         self.fields_to_serialize = list(set(self.fields_to_serialize))
 
     def remove_serializable_fields(self, fields: List[str]) -> None:
-        """
-        Remove field names from the list that should be included in serialization.
+        """Remove field names from the list that should be included in serialization.
 
-        :param fields: List of field names to be removed.
-        :type fields: List[str]
+        Args:
+            fields: List of field names to be removed.
         """
         self.fields_to_serialize = [
             x for x in self.fields_to_serialize if x not in fields
         ]
 
     def serialize(self) -> Dict[str, Any]:
-        """
-        Serialize the object to a dictionary.
+        """Serialize the object to a dictionary.
 
-        :return: Dictionary containing all serializable fields.
-        :rtype: Dict[str, Any]
+        Returns:
+            Dictionary containing all serializable fields.
         """
         data = {"_type": type(self).__name__}
         for field in self.fields_to_serialize:
@@ -117,11 +133,10 @@ class Serializable:
         return data
 
     def deserialize(self, data: Dict[str, Any]) -> None:
-        """
-        Deserialize the object from a dictionary, restoring its state.
+        """Deserialize the object from a dictionary, restoring its state.
 
-        :param data: Dictionary containing all serializable fields.
-        :type data: Dict[str, Any]
+        Args:
+            data: Dictionary containing all serializable fields.
         """
         for key, value in data.items():
             if key == "_type":
@@ -149,7 +164,14 @@ class Serializable:
 
     @staticmethod
     def deserialize_item(item: Dict[str, Any]) -> Any:
-        """Deserialize an item"""
+        """Deserialize an item.
+
+        Args:
+            item: Item to deserialize.
+
+        Returns:
+            Deserialized item.
+        """
         if isinstance(item, dict):
             if "_type" in item:
                 attr_class = SerializableRegistry.get_class(item["_type"])

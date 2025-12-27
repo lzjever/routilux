@@ -1,86 +1,234 @@
-# flowforge 更新日志
+# FlowForge Changelog
 
-## [Unreleased]
+All notable changes to this project will be documented in this file.
 
-### 新增功能
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-- ✅ **Routine 级别的错误处理**: 支持为每个 routine 设置独立的错误处理策略，优先级高于 flow 级别
-- ✅ **Critical/Optional routine 标记**: 新增 `set_as_critical()` 和 `set_as_optional()` 便捷方法
-- ✅ **`is_critical` 标志**: ErrorHandler 新增 `is_critical` 参数，用于标记关键 routine
-- ✅ **错误处理优先级系统**: 优先级顺序为 routine-level > flow-level > default (STOP)
+## [0.8.0] - 2025-12-27
 
-### 改进
+### Added
 
-- ✅ **向后兼容**: 保持对现有代码的完全兼容，flow 级别的错误处理仍然有效
-- ✅ **Critical routine 重试失败处理**: Critical routine 在重试失败后会导致 flow 失败
+- **Routine-level error handling**: Support for setting independent error handling strategies per routine, with priority over flow-level handlers
+- **Critical/Optional routine marking**: Added `set_as_critical()` and `set_as_optional()` convenience methods for marking routines
+- **`is_critical` flag**: ErrorHandler now supports `is_critical` parameter to mark critical routines that must succeed
+- **Error handling priority system**: Priority order is routine-level > flow-level > default (STOP)
+- **Critical routine retry failure handling**: Critical routines that fail after all retries will cause the flow to fail
 
-### 文档
+### Improved
 
-- ✅ 更新错误处理文档，添加 routine 级别错误处理示例
-- ✅ 添加 critical 和 optional routine 使用模式文档
-- ✅ 明确说明 CONTINUE 和 SKIP 策略的区别
+- **Backward compatibility**: Maintained full compatibility with existing code; flow-level error handling remains effective
+- **Error handler flexibility**: Enhanced error handler configuration with better support for routine-specific overrides
+- **Documentation**: Updated error handling documentation with routine-level error handling examples
+- **Critical routine semantics**: Clarified behavior when critical routines fail after retries
 
-## [0.1.2] - 2024-12-26
+### Documentation
 
-### 新增功能
+- Added comprehensive documentation for routine-level error handling
+- Added examples for critical and optional routine usage patterns
+- Clarified differences between CONTINUE and SKIP strategies
+- Updated API reference with new error handling methods
 
-- ✅ **ErrorHandler**: 错误处理器，支持多种错误处理策略（停止、继续、重试、跳过）
-- ✅ **错误恢复策略**: 支持配置错误处理策略和重试机制
-- ✅ **暂停和恢复**: Flow 支持暂停和恢复功能
-- ✅ **取消功能**: Flow 支持取消执行
+## [0.7.0] - 2025-12-06
 
-### 改进
+### Added
 
-- ✅ **错误处理集成**: Flow.execute 集成错误处理器
-- ✅ **重试机制**: 支持自动重试，可配置重试次数和延迟
-- ✅ **暂停点记录**: 记录暂停点和检查点信息
-- ✅ **设计优化**: 优化 pause/resume/cancel 的职责分离
-  - Flow 负责执行控制（pause/resume/cancel）
-  - JobState 只负责状态记录和查询
-  - 移除 JobState 的公开 pause/resume/cancel 方法，改为内部方法
+- **Concurrent execution mode**: Added support for parallel execution of independent routines using thread pools
+- **Execution strategy configuration**: Flow now supports "sequential" and "concurrent" execution strategies
+- **Thread pool management**: Added `wait_for_completion()` and `shutdown()` methods for managing concurrent execution
+- **Dependency graph analysis**: Automatic dependency graph building for concurrent execution scheduling
+- **Built-in routines package**: Comprehensive set of reusable routines for common tasks
+  - **Text Processing**: TextClipper, TextRenderer, ResultExtractor
+  - **Data Processing**: DataTransformer, DataValidator
+  - **Control Flow**: ConditionalRouter, RetryHandler
+  - **Utilities**: TimeProvider, DataFlattener
+- **Built-in routine architecture**: Common base patterns for consistent routine implementation
 
-## [0.1.1] - 2024-12-26
+### Improved
 
-### 新增功能
+- **Event emission in concurrent mode**: Events now trigger parallel slot handler execution when in concurrent mode
+- **Thread safety**: Added proper locking mechanisms for thread-safe state management
+- **Future tracking**: Automatic tracking and cleanup of concurrent task futures
+- **Performance**: Optimized concurrent execution with proper resource management
 
-- ✅ **ExecutionTracker**: 执行跟踪器，跟踪 flow 的执行状态、性能和事件流
-- ✅ **执行历史记录**: 自动记录所有 emit 的事件到 JobState
-- ✅ **性能指标**: 支持获取 routine 和 flow 的性能指标
-- ✅ **详细状态跟踪**: 记录执行时间、开始/结束时间等详细信息
+### Documentation
 
-### 改进
+- Added concurrent execution guide
+- Documented all built-in routines with examples
+- Added best practices for concurrent workflow design
+- Updated examples with concurrent execution patterns
 
-- ✅ **错误处理**: 更完善的错误记录和处理
-- ✅ **执行时间跟踪**: 自动计算和记录每个 routine 的执行时间
-- ✅ **事件流跟踪**: 记录所有事件的触发和传递
+## [0.6.0] - 2025-11-08
 
-## [0.1.0] - 2024-01-XX
+### Added
 
-### 新增功能
+- **Full serialization support**: Complete serialization/deserialization for Flow, Routine, Slot, Event, Connection, and JobState
+- **Persistence capabilities**: Flow and JobState can be saved to and loaded from files
+- **Serializable base class**: New Serializable utility class with automatic field registration
+- **Serialization validation**: Pre-serialization validation to catch issues early
+- **Callable serialization**: Support for serializing and deserializing handler functions and merge strategies
+- **Class information tracking**: Automatic tracking of routine class information for proper deserialization
+- **JobState persistence**: `save()` and `load()` methods for JobState persistence
 
-- ✅ **Routine 基类**: 支持定义 slots 和 events，提供 stats() 方法
-- ✅ **Slot 类**: 输入插槽，支持连接多个 events，数据接收和处理
-- ✅ **Event 类**: 输出事件，支持连接多个 slots，事件触发
-- ✅ **Connection 类**: 连接对象，支持参数映射
-- ✅ **Flow 类**: Flow 管理器，支持流程编排、执行和恢复
-- ✅ **JobState 类**: 作业状态管理，支持状态记录和持久化
-- ✅ **ExecutionRecord 类**: 执行记录
+### Improved
 
-### 改进
+- **Serialization robustness**: Enhanced error handling and validation in serialization process
+- **Reference restoration**: Improved handling of object references during deserialization
+- **Handler restoration**: Proper restoration of slot handlers and merge strategies after deserialization
+- **Connection reconstruction**: Automatic rebuilding of event-slot connections from serialized data
 
-- ✅ **事件驱动执行**: 实现了事件驱动的执行机制
-- ✅ **参数映射**: 完善了 Connection 的参数映射功能
-- ✅ **智能参数匹配**: Slot.receive 现在可以智能匹配 handler 参数
-- ✅ **Flow 上下文**: Routine.emit 可以自动获取 Flow 上下文
+### Fixed
 
-### 测试
+- **Circular reference handling**: Proper handling of bidirectional connections during serialization
+- **Datetime serialization**: Consistent datetime handling across all serializable objects
+- **Routine instance restoration**: Fixed issues with routine instance recreation from serialized data
 
-- ✅ 基本功能测试通过
-- ✅ Flow 执行测试通过（线性流程、分支流程、参数映射）
+### Documentation
 
-### 已知问题
+- Added serialization guide
+- Documented persistence patterns
+- Added examples for saving and loading flows
+- Updated API reference with serialization methods
 
-- ⚠️ Flow 持久化只保存结构，不保存 routine 实例
-- ⚠️ 需要完善异步执行支持
-- ⚠️ 需要实现完整的测试用例
+## [0.5.0] - 2025-10-11
 
+### Added
+
+- **ErrorHandler class**: Comprehensive error handling system with multiple strategies
+- **Error handling strategies**: Support for STOP, CONTINUE, RETRY, and SKIP strategies
+- **Retry mechanism**: Configurable retry logic with exponential backoff
+- **Retryable exception filtering**: Support for specifying which exception types should be retried
+- **Flow-level error handling**: `set_error_handler()` method for setting default error handler for all routines
+- **Error recovery**: Automatic error recovery based on configured strategies
+- **Error logging**: Comprehensive error logging and tracking
+
+### Improved
+
+- **Error handling integration**: Seamless integration of error handlers into Flow execution
+- **Retry configuration**: Flexible retry configuration with delay and backoff parameters
+- **Error state tracking**: Enhanced error state tracking in JobState
+- **Exception handling**: Improved exception handling throughout the execution pipeline
+
+### Documentation
+
+- Added comprehensive error handling guide
+- Documented all error handling strategies with examples
+- Added retry configuration examples
+- Updated troubleshooting guide
+
+## [0.4.0] - 2025-09-06
+
+### Added
+
+- **ExecutionTracker class**: Comprehensive execution tracking and performance monitoring
+- **Routine execution tracking**: Automatic tracking of routine start/end times, parameters, and results
+- **Event flow tracking**: Complete event emission history with source, target, and data
+- **Performance metrics**: Automatic calculation of execution times, success rates, and throughput
+- **Routine performance analysis**: `get_routine_performance()` method for detailed routine metrics
+- **Flow performance analysis**: `get_flow_performance()` method for overall flow metrics
+- **Execution history integration**: Automatic recording of all events to JobState execution history
+
+### Improved
+
+- **Performance monitoring**: Enhanced performance tracking with detailed metrics
+- **Execution time tracking**: Automatic calculation and recording of execution times
+- **Event flow visibility**: Complete visibility into data flow through the workflow
+- **Statistics integration**: Better integration between ExecutionTracker and Routine statistics
+
+### Documentation
+
+- Added execution tracking guide
+- Documented performance analysis methods
+- Added examples for monitoring workflow performance
+- Updated API reference with tracking methods
+
+## [0.3.0] - 2025-08-02
+
+### Added
+
+- **JobState class**: Comprehensive execution state management
+- **ExecutionRecord class**: Individual execution record tracking
+- **State persistence**: Support for saving and loading JobState
+- **Pause and resume functionality**: Flow execution can be paused and resumed
+- **Cancel functionality**: Flow execution can be cancelled with reason tracking
+- **Execution history**: Complete history of all routine executions and event emissions
+- **Routine state tracking**: Per-routine state tracking with status, errors, and results
+- **Checkpoint support**: Checkpoint data can be saved during pause operations
+
+### Improved
+
+- **State management**: Unified state management across all routines
+- **Execution control**: Better separation of concerns between Flow and JobState
+- **State queries**: Enhanced methods for querying execution state
+- **Timestamp tracking**: Automatic tracking of creation and update timestamps
+
+### Documentation
+
+- Added state management guide
+- Documented pause/resume/cancel patterns
+- Added examples for state persistence
+- Updated API reference with JobState methods
+
+## [0.2.0] - 2025-07-05
+
+### Added
+
+- **Flow class**: Workflow manager for orchestrating multiple routines
+- **Routine management**: `add_routine()` method for registering routines in flows
+- **Connection management**: `connect()` method for linking events to slots
+- **Flow execution**: `execute()` method for running workflows from entry routines
+- **Parameter mapping**: Support for parameter name transformation in connections
+- **Flow context**: Automatic flow context passing to routines for event emission
+- **Entry point execution**: Support for executing flows starting from any routine
+- **Flow ID management**: Unique flow identification and tracking
+
+### Improved
+
+- **Event-driven execution**: Implemented event-driven execution mechanism
+- **Parameter passing**: Enhanced parameter passing through connections
+- **Flow organization**: Better structure for managing complex workflows
+- **Error handling**: Basic error handling during flow execution
+
+### Documentation
+
+- Added flow orchestration guide
+- Documented connection patterns
+- Added examples for basic workflow creation
+- Updated quick start guide
+
+## [0.1.0] - 2025-06-13
+
+### Added
+
+- **Routine base class**: Core Routine class with slots and events support
+- **Slot class**: Input slot mechanism for receiving data from other routines
+- **Event class**: Output event mechanism for transmitting data to other routines
+- **Connection class**: Connection object for linking events to slots with parameter mapping
+- **Slot merge strategies**: Support for "override", "append", and custom merge strategies
+- **Intelligent parameter matching**: Automatic parameter matching for slot handlers
+- **Statistics tracking**: Built-in `stats()` method and statistics dictionary
+- **Configuration management**: `_config` dictionary for routine configuration
+- **Event emission**: `emit()` method for triggering events and transmitting data
+- **Slot reception**: `receive()` method for receiving and processing data
+- **Many-to-many connections**: Support for flexible connection patterns
+- **Handler functions**: Support for flexible handler function signatures
+
+### Improved
+
+- **Event-driven architecture**: Foundation for event-driven workflow execution
+- **Data flow**: Clear data flow mechanism through slots and events
+- **Parameter mapping**: Parameter name transformation support in connections
+- **Error tolerance**: Slot handlers are error-tolerant and don't interrupt flow execution
+
+### Documentation
+
+- Initial documentation structure
+- Basic usage examples
+- API reference for core classes
+
+### Known Issues
+
+- Flow persistence only saves structure, not routine instances (addressed in v0.6.0)
+- Limited error handling (addressed in v0.5.0)
+- No execution tracking (addressed in v0.4.0)
+- Sequential execution only (addressed in v0.7.0)

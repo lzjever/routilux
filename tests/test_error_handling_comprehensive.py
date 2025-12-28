@@ -5,7 +5,6 @@
 """
 
 import time
-import pytest
 from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
 
 
@@ -346,7 +345,7 @@ class TestMixedRoutines:
 
         flow.connect(optional_id, "output", critical_id, "input")
 
-        job_state = flow.execute(optional_id)
+        flow.execute(optional_id)
 
         # Optional routine失败被容忍，但critical routine失败会导致flow失败
         # 注意：在这个场景中，optional失败后不会emit数据，所以critical可能不会执行
@@ -436,9 +435,7 @@ class TestRetryBehavior:
         )
         routine_id = flow.add_routine(routine, "failing")
 
-        start_time = time.time()
         job_state = flow.execute(routine_id)
-        end_time = time.time()
 
         # 应该重试成功
         assert job_state.status == "completed"
@@ -697,7 +694,7 @@ class TestErrorHandlerConfiguration:
                 retryable_exceptions=(ConnectionError, TimeoutError),
             )
         )
-        routine_id = flow.add_routine(routine, "failing")
+        flow.add_routine(routine, "failing")
 
         # 验证配置
         handler = routine.get_error_handler()

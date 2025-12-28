@@ -2,7 +2,6 @@
 JobState 测试用例
 """
 
-import pytest
 from datetime import datetime
 
 from routilux import JobState
@@ -24,8 +23,6 @@ class TestJobStateManagement:
     def test_update_status(self):
         """测试用例 2: 更新状态"""
         job_state = JobState(flow_id="test_flow")
-
-        original_updated_at = job_state.updated_at
 
         # 更新状态
         job_state.status = "running"

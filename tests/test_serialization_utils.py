@@ -4,8 +4,6 @@
 测试 serialization_utils 模块的所有功能，提高代码覆盖率。
 """
 
-import pytest
-import inspect
 from routilux.serialization_utils import (
     serialize_callable,
     deserialize_callable,
@@ -64,7 +62,9 @@ class TestSerializeCallable:
 
     def test_serialize_lambda(self):
         """测试序列化 lambda 函数"""
-        lambda_func = lambda x: x + 1
+
+        def lambda_func(x):
+            return x + 1
 
         result = serialize_callable(lambda_func)
         # lambda 函数应该被当作普通函数处理

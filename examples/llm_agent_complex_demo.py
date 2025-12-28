@@ -15,8 +15,8 @@ It demonstrates all Routilux features including:
 
 import json
 import time
-from typing import Dict, Any, List, Optional
-from routilux import Flow, Routine, JobState, ErrorHandler, ErrorStrategy, ExecutionTracker
+from typing import Dict, Any, List
+from routilux import Flow, Routine, JobState, ErrorHandler, ErrorStrategy
 
 
 # ============================================================================
@@ -558,8 +558,6 @@ def test_cancel(flow: Flow):
     print("Test 5: Flow Cancellation")
     print("=" * 70)
 
-    parser_id = "task_parser"
-
     # Note: Cancellation requires active execution
     # In a real scenario, this would be called from another thread
     print("Cancellation test (requires active execution context)")
@@ -575,7 +573,7 @@ def test_execution_tracking(flow: Flow):
     parser_id = "task_parser"
     task = "Track execution performance"
 
-    job_state = flow.execute(parser_id, entry_params={"task": task})
+    flow.execute(parser_id, entry_params={"task": task})
 
     tracker = flow.execution_tracker
     if tracker:

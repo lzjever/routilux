@@ -267,7 +267,6 @@ class TestResumeEdgeCases:
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        flow = Flow(flow_id="test_flow")
         with open(temp_file, "r", encoding="utf-8") as f:
             loaded_data = json.load(f)
         job_state2 = JobState()

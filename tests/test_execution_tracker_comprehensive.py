@@ -4,7 +4,6 @@ ExecutionTracker 综合测试用例
 
 import time
 
-import pytest
 from routilux import Flow, Routine, ExecutionTracker
 
 
@@ -207,7 +206,7 @@ class TestExecutionTrackerIntegration:
         flow.connect(id_a, "output", id_b, "input")
 
         # 执行
-        job_state = flow.execute(id_a)
+        flow.execute(id_a)
 
         # 验证 tracker 被创建和使用
         assert flow.execution_tracker is not None

@@ -5,7 +5,6 @@ Improved Routine mechanism supporting slots (input slots) and events (output eve
 """
 
 from __future__ import annotations
-import uuid
 from typing import Dict, Any, Callable, Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:

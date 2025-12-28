@@ -10,11 +10,10 @@
 import sys
 import time
 import threading
-from pathlib import Path
 
 # Try to import routilux - if it fails, provide helpful error message
 try:
-    from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
+    from routilux import Flow, Routine
 except ImportError:
     print("Error: routilux package not found!")
     print("Please install the package first:")
@@ -22,8 +21,6 @@ except ImportError:
     print("\nOr if you're in development mode:")
     print("  pip install -e '.[dev]'")
     sys.exit(1)
-
-from concurrent.futures import ThreadPoolExecutor
 
 
 def test_basic_concurrent_execution():
@@ -119,7 +116,7 @@ def test_serialization():
             self.output_event = self.define_event("output", ["data"])
 
     routine = TestRoutine()
-    routine_id = flow.add_routine(routine, "test")
+    flow.add_routine(routine, "test")
 
     # 序列化
     data = flow.serialize()

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from routilux.event import Event
 
 from routilux.utils.serializable import register_serializable, Serializable
-from routilux.serialization_utils import serialize_callable, deserialize_callable
+from routilux.serialization_utils import serialize_callable
 
 
 @register_serializable

@@ -2,9 +2,8 @@
 Flow 综合测试用例 - 补充缺失的功能测试
 """
 
-import json
 import pytest
-from routilux import Flow, Routine, ErrorHandler, ErrorStrategy, JobState
+from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
 
 
 class TestFlowCancel:
@@ -248,7 +247,7 @@ class TestFlowSerializationEdgeCases:
         routine_id = flow.add_routine(routine, "test")
 
         # 执行以创建 job_state
-        job_state = flow.execute(routine_id)
+        flow.execute(routine_id)
 
         # 序列化
         data = flow.serialize()

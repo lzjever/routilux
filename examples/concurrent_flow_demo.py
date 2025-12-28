@@ -17,9 +17,8 @@ Features demonstrated:
 """
 
 import time
-import threading
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any
 from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
 
 

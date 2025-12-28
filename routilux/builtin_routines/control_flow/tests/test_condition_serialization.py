@@ -30,8 +30,10 @@ class TestConditionSerialization(unittest.TestCase):
 
     def test_lambda_condition_serialization(self):
         """Test lambda condition serialization and deserialization."""
-        # Create lambda at module level (so inspect.getsource can work)
-        test_lambda = lambda x: x.get("priority") == "high"
+
+        # Create function at module level (so inspect.getsource can work)
+        def test_lambda(x):
+            return x.get("priority") == "high"
 
         router1 = ConditionalRouter()
         router1.set_config(
@@ -181,8 +183,10 @@ class TestConditionSerialization(unittest.TestCase):
 
     def test_mixed_conditions_serialization(self):
         """Test serialization of mixed condition types."""
-        # Module-level lambda for testing
-        test_lambda = lambda x: x.get("type") == "test"
+
+        # Module-level function for testing
+        def test_lambda(x):
+            return x.get("type") == "test"
 
         router1 = ConditionalRouter()
         router1.set_config(
@@ -239,7 +243,9 @@ class TestConditionSerialization(unittest.TestCase):
 
     def test_flow_level_serialization_with_lambda(self):
         """Test Flow-level serialization with lambda condition."""
-        test_lambda = lambda x: x.get("priority") == "high"
+
+        def test_lambda(x):
+            return x.get("priority") == "high"
 
         flow1 = Flow(flow_id="test_flow")
         router = ConditionalRouter()
@@ -249,7 +255,7 @@ class TestConditionSerialization(unittest.TestCase):
             ]
         )
 
-        router_id = flow1.add_routine(router, "router")
+        flow1.add_routine(router, "router")
 
         # Serialize Flow
         serialized = flow1.serialize()
@@ -290,7 +296,7 @@ class TestConditionSerialization(unittest.TestCase):
             ]
         )
 
-        router_id = flow1.add_routine(router, "router")
+        flow1.add_routine(router, "router")
 
         # Serialize Flow
         serialized = flow1.serialize()
@@ -326,7 +332,8 @@ class TestConditionSerialization(unittest.TestCase):
         """Test JSON serialization roundtrip with lambda."""
         import json
 
-        test_lambda = lambda x: x.get("priority") == "high"
+        def test_lambda(x):
+            return x.get("priority") == "high"
 
         router1 = ConditionalRouter()
         router1.set_config(

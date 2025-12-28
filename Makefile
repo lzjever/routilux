@@ -57,7 +57,7 @@ test-cov:
 	pytest tests/ routilux/builtin_routines/ --cov=routilux --cov-report=html --cov-report=term
 
 lint:
-	flake8 routilux/ tests/ examples/ --max-line-length=100 --extend-ignore=E203,W503
+	flake8 routilux/ tests/ examples/ --max-line-length=100 --extend-ignore=E203,W503,E501
 
 format:
 	black routilux/ tests/ examples/

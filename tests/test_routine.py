@@ -3,7 +3,6 @@ Routine 测试用例
 """
 
 import pytest
-
 from routilux import Routine
 
 
@@ -125,8 +124,8 @@ class TestRoutineIntegration:
         def handler(data):
             received_data.append(data)
 
-        input_slot = routine.define_slot("input", handler=handler)
-        output_event = routine.define_event("output", ["result"])
+        routine.define_slot("input", handler=handler)
+        routine.define_event("output", ["result"])
 
         # 2. 更新状态
         routine._stats["initialized"] = True

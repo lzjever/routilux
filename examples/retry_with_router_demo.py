@@ -14,7 +14,7 @@
    - 如果失败且 retry_count < max_retries -> 发送 retry 事件回 R1
    - 如果失败且 retry_count >= max_retries -> 发送 final_failure 事件
 """
-from typing import Any, Dict
+from typing import Any
 from routilux import Flow, Routine
 import time
 
@@ -186,12 +186,12 @@ def demo_retry_with_router():
     print(f"  失败结果数: {len(collector.failure_results)}")
 
     if collector.success_results:
-        print(f"\n  成功详情:")
+        print("\n  成功详情:")
         for i, result in enumerate(collector.success_results, 1):
             print(f"    {i}. {result}")
 
     if collector.failure_results:
-        print(f"\n  失败详情:")
+        print("\n  失败详情:")
         for i, result in enumerate(collector.failure_results, 1):
             print(f"    {i}. {result}")
 
@@ -256,7 +256,7 @@ def demo_max_retries_exceeded():
     print(f"  失败结果数: {len(collector.failure_results)}")
 
     if collector.failure_results:
-        print(f"\n  最终失败详情:")
+        print("\n  最终失败详情:")
         for i, result in enumerate(collector.failure_results, 1):
             print(f"    {i}. {result}")
 

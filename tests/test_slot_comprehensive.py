@@ -4,7 +4,6 @@ Slot 综合测试用例
 补充 Slot 类的测试覆盖，特别是边界情况和错误处理。
 """
 
-import pytest
 from routilux import Routine, Slot
 
 
@@ -61,7 +60,7 @@ class TestSlotHandler:
             return kwargs
 
         slot = Slot(name="test", handler=kwargs_handler)
-        result = slot.receive({"a": 1, "b": 2})
+        slot.receive({"a": 1, "b": 2})
         # handler 应该被调用
         assert slot._data == {"a": 1, "b": 2}
 

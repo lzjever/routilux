@@ -7,10 +7,6 @@ This example demonstrates:
 - Parameter mapping
 - Statistics tracking
 """
-import sys
-import os
-
-
 from routilux import Flow, Routine
 
 

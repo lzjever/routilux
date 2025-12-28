@@ -5,8 +5,7 @@ This test suite verifies the execution order behavior when an event emits
 to multiple connected slots, especially when downstream slots emit further events.
 """
 
-import pytest
-from routilux import Flow, Routine, Event, Slot
+from routilux import Flow, Routine
 
 
 class ExecutionOrderTracker:
@@ -185,12 +184,10 @@ class TestEventExecutionOrder:
         assert order[0] == "source"
 
         # Find positions
-        source_start_idx = order.index("source")
         i1_start_idx = order.index("intermediate1")
         i2_start_idx = order.index("intermediate2")
         l1_idx = order.index("leaf1")
         l2_idx = order.index("leaf2")
-        l3_idx = order.index("leaf3")
 
         # Intermediate1 should execute before intermediate2 (connection order)
         assert i1_start_idx < i2_start_idx
@@ -265,7 +262,6 @@ class TestEventExecutionOrder:
         print(f"Execution order: {order}")
 
         # Find positions
-        source_idx = order.index("source")
         a_idx = order.index("A")
         b_idx = order.index("B")
         c_idx = order.index("C")

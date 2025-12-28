@@ -2,9 +2,6 @@
 ErrorHandler 综合测试用例
 """
 
-import time
-
-import pytest
 from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
 
 
@@ -193,8 +190,6 @@ class TestErrorHandlerContext:
 
         error_handler = ErrorHandler(strategy=ErrorStrategy.CONTINUE)
         flow.set_error_handler(error_handler)
-
-        context = {"user_id": "test_user", "session_id": "test_session"}
 
         # 执行
         job_state = flow.execute(routine_id)

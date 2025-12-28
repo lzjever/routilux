@@ -196,8 +196,6 @@ class Event(Serializable):
                     slot.receive(kwargs)
         else:
             # Concurrent execution mode
-            from concurrent.futures import ThreadPoolExecutor, Future
-
             executor = flow._get_executor()
 
             # Submit task for each connected slot (asynchronous execution, non-blocking)

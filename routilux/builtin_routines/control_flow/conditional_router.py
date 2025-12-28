@@ -5,10 +5,9 @@ Routes data to different outputs based on conditions.
 """
 
 from __future__ import annotations
-from typing import Dict, Any, Callable, Optional, List, Tuple, Union
+from typing import Dict, Any, Callable, Optional, Union
 import inspect
 import warnings
-import re
 from routilux.routine import Routine
 from routilux.serialization_utils import serialize_callable, deserialize_callable
 
@@ -405,11 +404,11 @@ class ConditionalRouter(Routine):
                         try:
                             # Replace common lambda parameter names with 'data'
                             # This handles cases where lambda uses 'x', 'item', etc.
-                            import re
+                            import re as re_module
 
                             # Replace standalone variable names (not part of method calls)
                             # Pattern: word boundary + common param names + word boundary
-                            expr = re.sub(r"\b(x|item|value|obj)\b", "data", expr)
+                            expr = re_module.sub(r"\b(x|item|value|obj)\b", "data", expr)
 
                             # Safe evaluation to restore lambda
                             safe_globals = {

@@ -2,8 +2,6 @@
 Event 测试用例
 """
 
-import pytest
-
 from routilux import Routine
 
 
@@ -120,7 +118,7 @@ class TestEventEmission:
         """测试用例 5: 无连接事件"""
         routine = Routine()
 
-        event = routine.define_event("output", ["data"])
+        routine.define_event("output", ["data"])
 
         # 没有连接的事件应该可以正常触发，不报错
         routine.emit("output", data="test")

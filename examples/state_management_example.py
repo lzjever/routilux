@@ -7,8 +7,6 @@ This example demonstrates:
 - ExecutionTracker for performance monitoring
 - State persistence and recovery
 """
-import sys
-import os
 import json
 
 
@@ -56,21 +54,21 @@ def main():
     job_state = flow.execute(id1, entry_params={"data": "test"})
 
     # Check JobState
-    print(f"\nJobState Information:")
+    print("\nJobState Information:")
     print(f"  Status: {job_state.status}")
     print(f"  Flow ID: {job_state.flow_id}")
     print(f"  Job ID: {job_state.job_id}")
     print(f"  Execution History Count: {len(job_state.execution_history)}")
 
     # Check routine states
-    print(f"\nRoutine States:")
+    print("\nRoutine States:")
     for routine_id in job_state.routine_states:
         state = job_state.get_routine_state(routine_id)
         print(f"  {routine_id}: {state}")
 
     # Check ExecutionTracker
     if flow.execution_tracker:
-        print(f"\nExecutionTracker Information:")
+        print("\nExecutionTracker Information:")
         print(f"  Flow ID: {flow.execution_tracker.flow_id}")
         print(f"  Routines Executed: {len(flow.execution_tracker.routine_executions)}")
         print(f"  Events Recorded: {len(flow.execution_tracker.event_flow)}")
@@ -85,13 +83,13 @@ def main():
                 print(f"    Avg Execution Time: {perf['avg_execution_time']:.4f}s")
 
         flow_perf = flow.execution_tracker.get_flow_performance()
-        print(f"\n  Overall Flow Performance:")
+        print("\n  Overall Flow Performance:")
         print(f"    Total Routines: {flow_perf['total_routines']}")
         print(f"    Total Events: {flow_perf['total_events']}")
         print(f"    Total Execution Time: {flow_perf['total_execution_time']:.4f}s")
 
     # Demonstrate serialization
-    print(f"\nSerialization Example:")
+    print("\nSerialization Example:")
     flow_data = flow.serialize()
     print(f"  Serialized Flow: {len(flow_data)} fields")
 
@@ -101,7 +99,7 @@ def main():
     # Save to JSON (example)
     with open("/tmp/flow_example.json", "w") as f:
         json.dump(flow_data, f, indent=2, default=str)
-    print(f"  Saved flow to /tmp/flow_example.json")
+    print("  Saved flow to /tmp/flow_example.json")
 
     assert job_state.status == "completed"
     print("\n✓ State management example completed!")

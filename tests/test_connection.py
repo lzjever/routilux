@@ -2,8 +2,6 @@
 Connection 测试用例
 """
 
-import pytest
-
 from routilux import Routine, Connection
 
 

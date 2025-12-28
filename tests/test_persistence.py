@@ -2,11 +2,10 @@
 持久化测试用例
 """
 
-import pytest
 import json
 import os
+import pytest
 from routilux import Flow, Routine, JobState
-from routilux.utils.serializable import SerializableRegistry
 
 
 class TestFlowPersistence:
@@ -86,7 +85,7 @@ class TestFlowPersistence:
                 self.output_event = self.define_event("output", ["data"])
 
         routine = TestRoutine()
-        routine_id = flow1.add_routine(routine, "test_routine")
+        flow1.add_routine(routine, "test_routine")
 
         # 序列化并保存
         data = flow1.serialize()

@@ -4,8 +4,6 @@ pytest 配置和 fixtures
 
 import os
 import pytest
-import tempfile
-from pathlib import Path
 
 
 @pytest.fixture

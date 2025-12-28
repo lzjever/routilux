@@ -2,7 +2,6 @@
 Test cases for aggregator pattern - waiting for all expected messages.
 """
 
-import pytest
 import time
 from routilux import Flow, Routine
 

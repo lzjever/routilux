@@ -69,7 +69,7 @@ class TestConcurrentExecutionBasic:
 class TestConcurrentRoutineExecution:
     """并发 Routine 执行测试"""
 
-    def test_single_event_multiple_slots_concurrent(self):
+    def test_singleevent_multiple_slots_concurrent(self):
         """测试单个事件触发多个 slots 并发执行"""
         flow = Flow(execution_strategy="concurrent", max_workers=5)
         execution_order = []
@@ -78,7 +78,7 @@ class TestConcurrentRoutineExecution:
         class SourceRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
             def __call__(self):
                 time.sleep(0.1)  # 模拟处理时间
@@ -151,7 +151,7 @@ class TestConcurrentRoutineExecution:
 
         assert job_state.status == "completed"
 
-    def test_multiple_events_concurrent(self):
+    def test_multipleevents_concurrent(self):
         """测试多个事件并发触发"""
         flow = Flow(execution_strategy="concurrent", max_workers=5)
         results = []
@@ -220,7 +220,7 @@ class TestConcurrentRoutineExecution:
             class SourceRoutine(Routine):
                 def __init__(self):
                     super().__init__()
-                    self.output_event = self.define_event("output", ["data"])
+                    self.outputevent = self.define_event("output", ["data"])
 
                 def __call__(self):
                     self.emit("output", data="test", flow=flow)
@@ -285,13 +285,13 @@ class TestConcurrentDependencyHandling:
         class R1(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
         class R2(Routine):
             def __init__(self):
                 super().__init__()
                 self.input_slot = self.define_slot("input", handler=lambda x: None)
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
         class R3(Routine):
             def __init__(self):
@@ -326,7 +326,7 @@ class TestConcurrentDependencyHandling:
         class R1(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
         class R2(Routine):
             def __init__(self):
@@ -381,7 +381,7 @@ class TestConcurrentThreadSafety:
         class SourceRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
             def __call__(self):
                 # 触发多个并发执行
@@ -406,7 +406,7 @@ class TestConcurrentThreadSafety:
         assert counter["value"] == 20, f"Expected 20 messages processed, got {counter['value']}"
         assert job_state.status == "completed"
 
-    def test_concurrent_job_state_updates(self):
+    def test_concurrentjob_state_updates(self):
         """测试并发更新 JobState 的线程安全"""
         flow = Flow(execution_strategy="concurrent", max_workers=5)
         execution_count = 0
@@ -415,7 +415,7 @@ class TestConcurrentThreadSafety:
         class SourceRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
             def __call__(self):
                 for i in range(10):
@@ -464,7 +464,7 @@ class TestConcurrentErrorHandling:
         class SourceRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
             def __call__(self):
                 for i in range(5):
@@ -513,7 +513,7 @@ class TestConcurrentErrorHandling:
         class SourceRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
             def __call__(self):
                 for i in range(5):
@@ -560,10 +560,10 @@ class TestConcurrentSerialization:
         class TestRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
         routine = TestRoutine()
-        routine_id = flow.add_routine(routine, "test")
+        flow.add_routine(routine, "test")
 
         # 序列化
         data = flow.serialize()
@@ -581,10 +581,10 @@ class TestConcurrentSerialization:
         class TestRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
         routine = TestRoutine()
-        routine_id = flow.add_routine(routine, "test")
+        flow.add_routine(routine, "test")
 
         # 序列化
         data = flow.serialize()
@@ -608,7 +608,7 @@ class TestConcurrentSerialization:
         class SourceRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
             def __call__(self):
                 self.emit("output", data="test", flow=flow)
@@ -682,7 +682,7 @@ class TestConcurrentEdgeCases:
         class SourceRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
             def __call__(self):
                 self.emit("output", data="test", flow=flow)
@@ -722,7 +722,7 @@ class TestConcurrentEdgeCases:
         class SourceRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
             def __call__(self):
                 for i in range(3):
@@ -761,7 +761,7 @@ class TestConcurrentEdgeCases:
         class SourceRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("output", ["data"])
+                self.outputevent = self.define_event("output", ["data"])
 
             def __call__(self):
                 self.emit("output", data="test", flow=flow)
@@ -799,7 +799,7 @@ class TestConcurrentIntegration:
         class ParserRoutine(Routine):
             def __init__(self):
                 super().__init__()
-                self.output_event = self.define_event("parsed", ["tasks"])
+                self.outputevent = self.define_event("parsed", ["tasks"])
 
             def __call__(self, tasks):
                 # 解析任务
@@ -811,7 +811,7 @@ class TestConcurrentIntegration:
                 super().__init__()
                 self.worker_id = worker_id
                 self.input_slot = self.define_slot("input", handler=self.process)
-                self.output_event = self.define_event("result", ["result"])
+                self.outputevent = self.define_event("result", ["result"])
 
             def process(self, tasks):
                 # 处理任务

@@ -71,7 +71,6 @@ def deserialize_callable(
 
         if callable_type == "method":
             # Restore method
-            class_name = callable_data.get("class_name")
             method_name = callable_data.get("method_name")
             object_id = callable_data.get("object_id")
 

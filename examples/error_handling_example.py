@@ -7,10 +7,6 @@ This example demonstrates:
 - Error handler configuration
 - Error recovery
 """
-import sys
-import os
-
-
 from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
 
 

@@ -8,9 +8,6 @@ This example demonstrates:
 - Executing a flow
 - Checking execution status
 """
-import sys
-import os
-
 
 from routilux import Flow, Routine
 

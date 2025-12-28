@@ -121,9 +121,11 @@ class ResultExtractor(Routine):
         self._extractors["code_block"] = self._extract_code_block
 
         # YAML extractors (if available)
+        # Note: yaml is imported conditionally in the methods themselves
         try:
-            import yaml
+            import yaml  # noqa: F401
 
+            # Only register if yaml is available
             self._extractors["yaml_code_block"] = self._extract_yaml_code_block
             self._extractors["yaml_string"] = self._extract_yaml_string
         except ImportError:

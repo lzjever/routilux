@@ -4,9 +4,7 @@ Event 综合测试用例
 补充 Event 类的测试覆盖，特别是并发执行和错误处理。
 """
 
-import pytest
 import threading
-import time
 from routilux import Flow, Routine, Event, Slot, ErrorHandler, ErrorStrategy
 
 
@@ -16,8 +14,6 @@ class TestEventConcurrentEmit:
     def test_concurrent_emit_error_handling(self):
         """测试并发 emit 时的错误处理"""
         flow = Flow(execution_strategy="concurrent", max_workers=5)
-        errors = []
-        errors_lock = threading.Lock()
 
         class SourceRoutine(Routine):
             def __init__(self):
@@ -83,7 +79,7 @@ class TestEventConcurrentEmit:
         target = TargetRoutine()
 
         source_id = flow.add_routine(source, "source")
-        target_id = flow.add_routine(target, "target")
+        flow.add_routine(target, "target")
 
         # 直接连接（不使用 Connection）
         source.output_event.connect(target.input_slot)

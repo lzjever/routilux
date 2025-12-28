@@ -161,15 +161,6 @@ class ResultAggregator(Routine):
             task_name_list = accumulated_data["task_name"]
             task_names = task_name_list if isinstance(task_name_list, list) else [task_name_list]
 
-        # Create aggregated result
-        aggregated_result = {
-            "all_results": all_results,
-            "total_count": len(all_results),
-            "queries": queries,
-            "task_names": task_names,
-            "search_count": len(task_names),
-        }
-
         print(f"📊 Aggregated {len(all_results)} results from {len(task_names)} search tasks")
 
         # Emit aggregated result
@@ -224,14 +215,14 @@ def demo_aggregator():
     consumer_id = flow.add_routine(consumer, "consumer")
     flow.connect(agg_id, "aggregated", consumer_id, "input")
 
-    print(f"\nFlow structure:")
-    print(f"  search1 -> aggregator -> consumer")
-    print(f"  search2 -> aggregator")
-    print(f"  search3 -> aggregator")
-    print(f"\nAggregator expects: 3 messages")
+    print("\nFlow structure:")
+    print("  search1 -> aggregator -> consumer")
+    print("  search2 -> aggregator")
+    print("  search3 -> aggregator")
+    print("\nAggregator expects: 3 messages")
 
     # Execute all search tasks
-    print(f"\n🚀 Executing all search tasks...")
+    print("\n🚀 Executing all search tasks...")
     flow.execute(id1, entry_params={"query": "test query"})
     flow.execute(id2, entry_params={"query": "test query"})
     flow.execute(id3, entry_params={"query": "test query"})
@@ -239,8 +230,8 @@ def demo_aggregator():
     # Wait a bit for all messages to arrive
     time.sleep(0.5)
 
-    print(f"\n" + "=" * 70)
-    print(f"Results:")
+    print("\n" + "=" * 70)
+    print("Results:")
     print(f"  Aggregator stats: {aggregator.stats()}")
     print(f"  Consumer received: {len(consumer.received_results)} aggregated result(s)")
     if consumer.received_results:

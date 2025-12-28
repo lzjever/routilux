@@ -3,8 +3,6 @@ Comprehensive test cases for built-in routines.
 
 Tests all routines to ensure they work correctly and handle edge cases.
 
-Note: This test requires routilux package to be installed.
-Install with: pip install -e .
 """
 import unittest
 import time

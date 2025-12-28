@@ -7,7 +7,7 @@ Flattens nested data structures into flat dictionaries.
 from __future__ import annotations
 from typing import Any, Dict, Optional, Tuple
 from routilux.routine import Routine
-from routilux.utils.serializable import Serializable
+from serilux import Serializable
 
 
 class DataFlattener(Routine):

@@ -13,11 +13,7 @@ if TYPE_CHECKING:
     from routilux.flow import Flow
     from routilux.error_handler import ErrorHandler, ErrorStrategy
 
-from routilux.utils.serializable import register_serializable, Serializable
-import importlib
-from typing import Dict, Any, Optional, Type
-
-
+from serilux import register_serializable, Serializable
 
 
 @register_serializable

@@ -576,8 +576,8 @@ class TestConcurrentSerialization:
 
     def test_deserialize_concurrent_flow(self):
         """测试反序列化并发 Flow"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow(execution_strategy="concurrent", max_workers=6)
 
         @register_serializable
@@ -604,8 +604,8 @@ class TestConcurrentSerialization:
 
     def test_serialize_deserialize_preserves_concurrency(self):
         """测试序列化/反序列化后并发功能仍然可用"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow(execution_strategy="concurrent", max_workers=5)
         execution_order = []
         execution_lock = threading.Lock()

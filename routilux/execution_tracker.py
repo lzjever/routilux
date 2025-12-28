@@ -7,7 +7,7 @@ Tracks flow execution state and performance metrics.
 from __future__ import annotations
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from routilux.utils.serializable import register_serializable, Serializable
+from serilux import register_serializable, Serializable
 
 
 @register_serializable

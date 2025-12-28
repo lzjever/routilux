@@ -1,4 +1,4 @@
-.PHONY: help clean install dev-install test test-builtin test-all test-cov lint format check build sdist wheel docs html clean-docs test-rtd upload upload-test check-package
+.PHONY: help clean install dev-install test test-core test-builtin test-cov lint format check build sdist wheel docs html clean-docs test-rtd upload upload-test check-package
 
 help:
 	@echo "Available targets:"
@@ -8,9 +8,9 @@ help:
 	@echo "  dev-install   - Install with development dependencies (recommended)"
 	@echo ""
 	@echo "Testing:"
-	@echo "  test          - Run tests"
-	@echo "  test-builtin  - Run built-in routines tests"
-	@echo "  test-all      - Run all tests (main + builtin)"
+	@echo "  test          - Run all tests (main + builtin)"
+	@echo "  test-core     - Run main tests only"
+	@echo "  test-builtin  - Run built-in routines tests only"
 	@echo "  test-cov      - Run tests with coverage report"
 	@echo ""
 	@echo "Code Quality:"
@@ -46,12 +46,13 @@ dev-install:
 	pip install -e ".[dev]"
 
 test:
+	pytest tests/ routilux/builtin_routines/ -v
+
+test-core:
 	pytest tests/ -v
 
 test-builtin:
 	pytest routilux/builtin_routines/ -v
-
-test-all: test test-builtin
 
 test-cov:
 	pytest tests/ routilux/builtin_routines/ --cov=routilux --cov-report=html --cov-report=term

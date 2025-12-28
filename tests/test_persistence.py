@@ -76,15 +76,18 @@ class TestFlowPersistence:
 
     def test_save_load_consistency(self, temp_file):
         """测试用例 3: 序列化和反序列化一致性"""
+        from serilux import register_serializable
+
         # 创建 flow
         flow1 = Flow(flow_id="test_flow")
 
-        class TestRoutine(Routine):
+        @register_serializable
+        class PersistenceTestRoutine0(Routine):
             def __init__(self):
                 super().__init__()
                 self.output_event = self.define_event("output", ["data"])
 
-        routine = TestRoutine()
+        routine = PersistenceTestRoutine0()
         flow1.add_routine(routine, "test_routine")
 
         # 序列化并保存
@@ -223,28 +226,28 @@ class TestSerializationComprehensive:
 
     def test_serialize_flow_with_multiple_connections(self):
         """测试序列化包含多个连接的 Flow"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow(flow_id="multi_connection_flow")
 
         @register_serializable
-        class SourceRoutine(Routine):
+        class PersistenceSourceRoutine(Routine):
             def __init__(self):
                 super().__init__()
                 self.outputevent = self.define_event("output", ["data"])
 
         @register_serializable
-        class TargetRoutine(Routine):
+        class PersistenceTargetRoutine(Routine):
             def __init__(self):
                 super().__init__()
                 self.input_slot = self.define_slot("input", handler=lambda x: None)
 
-        source = SourceRoutine()
-        target1 = TargetRoutine()
+        source = PersistenceSourceRoutine()
+        target1 = PersistenceTargetRoutine()
         target1.set_config(name="target1")
-        target2 = TargetRoutine()
+        target2 = PersistenceTargetRoutine()
         target2.set_config(name="target2")
-        target3 = TargetRoutine()
+        target3 = PersistenceTargetRoutine()
         target3.set_config(name="target3")
 
         source_id = flow.add_routine(source, "source")
@@ -271,32 +274,32 @@ class TestSerializationComprehensive:
 
     def test_serialize_flow_with_chained_routines(self):
         """测试序列化链式连接的 Flow"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow(flow_id="chained_flow")
 
         @register_serializable
-        class R1(Routine):
+        class PersistenceR1(Routine):
             def __init__(self):
                 super().__init__()
                 self.outputevent = self.define_event("output", ["data"])
 
         @register_serializable
-        class R2(Routine):
+        class PersistenceR2(Routine):
             def __init__(self):
                 super().__init__()
                 self.input_slot = self.define_slot("input", handler=lambda x: None)
                 self.outputevent = self.define_event("output", ["data"])
 
         @register_serializable
-        class R3(Routine):
+        class PersistenceR3(Routine):
             def __init__(self):
                 super().__init__()
                 self.input_slot = self.define_slot("input", handler=lambda x: None)
 
-        r1 = R1()
-        r2 = R2()
-        r3 = R3()
+        r1 = PersistenceR1()
+        r2 = PersistenceR2()
+        r3 = PersistenceR3()
 
         r1_id = flow.add_routine(r1, "r1")
         r2_id = flow.add_routine(r2, "r2")
@@ -318,8 +321,8 @@ class TestSerializationComprehensive:
 
     def test_serialize_deserialize_with_custom_routine_config(self):
         """测试序列化/反序列化包含自定义配置的 Routine"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow(flow_id="config_flow")
 
         @register_serializable
@@ -359,8 +362,8 @@ class TestSerializationComprehensive:
 
     def test_serialize_with_special_characters(self):
         """测试序列化包含特殊字符的数据"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow(flow_id="special_chars_flow")
 
         @register_serializable
@@ -414,8 +417,8 @@ class TestSerializationComprehensive:
 
     def test_serialize_with_large_data(self):
         """测试序列化包含大量数据的 Flow"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow(flow_id="large_data_flow")
 
         @register_serializable
@@ -455,18 +458,18 @@ class TestSerializationComprehensive:
 
     def test_serialize_deserialize_idempotency(self):
         """测试序列化/反序列化的幂等性（多次序列化结果一致）"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow(flow_id="idempotency_test")
 
         @register_serializable
-        class TestRoutine(Routine):
+        class PersistenceTestRoutine1(Routine):
             def __init__(self):
                 super().__init__()
                 self.outputevent = self.define_event("output", ["data"])
                 self.set_config(value=42, name="test")
 
-        routine = TestRoutine()
+        routine = PersistenceTestRoutine1()
         routine_id = flow.add_routine(routine, "test")
 
         # 第一次序列化
@@ -499,17 +502,17 @@ class TestSerializationComprehensive:
 
     def test_deserialize_with_missing_routine_id(self):
         """测试反序列化时缺少 routine_id 的情况"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow(flow_id="test_flow")
 
         @register_serializable
-        class TestRoutine(Routine):
+        class PersistenceTestRoutine2(Routine):
             def __init__(self):
                 super().__init__()
                 self.outputevent = self.define_event("output", ["data"])
 
-        routine = TestRoutine()
+        routine = PersistenceTestRoutine2()
         routine_id = flow.add_routine(routine, "test")
 
         # 序列化
@@ -529,8 +532,8 @@ class TestSerializationComprehensive:
 
     def test_serialize_with_none_values(self):
         """测试序列化包含 None 值的数据"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow(flow_id="none_values_flow")
 
         @register_serializable
@@ -592,18 +595,18 @@ class TestSerializationComprehensive:
 
     def test_serialize_deserialize_multiple_rounds(self):
         """测试多次序列化/反序列化循环"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow(flow_id="multi_round_flow")
 
         @register_serializable
-        class TestRoutine(Routine):
+        class PersistenceTestRoutine3(Routine):
             def __init__(self):
                 super().__init__()
                 self.outputevent = self.define_event("output", ["data"])
                 self.set_config(round=0)
 
-        routine = TestRoutine()
+        routine = PersistenceTestRoutine3()
         routine_id = flow.add_routine(routine, "test")
 
         # 进行多轮序列化/反序列化

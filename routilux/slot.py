@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from routilux.routine import Routine
     from routilux.event import Event
 
-from routilux.utils.serializable import register_serializable, Serializable
+from serilux import register_serializable, Serializable
 
 
 @register_serializable
@@ -408,7 +408,8 @@ class Slot(Serializable):
         if hasattr(self, "merge_strategy") and self.merge_strategy == "_custom":
             # Try to restore from legacy metadata if present
             if hasattr(self, "_merge_strategy_metadata"):
-                from routilux.utils.serializable import deserialize_callable
+                from serilux import deserialize_callable
+
                 strategy = deserialize_callable(self._merge_strategy_metadata, registry=registry)
                 if strategy:
                     self.merge_strategy = strategy

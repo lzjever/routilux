@@ -6,9 +6,8 @@ Routes data to different outputs based on conditions.
 
 from __future__ import annotations
 from typing import Dict, Any, Callable, Optional, Union
-import inspect
 from routilux.routine import Routine
-from routilux.utils.serializable import (
+from serilux import (
     register_serializable,
     serialize_callable_with_fallback,
     deserialize_callable,
@@ -294,7 +293,6 @@ class ConditionalRouter(Routine):
         except Exception:
             return False
 
-
     def serialize(self) -> Dict[str, Any]:
         """Serialize ConditionalRouter, handling lambda functions in routes.
 
@@ -314,7 +312,9 @@ class ConditionalRouter(Routine):
             if callable(condition):
                 # Use smart serialization with automatic fallback to expression extraction
                 try:
-                    condition_data = serialize_callable_with_fallback(condition, owner=self, fallback_to_expression=True)
+                    condition_data = serialize_callable_with_fallback(
+                        condition, owner=self, fallback_to_expression=True
+                    )
                     serialized_routes.append((route_name, condition_data))
                 except ValueError as e:
                     # Re-raise with route name context
@@ -354,7 +354,7 @@ class ConditionalRouter(Routine):
             if callable(condition_data):
                 deserialized_routes.append((route_name, condition_data))
                 continue
-            
+
             # Try to deserialize using the serialization module
             if isinstance(condition_data, dict) and "_type" in condition_data:
                 condition = deserialize_callable(condition_data, registry=registry)
@@ -373,10 +373,14 @@ class ConditionalRouter(Routine):
                         )
                     else:
                         # Extract more information for error message
-                        callable_type = condition_data.get("callable_type") or condition_data.get("_type", "unknown")
+                        callable_type = condition_data.get("callable_type") or condition_data.get(
+                            "_type", "unknown"
+                        )
                         module_name = condition_data.get("module", "unknown")
-                        function_name = condition_data.get("name") or condition_data.get("method_name", "unknown")
-                        
+                        function_name = condition_data.get("name") or condition_data.get(
+                            "method_name", "unknown"
+                        )
+
                         raise ValueError(
                             f"Failed to deserialize {callable_type} condition for route '{route_name}': "
                             f"cannot restore {callable_type} '{function_name}' from module '{module_name}'. "

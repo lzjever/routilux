@@ -7,7 +7,7 @@ Used for recording flow execution state.
 import uuid
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from routilux.utils.serializable import register_serializable, Serializable
+from serilux import register_serializable, Serializable
 import json
 
 

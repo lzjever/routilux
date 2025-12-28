@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 import threading
 from datetime import datetime
-from typing import Dict, Optional, Any, List, Set, Tuple, Type, TYPE_CHECKING
+from typing import Dict, Optional, Any, List, Set, Tuple, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor, Future
 
 if TYPE_CHECKING:
@@ -20,13 +20,7 @@ if TYPE_CHECKING:
     from routilux.execution_tracker import ExecutionTracker
     from routilux.error_handler import ErrorHandler
 
-from routilux.utils.serializable import register_serializable, Serializable
-from routilux.utils.serializable import (
-    deserialize_callable,
-    ObjectRegistry,
-    SerializableRegistry,
-)
-import importlib
+from serilux import register_serializable, Serializable
 
 
 @register_serializable
@@ -976,7 +970,8 @@ class Flow(Serializable):
         """
         # Validate all Serializable objects before serialization
         # This catches issues early and provides clear error messages
-        from routilux.utils.serializable import validate_serializable_tree
+        from serilux import validate_serializable_tree
+
         validate_serializable_tree(self)
 
         # Let base class handle all registered fields including routines and connections
@@ -1002,18 +997,17 @@ class Flow(Serializable):
             if isinstance(job_state_data.get("updated_at"), str):
                 job_state_data["updated_at"] = datetime.fromisoformat(job_state_data["updated_at"])
 
-
         super().deserialize(data)
-        
+
         # Post-process: Restore routine references by finding routines with matching event/slot names
         # (This is Flow-specific logic that base class cannot handle)
-        from routilux.routine import Routine
+
         for routine in self.routines.values():
             routine.current_flow = self._current_flow
-        
+
         # Post-process: Restore connection references by finding routines with matching event/slot names
         # (This is Flow-specific logic that base class cannot handle)
-        
+
         valid_connections = []
         for connection in self.connections:
             source_event_name = getattr(connection, "_source_event_name", None)
@@ -1047,6 +1041,6 @@ class Flow(Serializable):
                 # Rebuild mapping
                 key = (connection.source_event, connection.target_slot)
                 self._event_slot_connections[key] = connection
-        
+
         # Update connections list with only valid connections
         self.connections = valid_connections

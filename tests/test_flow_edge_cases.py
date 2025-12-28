@@ -13,12 +13,15 @@ class TestFlowDeserializeEdgeCases:
 
     def test_deserialize_with_missing_routine_class(self):
         """测试反序列化时无法加载 routine 类（应该报错）"""
+        from serilux import register_serializable
+
         flow = Flow()
 
-        class TestRoutine(Routine):
+        @register_serializable
+        class EdgeCaseTestRoutine(Routine):
             pass
 
-        routine = TestRoutine()
+        routine = EdgeCaseTestRoutine()
         routine_id = flow.add_routine(routine, "test")
 
         # 序列化
@@ -58,8 +61,8 @@ class TestFlowDeserializeEdgeCases:
 
     def test_deserialize_with_partial_connection_data(self):
         """测试反序列化时连接数据不完整"""
-        from routilux.utils.serializable import register_serializable
-        
+        from serilux import register_serializable
+
         flow = Flow()
 
         @register_serializable

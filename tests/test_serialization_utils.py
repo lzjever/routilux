@@ -4,7 +4,7 @@
 测试 serialization_utils 模块的所有功能，提高代码覆盖率。
 """
 
-from routilux.utils.serializable import (
+from serilux import (
     serialize_callable,
     deserialize_callable,
 )
@@ -193,7 +193,8 @@ class TestDeserializeCallable:
         assert serialized is not None
 
         # 反序列化（需要提供 registry）
-        from routilux.utils.serializable import ObjectRegistry
+        from serilux import ObjectRegistry
+
         registry = ObjectRegistry()
         registry.register(routine, object_id="test_routine")
         deserialized = deserialize_callable(serialized, registry=registry)
@@ -275,6 +276,3 @@ class TestDeserializeCallable:
         result = deserialize_callable(bad_data)
         # 应该返回 None 而不是抛出异常
         assert result is None
-
-
-

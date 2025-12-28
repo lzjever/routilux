@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from routilux.slot import Slot
     from routilux.flow import Flow
 
-from routilux.utils.serializable import register_serializable, Serializable
+from serilux import register_serializable, Serializable
 
 
 @register_serializable
@@ -99,7 +99,6 @@ class Event(Serializable):
         # Let base class handle registered fields (name, output_params)
         # Base class is sufficient - no special handling needed
         super().deserialize(data, registry=registry)
-
 
     def __repr__(self) -> str:
         """Return string representation of the Event."""

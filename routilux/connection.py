@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from routilux.event import Event
     from routilux.slot import Slot
 
-from routilux.utils.serializable import register_serializable, Serializable
+from serilux import register_serializable, Serializable
 
 
 @register_serializable

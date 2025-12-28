@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, TYPE_CHECKING
 from enum import Enum
 import time
 import logging
-from routilux.utils.serializable import register_serializable, Serializable
+from serilux import register_serializable, Serializable
 
 if TYPE_CHECKING:
     from routilux.routine import Routine

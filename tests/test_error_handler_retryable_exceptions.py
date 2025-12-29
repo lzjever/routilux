@@ -18,7 +18,7 @@ class TestRetryableExceptions:
                 super().__init__()
                 # Define trigger slot for entry routine
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            
+
             def _handle_trigger(self, **kwargs):
                 call_count[0] += 1
                 if call_count[0] == 1:
@@ -56,7 +56,7 @@ class TestRetryableExceptions:
                 super().__init__()
                 # Define trigger slot for entry routine
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            
+
             def _handle_trigger(self, **kwargs):
                 call_count[0] += 1
                 if call_count[0] < 3:
@@ -86,7 +86,7 @@ class TestRetryableExceptions:
                 super().__init__()
                 # Define trigger slot for entry routine
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            
+
             def _handle_trigger(self, **kwargs):
                 call_count[0] += 1
                 raise ValueError("Non-retryable")

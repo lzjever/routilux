@@ -22,7 +22,7 @@ class TestRoutineLevelErrorHandler:
                 super().__init__()
                 # Define trigger slot for entry routine
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            
+
             def _handle_trigger(self, **kwargs):
                 raise ValueError("Test error")
 
@@ -49,7 +49,7 @@ class TestRoutineLevelErrorHandler:
                 super().__init__()
                 # Define trigger slot for entry routine
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            
+
             def _handle_trigger(self, **kwargs):
                 raise ValueError("Test error")
 
@@ -75,7 +75,7 @@ class TestRoutineLevelErrorHandler:
                 super().__init__()
                 # Define trigger slot for entry routine
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            
+
             def _handle_trigger(self, **kwargs):
                 raise ValueError("Test error")
 
@@ -102,7 +102,7 @@ class TestCriticalOptionalRoutines:
                 super().__init__()
                 # Define trigger slot for entry routine
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            
+
             def _handle_trigger(self, **kwargs):
                 raise ValueError("Optional operation failed")
 
@@ -125,7 +125,7 @@ class TestCriticalOptionalRoutines:
                 super().__init__()
                 # Define trigger slot for entry routine
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            
+
             def _handle_trigger(self, **kwargs):
                 raise ValueError("Optional operation failed")
 
@@ -149,7 +149,7 @@ class TestCriticalOptionalRoutines:
                 super().__init__()
                 # Define trigger slot for entry routine
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            
+
             def _handle_trigger(self, **kwargs):
                 call_count[0] += 1
                 if call_count[0] < 2:
@@ -177,7 +177,7 @@ class TestCriticalOptionalRoutines:
                 super().__init__()
                 # Define trigger slot for entry routine
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            
+
             def _handle_trigger(self, **kwargs):
                 raise ConnectionError("Always fails")
 
@@ -279,7 +279,7 @@ class TestErrorHandlerIsCritical:
                 super().__init__()
                 # Define trigger slot for entry routine
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            
+
             def _handle_trigger(self, **kwargs):
                 raise ConnectionError("Always fails")
 

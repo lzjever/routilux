@@ -87,7 +87,7 @@ def test_continue_strategy():
             super().__init__()
             # Define trigger slot for entry routine
             self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-        
+
         def _handle_trigger(self, **kwargs):
             raise ValueError("This will be logged but execution continues")
 

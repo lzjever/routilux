@@ -478,7 +478,7 @@ class Flow(Serializable):
             entry_params: Optional dictionary of parameters to pass to the entry
                 routine's trigger slot. These are passed as data to the trigger slot.
                 Example: {"data": "value", "count": 42}
-                
+
                 Note: The entry routine must have a "trigger" slot defined.
                 Define it using: routine.define_slot("trigger", handler=your_handler)
             execution_strategy: Optional execution strategy override.
@@ -1073,6 +1073,6 @@ class Flow(Serializable):
                 # Rebuild mapping
                 key = (connection.source_event, connection.target_slot)
                 self._event_slot_connections[key] = connection
-        
+
         # Update connections list with only valid connections
         self.connections = valid_connections

@@ -142,6 +142,277 @@ When a flow is set to concurrent execution mode:
 3. **Dependency Handling**: Routines wait for their dependencies to complete before executing
 4. **Thread Safety**: All state updates are thread-safe
 
+Concurrent Execution Thread Model
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Understanding the thread model is crucial for effectively using concurrent execution mode.
+This section explains how routines are scheduled and executed in concurrent mode.
+
+Thread Pool Architecture
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Routilux uses a thread pool executor to manage concurrent routine execution:
+
+.. code-block:: python
+
+   flow = Flow(execution_strategy="concurrent", max_workers=5)
+   # Creates a ThreadPoolExecutor with 5 worker threads
+
+**Key Components**:
+
+1. **Thread Pool**: A pool of worker threads (controlled by ``max_workers``)
+2. **Task Queue**: Internal queue in the thread pool for pending tasks
+3. **Active Futures Tracking**: Flow maintains a set of active futures to track running tasks
+4. **Execution Lock**: A lock protecting the ``_active_futures`` set for thread-safe updates
+
+Non-Blocking Event Emission
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In concurrent mode, ``Event.emit()`` is **non-blocking**:
+
+.. code-block:: python
+
+   # Routine A's handler
+   def _handle_trigger(self, **kwargs):
+       print("Before emit")
+       self.emit("output", data="test")
+       print("After emit")  # ← Executes immediately, doesn't wait for handlers
+
+When an event is emitted:
+
+1. **Task Submission**: Each connected slot's activation is submitted to the thread pool as a separate task
+2. **Immediate Return**: ``emit()`` returns immediately after submitting all tasks (typically < 1ms)
+3. **Background Execution**: Slot handlers execute in background threads independently
+
+**Important**: ``emit()`` does **not** wait for handlers to complete. Handlers continue executing
+asynchronously in background threads.
+
+Parallel Slot Execution
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+When an event emits to multiple connected slots, all slots execute **in parallel**:
+
+.. code-block:: python
+
+   # Routine A emits to 3 slots
+   self.emit("output", data="test")
+   # ↓
+   # All 3 slots execute concurrently:
+   # - Thread-1: Routine B.handler()
+   # - Thread-2: Routine C.handler()
+   # - Thread-3: Routine D.handler()
+
+**Execution Timeline**:
+
+.. code-block:: text
+
+   T0: Routine A.emit() starts
+   T1: Submit slot_B task → Thread-1 starts Routine B.handler()
+   T2: Submit slot_C task → Thread-2 starts Routine C.handler()
+   T3: Submit slot_D task → Thread-3 starts Routine D.handler()
+   T4: emit() returns (~1ms)  ← Doesn't wait for handlers
+   
+   Meanwhile:
+   T1-T6: Thread-1 executes Routine B.handler() (5 seconds)
+   T2-T5: Thread-2 executes Routine C.handler() (3 seconds)
+   T3-T4: Thread-3 executes Routine D.handler() (1 second)
+
+**Key Points**:
+
+* All connected slots start executing **almost simultaneously** (within milliseconds)
+* Each slot's handler runs in a **separate thread**
+* ``emit()`` returns **before** any handler completes
+* Total execution time = **max(handler_times)**, not sum(handler_times)
+
+Nested Event Emission and Call Stack Behavior
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a handler emits further events, the execution continues in the same thread until the
+task is submitted to the thread pool:
+
+.. code-block:: python
+
+   # Routine B's handler (executing in Thread-1)
+   def _handle_slot1(self, data, **kwargs):
+       result = self.process(data)
+       self.emit("result", data=result)  # ← Executes in Thread-1
+       self._cleanup()  # ← Must wait for emit() to return
+
+**Call Stack in Thread-1**:
+
+.. code-block:: text
+
+   Thread-1:
+     activate_slot()
+       → slot_B.receive()
+         → Routine B.handler()
+           → emit("result")
+             → Event.emit()
+               → executor.submit()  # Submit Routine C task
+               → with _execution_lock:  # Update tracking set
+                 → _active_futures.add()
+               → return
+           → _cleanup()  # Must wait for emit() to return
+           → return
+       → return
+
+**Important Observations**:
+
+1. **Handler execution is synchronous within its thread**: The handler must wait for
+   ``emit()`` to complete (including task submission and lock operations) before continuing
+2. **Downstream routines execute in different threads**: Routine C will execute in Thread-3,
+   but Routine B's handler is still running in Thread-1
+3. **Lock operations are fast**: Lock acquisition and set updates typically take < 0.1ms,
+   which is negligible compared to handler execution time (seconds or minutes)
+
+**Why This Design**:
+
+* Lock operations are necessary for thread-safe tracking of active futures
+* The time spent on locks (~0.1ms) is negligible compared to handler execution time
+* The real performance benefit comes from **parallel handler execution**, not from avoiding locks
+
+Multiple Event Emissions
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a routine emits multiple events sequentially, each ``emit()`` must complete before
+the next one starts:
+
+.. code-block:: python
+
+   # Routine A's handler
+   def _handle_trigger(self, **kwargs):
+       self.emit("output", msg="1#")  # Must complete before next emit
+       self.emit("output", msg="2#")  # Waits for first emit to finish
+
+**Execution Timeline**:
+
+.. code-block:: text
+
+   T0: emit("1#") starts
+   T1: Submit slot_B task (acquire lock, update set)
+   T2: Submit slot_C task (acquire lock, update set)
+   T3: Submit slot_D task (acquire lock, update set)
+   T4: emit("1#") returns (~1ms)
+   
+   T5: emit("2#") starts  ← Must wait for emit("1#") to complete
+   T6: Submit slot_B task
+   T7: Submit slot_C task
+   T8: Submit slot_D task
+   T9: emit("2#") returns
+
+**Key Points**:
+
+* Each ``emit()`` must complete (all tasks submitted, all locks released) before the next
+  ``emit()`` can start
+* If an event has many connected slots, the emit operation takes longer (more task
+  submissions and lock operations)
+* Lock contention may occur if handlers from the first emit are also emitting events
+
+**Performance Impact**:
+
+* Lock operations: ~0.1ms per slot
+* Task submission: ~0.1ms per slot
+* **Total emit() time**: ~0.2ms × number_of_slots
+* This is still very fast compared to handler execution time
+
+Thread Safety and Lock Usage
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Locks are used **only for metadata management**, not for blocking handler execution:
+
+.. code-block:: python
+
+   # Lock usage in Event.emit()
+   with flow._execution_lock:
+       flow._active_futures.add(future)  # Update tracking set
+
+**Lock Purpose**:
+
+* **Protect shared state**: The ``_active_futures`` set is shared across all threads
+* **Thread-safe updates**: Ensure atomic add/remove operations
+* **Very fast operations**: Set updates take < 0.1ms
+
+**Lock Does NOT**:
+
+* Block handler execution (handlers run in separate threads)
+* Serialize routine execution (routines execute in parallel)
+* Impact performance significantly (lock time << handler time)
+
+**Time Comparison**:
+
+* Lock operation: **0.1ms**
+* Handler execution: **5000ms**
+* **Lock time percentage: 0.002%** (negligible)
+
+Waiting for Completion
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Since ``emit()`` returns immediately without waiting for handlers, you must explicitly
+wait for completion when needed:
+
+.. code-block:: python
+
+   flow = Flow(execution_strategy="concurrent")
+   job_state = flow.execute("entry_routine")
+   
+   # emit() has returned, but handlers may still be running
+   # Wait for all handlers to complete
+   flow.wait_for_completion(timeout=10.0)
+   
+   # Now all handlers are guaranteed to be finished
+
+**How ``wait_for_completion()`` Works**:
+
+1. Checks the ``_active_futures`` set for incomplete tasks
+2. Waits in a loop, periodically checking completion status
+3. Returns when all futures are done (or timeout occurs)
+4. Thread-safe: Uses locks to safely check the futures set
+
+**Best Practice**:
+
+Always call ``wait_for_completion()`` before accessing results or shutting down:
+
+.. code-block:: python
+
+   flow = Flow(execution_strategy="concurrent")
+   try:
+       job_state = flow.execute("entry_routine")
+       flow.wait_for_completion(timeout=10.0)
+       # Now safe to access results
+   finally:
+       flow.shutdown(wait=True)
+
+Thread Model Summary
+^^^^^^^^^^^^^^^^^^^^^
+
+**Key Characteristics**:
+
+1. **Non-blocking emit()**: Returns immediately after task submission (~1ms)
+2. **Parallel handler execution**: All connected slots execute concurrently in separate threads
+3. **Fast lock operations**: Metadata updates take < 0.1ms (negligible)
+4. **True parallelism**: Multiple routines execute simultaneously, providing real performance benefits
+5. **Explicit waiting**: Must call ``wait_for_completion()`` to wait for handlers
+
+**Performance Benefits**:
+
+* **Sequential mode**: Total time = sum(all_handler_times)
+* **Concurrent mode**: Total time ≈ max(handler_times)
+* **Speedup**: Up to N× for N independent routines (limited by thread pool size)
+
+**When to Use Concurrent Mode**:
+
+* I/O-bound operations (network requests, file I/O)
+* Independent routines that can run in parallel
+* High-throughput scenarios
+* When performance is critical
+
+**When to Use Sequential Mode**:
+
+* Execution order matters
+* Deterministic behavior is required
+* Handlers share non-thread-safe state
+* Easier debugging
+
 Event Execution Order
 ~~~~~~~~~~~~~~~~~~~~~
 

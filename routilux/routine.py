@@ -567,7 +567,7 @@ class Routine(Serializable):
     def __call__(self, **kwargs) -> None:
         """Execute routine (deprecated - use slot handlers instead).
 
-        .. deprecated:: 
+        .. deprecated::
             Direct calling of routines is deprecated. Routines should be executed
             through slot handlers. Entry routines should define a "trigger" slot
             that will be called by Flow.execute().
@@ -582,7 +582,7 @@ class Routine(Serializable):
             The base implementation automatically updates statistics:
             - Sets "called" to True
             - Increments "call_count" by 1
-            
+
             However, in the new architecture, routines should be triggered through
             slots, and statistics should be tracked in slot handlers.
 
@@ -599,7 +599,7 @@ class Routine(Serializable):
             ...         super().__init__()
             ...         # Define trigger slot for entry routine
             ...         self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-            ...     
+            ...
             ...     def _handle_trigger(self, **kwargs):
             ...         # Execution logic here
             ...         self.increment_stat("custom_operations")

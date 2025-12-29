@@ -129,7 +129,7 @@ class TestFlowRoundTripSerialization:
                 self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
                 self.outputevent = self.define_event("output", ["data"])
                 self.set_config(key="value", number=42)
-            
+
             def _handle_trigger(self, **kwargs):
                 pass
 
@@ -166,7 +166,9 @@ class TestFlowRoundTripSerialization:
             if isinstance(strategy1, str):
                 assert strategy1 == (strategy2.value if hasattr(strategy2, "value") else strategy2)
             elif hasattr(strategy1, "value"):
-                assert strategy1.value == (strategy2.value if hasattr(strategy2, "value") else strategy2)
+                assert strategy1.value == (
+                    strategy2.value if hasattr(strategy2, "value") else strategy2
+                )
 
         # 验证 routine 配置一致
         if routine_id in data1["routines"]:
@@ -341,8 +343,7 @@ class TestFlowDeserializeAndExecute:
         assert source_id in new_flow.routines, "source routine 必须存在"
         assert target_id in new_flow.routines, "target routine 必须存在"
         assert len(new_flow.connections) > 0, "connections 必须被恢复"
-        
+
         # 如果 handler 是方法（可以恢复），应该产生结果
         # 如果 handler 是闭包/lambda（无法恢复），results 可能为空，这是预期的
         # 这个测试主要验证 Flow 结构完整性和执行不抛异常
-

@@ -356,9 +356,7 @@ class Slot(Serializable):
             self._data = new_data.copy()
             return self._data
 
-    def call_handler(
-        self, data: Dict[str, Any], propagate_exceptions: bool = False
-    ) -> None:
+    def call_handler(self, data: Dict[str, Any], propagate_exceptions: bool = False) -> None:
         """Call handler with data, optionally propagating exceptions.
 
         This method is used for entry routine trigger slots where exceptions

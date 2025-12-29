@@ -15,11 +15,20 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+# Import version from package
+try:
+    from routilux import __version__
+except ImportError as e:
+    raise ImportError(
+        f"Failed to import routilux.__version__: {e}. "
+        "Make sure the package is installed or the project root is in sys.path."
+    ) from e
+
 project = 'Routilux'
 copyright = '2024, Routilux Team'
 author = 'Routilux Team'
-release = '0.8.0'
-version = '0.8.0'
+release = __version__  # Full version (e.g., '0.8.1')
+version = '.'.join(__version__.split('.')[:2])  # Major.minor version (e.g., '0.8')
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

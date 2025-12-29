@@ -55,8 +55,13 @@ jobs:
       
       - name: Verify version matches package
         run: |
-          PACKAGE_VERSION=$(python -c "import sys; sys.path.insert(0, '.'); from routilux import __version__; print(__version__)")
+          # Extract version from __init__.py without importing the package (to avoid dependency issues)
+          PACKAGE_VERSION=$(python -c "import re; content = open('routilux/__init__.py').read(); match = re.search(r\"__version__\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]\", content); print(match.group(1) if match else '')")
           EXPECTED_VERSION="${{ steps.get_version.outputs.version }}"
+          if [ -z "$PACKAGE_VERSION" ]; then
+            echo "Error: Failed to extract version from routilux/__init__.py"
+            exit 1
+          fi
           if [ "$PACKAGE_VERSION" != "$EXPECTED_VERSION" ]; then
             echo "Error: Package version ($PACKAGE_VERSION) doesn't match tag version ($EXPECTED_VERSION)"
             exit 1

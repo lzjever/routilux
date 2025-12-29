@@ -68,14 +68,18 @@ Emit events to trigger connected slots. The flow context is automatically detect
        self.emit("output", result="success", status="completed")
 
 **Automatic Flow Detection**:
+
 - When called within a Flow execution context, ``emit()`` automatically retrieves
   the flow from ``routine._current_flow``
 - The flow context is set by ``Flow.execute()`` and ``Flow.resume()``
 - You don't need to manually pass the flow parameter
 
 **Explicit Flow Parameter** (optional):
+
 - You can still explicitly pass flow for backward compatibility:
+
   .. code-block:: python
+
      flow = getattr(self, "_current_flow", None)
      self.emit("output", flow=flow, result="success")
 
@@ -293,24 +297,34 @@ Best Practices
 --------------
 
 1. **Always use ``**kwargs`` in handlers**:
+
    .. code-block:: python
+
       def _handle_input(self, data=None, **kwargs):
           # Flexible handler signature
 
 2. **Define trigger slot for entry routines**:
+
    .. code-block:: python
+
       self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
 
 3. **Don't rely on emit() waiting**:
+
    .. code-block:: python
+
       self.emit("output", data="value")
       # Handler may not have executed yet!
       # Use wait_for_completion() if needed
 
 4. **Use merge_strategy="append" for aggregation**:
+
    .. code-block:: python
+
       self.input_slot = self.define_slot("input", merge_strategy="append")
 
 5. **Track operations consistently**:
+
    .. code-block:: python
+
       self._track_operation("processing", success=True, items=10)

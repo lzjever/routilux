@@ -124,7 +124,7 @@ Job state that records:
 * Execution history
 
 Architecture Pattern
--------------------
+--------------------
 
 Event Queue Pattern
 ~~~~~~~~~~~~~~~~~~~

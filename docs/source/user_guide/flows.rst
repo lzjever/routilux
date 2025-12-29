@@ -115,6 +115,7 @@ Example entry routine:
 The execute method returns a ``JobState`` object that tracks the execution status.
 
 **Important**: Each ``execute()`` call is an independent execution:
+
 - Each ``execute()`` creates a new ``JobState`` and starts a new event loop
 - Slot data (``_data``) is **NOT shared** between different ``execute()`` calls
 - If you need to aggregate data from multiple sources, use a single ``execute()``
@@ -501,19 +502,25 @@ Best Practices
 --------------
 
 1. **Always wait for completion** in concurrent mode:
+
    .. code-block:: python
+
       flow.execute("entry")
       flow.wait_for_completion(timeout=10.0)
 
 2. **Always shut down** flows when done:
+
    .. code-block:: python
+
       try:
           # Use flow
       finally:
           flow.shutdown(wait=True)
 
 3. **Use single execute() for aggregation**:
+
    .. code-block:: python
+
       # Good: Single execute with multiple emits
       class MultiSource(Routine):
           def _handle_trigger(self, **kwargs):

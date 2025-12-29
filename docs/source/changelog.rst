@@ -48,6 +48,7 @@ Migration Guide
 **For Entry Routines:**
 
 Before (deprecated):
+
 .. code-block:: python
 
    class MyEntryRoutine(Routine):
@@ -56,6 +57,7 @@ Before (deprecated):
            self.emit("output", data="result")
 
 After (required):
+
 .. code-block:: python
 
    class MyEntryRoutine(Routine):

@@ -589,7 +589,7 @@ class Routine(Serializable):
         Examples:
             Old way (deprecated):
             >>> class MyRoutine(Routine):
-            ...     def __call__(self, **kwargs):
+            ...     def __call__(self, \*\*kwargs):
             ...         # This is deprecated
             ...         pass
 
@@ -600,7 +600,7 @@ class Routine(Serializable):
             ...         # Define trigger slot for entry routine
             ...         self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
             ...
-            ...     def _handle_trigger(self, **kwargs):
+            ...     def _handle_trigger(self, \*\*kwargs):
             ...         # Execution logic here
             ...         self.increment_stat("custom_operations")
         """

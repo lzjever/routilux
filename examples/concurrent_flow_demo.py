@@ -56,12 +56,12 @@ class DataFetcher(Routine):
             "fetched_at": time.time(),
         }
 
+        # Flow is automatically detected from routine context
         self.emit(
             "data_fetched",
             data=data,
             source=self.source_name,
             timestamp=time.time(),
-            flow=self._current_flow,
         )
 
 
@@ -97,12 +97,12 @@ class DataProcessor(Routine):
 
         processing_time = time.time() - start_time
 
+        # Flow is automatically detected from routine context
         self.emit(
             "data_processed",
             result=processed,
             processor_id=self.processor_id,
             processing_time=processing_time,
-            flow=self._current_flow,
         )
 
 
@@ -135,11 +135,11 @@ class DataAggregator(Routine):
                 "aggregated_at": time.time(),
             }
 
+            # Flow is automatically detected from routine context
             self.emit(
                 "aggregated",
                 final_result=final_result,
                 total_count=len(self._collected_results),
-                flow=self._current_flow,
             )
 
 
@@ -175,7 +175,8 @@ class TriggerRoutine(Routine):
     def _handle_trigger(self, task_id: str = None, **kwargs):
         """Handle trigger and start concurrent fetching"""
         task_id = task_id or kwargs.get("task_id", "default_task")
-        self.emit("trigger_fetch", task_id=task_id, flow=self._current_flow)
+        # Flow is automatically detected from routine context
+        self.emit("trigger_fetch", task_id=task_id)
 
 
 # ============================================================================

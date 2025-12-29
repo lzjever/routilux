@@ -208,20 +208,42 @@ def demo_aggregator():
     consumer_id = flow.add_routine(consumer, "consumer")
     flow.connect(agg_id, "aggregated", consumer_id, "input")
 
+    # Create a multi-source trigger routine that triggers all search tasks
+    class MultiSourceTrigger(Routine):
+        """Trigger routine that emits to multiple search tasks in a single execute()"""
+
+        def __init__(self):
+            super().__init__()
+            self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
+            self.output_event = self.define_event("trigger_search", ["query"])
+
+        def _handle_trigger(self, query: str = None, **kwargs):
+            """Trigger all search tasks in a single execute() call"""
+            query = query or kwargs.get("query", "test query")
+            # Emit to all connected search tasks - they all share the same execution
+            # Flow is automatically detected from routine context
+            self.emit("trigger_search", query=query)
+
+    trigger = MultiSourceTrigger()
+    trigger_id = flow.add_routine(trigger, "trigger")
+
+    # Connect trigger to all search tasks
+    flow.connect(trigger_id, "trigger_search", id1, "trigger")
+    flow.connect(trigger_id, "trigger_search", id2, "trigger")
+    flow.connect(trigger_id, "trigger_search", id3, "trigger")
+
     print("\nFlow structure:")
-    print("  search1 -> aggregator -> consumer")
-    print("  search2 -> aggregator")
-    print("  search3 -> aggregator")
+    print("  trigger -> search1 -> aggregator -> consumer")
+    print("  trigger -> search2 -> aggregator")
+    print("  trigger -> search3 -> aggregator")
     print("\nAggregator expects: 3 messages")
 
-    # Execute all search tasks
-    print("\n🚀 Executing all search tasks...")
-    flow.execute(id1, entry_params={"query": "test query"})
-    flow.execute(id2, entry_params={"query": "test query"})
-    flow.execute(id3, entry_params={"query": "test query"})
+    # Execute once - all search tasks will be triggered in the same execution
+    print("\n🚀 Executing all search tasks (single execute, multiple emits)...")
+    flow.execute(trigger_id, entry_params={"query": "test query"})
 
-    # Wait a bit for all messages to arrive
-    time.sleep(0.5)
+    # Wait for all async tasks to complete
+    flow.wait_for_completion(timeout=2.0)
 
     print("\n" + "=" * 70)
     print("Results:")

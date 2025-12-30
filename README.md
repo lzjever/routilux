@@ -1,6 +1,6 @@
 # Routilux ⚡
 
-[![PyPI version](https://badge.fury.io/py/routilux.svg)](https://badge.fury.io/py/routilux)
+[![PyPI version](https://img.shields.io/pypi/v/routilux.svg)](https://pypi.org/project/routilux/)
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Documentation](https://readthedocs.org/projects/routilux/badge/?version=latest)](https://routilux.readthedocs.io)
@@ -279,6 +279,21 @@ We welcome contributions! Here's how you can help:
 2. **Report bugs** 🐛 - Help us improve
 3. **Suggest features** 💡 - Share your ideas
 4. **Submit PRs** 🔧 - Contribute code
+
+## 🏢 About Agentsmith
+
+**Routilux** is part of the **Agentsmith** open-source ecosystem. Agentsmith is a ToB intelligent agent and algorithm development platform, currently deployed in multiple highway management companies, securities firms, and regulatory agencies in China. The Agentsmith team is gradually open-sourcing the platform by removing proprietary code and algorithm modules, as well as enterprise-specific customizations, while decoupling the system for modular use by the open-source community.
+
+### 🌟 Agentsmith Open-Source Projects
+
+- **[Varlord](https://github.com/lzjever/varlord)** ⚙️ - Configuration management library with multi-source support
+- **[Routilux](https://github.com/lzjever/routilux)** ⚡ - Event-driven workflow orchestration framework
+- **[Serilux](https://github.com/lzjever/serilux)** 📦 - Flexible serialization framework for Python objects
+- **[Lexilux](https://github.com/lzjever/lexilux)** 🚀 - Unified LLM API client library
+
+These projects are modular components extracted from the Agentsmith platform, designed to be used independently or together to build powerful applications.
+
+> **Note**: Currently, GitHub is used for code synchronization and package releases. The team is gradually transitioning to use GitHub as the primary repository.
 
 ## 📄 License
 

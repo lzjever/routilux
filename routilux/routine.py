@@ -565,7 +565,7 @@ class Routine(Serializable):
             self._stats[history_key] = history
 
     def __call__(self, **kwargs) -> None:
-        """Execute routine (deprecated - use slot handlers instead).
+        r"""Execute routine (deprecated - use slot handlers instead).
 
         .. deprecated::
             Direct calling of routines is deprecated. Routines should be executed

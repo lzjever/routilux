@@ -200,7 +200,7 @@ class Event(Serializable):
             return
 
         # Queue-based execution: create tasks and enqueue
-        from routilux.flow import SlotActivationTask, TaskPriority
+        from routilux.flow.task import SlotActivationTask, TaskPriority
 
         for slot in self.connected_slots:
             connection = flow._find_connection(self, slot)

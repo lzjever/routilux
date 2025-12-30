@@ -139,9 +139,9 @@ class TestUnifiedExecutionModel:
 
         # 两者都应该有队列和事件循环基础设施
         assert hasattr(flow_seq, "_task_queue")
-        assert hasattr(flow_seq, "_event_loop")
+        assert hasattr(flow_seq, "_start_event_loop")
         assert hasattr(flow_con, "_task_queue")
-        assert hasattr(flow_con, "_event_loop")
+        assert hasattr(flow_con, "_start_event_loop")
 
         # 区别只在 max_workers
         assert flow_seq.max_workers == 1

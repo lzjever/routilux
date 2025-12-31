@@ -109,6 +109,11 @@ def execute_sequential(
         required_empty_checks = 3  # Require 3 consecutive empty checks to ensure stability
 
         while True:
+            # Check if execution was paused
+            if job_state.status == "paused":
+                # Execution was paused, don't mark as completed
+                break
+
             queue_empty = flow._task_queue.empty()
             with flow._execution_lock:
                 active = [f for f in flow._active_tasks if not f.done()]
@@ -143,12 +148,13 @@ def execute_sequential(
             },
         )
 
-        job_state.record_execution(
-            entry_routine_id, "completed", {"execution_time": execution_time}
-        )
-        flow.execution_tracker.record_routine_end(entry_routine_id, "completed")
-
-        job_state.status = "completed"
+        # Only mark as completed if not paused
+        if job_state.status != "paused":
+            job_state.record_execution(
+                entry_routine_id, "completed", {"execution_time": execution_time}
+            )
+            flow.execution_tracker.record_routine_end(entry_routine_id, "completed")
+            job_state.status = "completed"
 
         # Clear thread-local storage after execution completes
         if hasattr(flow._current_execution_job_state, "value"):

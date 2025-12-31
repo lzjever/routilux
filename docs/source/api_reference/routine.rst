@@ -15,6 +15,30 @@ Key Features
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: ExecutionContext
+
+.. py:class:: ExecutionContext
+   :no-index:
+
+   Execution context containing flow, job_state, and routine_id.
+
+   This is returned by :meth:`Routine.get_execution_context` to provide convenient
+   access to execution-related handles during routine execution.
+
+   .. py:attribute:: flow
+      :no-index:
+
+      The Flow object managing this execution.
+
+   .. py:attribute:: job_state
+      :no-index:
+
+      The JobState object tracking this execution's state.
+
+   .. py:attribute:: routine_id
+      :no-index:
+
+      The string ID of this routine in the flow.
 
 Helper Methods
 --------------

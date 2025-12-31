@@ -474,9 +474,7 @@ class JobState(Serializable):
 
         super().deserialize(data)
 
-    def add_deferred_event(
-        self, routine_id: str, event_name: str, data: Dict[str, Any]
-    ) -> None:
+    def add_deferred_event(self, routine_id: str, event_name: str, data: Dict[str, Any]) -> None:
         """Add a deferred event to be emitted on resume.
 
         Args:
@@ -561,9 +559,7 @@ class JobState(Serializable):
         """
         self.output_handler = handler
 
-    def send_output(
-        self, routine_id: str, output_type: str, data: Dict[str, Any]
-    ) -> None:
+    def send_output(self, routine_id: str, output_type: str, data: Dict[str, Any]) -> None:
         """Send output from routine.
 
         This method is called by routines to send execution-specific data.

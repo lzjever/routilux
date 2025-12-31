@@ -133,9 +133,7 @@ class ToolExecutor(Routine):
 
             # Simulate occasional failures
             if execution_count % 5 == 0:
-                raise ValueError(
-                    f"Tool {self.tool_name} failed on attempt {execution_count}"
-                )
+                raise ValueError(f"Tool {self.tool_name} failed on attempt {execution_count}")
 
             # Update success count in JobState
             if flow and job_state:
@@ -675,7 +673,9 @@ def test_complex_scenario(flow: Flow):
                     break
             if formatter_id_in_flow:
                 formatter_state = job_state.get_routine_state(formatter_id_in_flow)
-                formatting_count = formatter_state.get("formatting_count", 0) if formatter_state else 0
+                formatting_count = (
+                    formatter_state.get("formatting_count", 0) if formatter_state else 0
+                )
                 print(f"  Formatted responses: {formatting_count}")
 
     print(f"\nProcessed {len(results)} tasks")

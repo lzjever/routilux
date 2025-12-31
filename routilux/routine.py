@@ -134,9 +134,7 @@ class Routine(Serializable):
         # Register serializable fields
         # _slots and _events are included - base class will automatically serialize/deserialize them
         # We only need to restore routine references after deserialization
-        self.add_serializable_fields(
-            ["_id", "_config", "_error_handler", "_slots", "_events"]
-        )
+        self.add_serializable_fields(["_id", "_config", "_error_handler", "_slots", "_events"])
 
     def __repr__(self) -> str:
         """Return string representation of the Routine."""

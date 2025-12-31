@@ -248,9 +248,7 @@ def resume_flow(flow: "Flow", job_state: "JobState") -> "JobState":
         else:
             import warnings
 
-            warnings.warn(
-                f"Routine '{routine_id}' not found in flow for deferred event"
-            )
+            warnings.warn(f"Routine '{routine_id}' not found in flow for deferred event")
 
     # Clear deferred events (they have been processed)
     job_state.deferred_events.clear()

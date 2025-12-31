@@ -47,6 +47,13 @@ Key Concepts
 **Fair Scheduling**
     Tasks are processed in queue order, allowing multiple message chains to progress alternately rather than one chain blocking others.
 
+Flow Identifier (flow_id)
+--------------------------
+
+Each ``Flow`` has a ``flow_id`` that identifies the workflow definition. You can specify it when creating the Flow, or let it auto-generate as a UUID.
+
+For details on how to use ``flow_id``, see :doc:`identifiers`.
+
 Creating a Flow
 ---------------
 

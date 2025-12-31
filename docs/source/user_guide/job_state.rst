@@ -39,6 +39,16 @@ This clear separation allows:
 - Independent pause/resume/cancel operations
 - Reusable routine objects across executions
 
+Identifiers in JobState
+-----------------------
+
+Each ``JobState`` has two important identifiers:
+
+- **job_id**: Automatically generated UUID that uniquely identifies this execution instance
+- **flow_id**: The identifier of the Flow that created this JobState
+
+For details on how to use these identifiers, see :doc:`identifiers`.
+
 Creating JobState
 -----------------
 

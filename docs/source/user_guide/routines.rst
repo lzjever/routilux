@@ -3,6 +3,13 @@ Working with Routines
 
 Routines are the core building blocks of routilux. This guide explains how to create and use routines in the new event queue architecture.
 
+Routine Identifier (routine_id)
+--------------------------------
+
+Each routine in a flow has a ``routine_id`` that identifies it within the flow. When you add a routine to a flow using ``flow.add_routine()``, you can specify a custom ``routine_id`` or use the auto-generated one.
+
+For details on how to use ``routine_id``, see :doc:`identifiers`.
+
 Creating a Routine
 ------------------
 

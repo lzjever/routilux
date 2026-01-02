@@ -2,7 +2,6 @@
 测试 slot handler 错误导致状态设置为 failed 的实际场景
 """
 
-import time
 from queue import Queue
 from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
 from routilux.job_state import JobState
@@ -98,7 +97,7 @@ class TestSlotErrorToFailedStatus:
         for i in range(3):
             try:
                 slot.receive({"test": f"data_{i}"}, job_state=job_state, flow=flow)
-            except:
+            except Exception:
                 pass  # slot.receive 内部捕获异常
 
         # 验证有多个错误记录

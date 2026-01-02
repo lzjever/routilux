@@ -98,6 +98,10 @@ poetry.lock
 # PEP 582
 __pypackages__/
 
+# uv
+.venv/
+# Note: uv.lock should be committed for reproducible builds
+
 # Celery stuff
 celerybeat-schedule
 celerybeat.pid

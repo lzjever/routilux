@@ -39,9 +39,47 @@ pip install routilux
 
 That's it! You're ready to go.
 
-### Development Install
+### Development Setup with uv (Recommended)
 
-For development with all dependencies:
+This project uses [uv](https://github.com/astral-sh/uv) for fast dependency management. Install uv first:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then set up the development environment:
+
+**Recommended: For active development**
+
+```bash
+# Install package with all development dependencies (recommended)
+make dev-install
+
+# Or manually with uv (dev group is installed by default)
+uv sync --group docs --all-extras
+```
+
+**Alternative: Dependencies only (for CI/CD or code review)**
+
+```bash
+# Create virtual environment and install dependencies only (without installing the package)
+# Useful for: CI/CD pipelines, code review, or when you only need development tools
+make setup-venv
+
+# Later, if you need to install the package:
+make install
+```
+
+**Understanding dependency groups vs extras:**
+
+- **Dependency groups** (`dev`, `docs`): Development dependencies that are not published to PyPI. The `dev` group is installed by default with `uv sync`.
+- **Extras**: Currently none, but may be added in the future.
+
+All `make` commands will automatically use `uv` if available, otherwise fall back to `pip`.
+
+### Development Install (Legacy - using pip)
+
+For development with all dependencies using pip:
 
 ```bash
 pip install -e ".[dev]"

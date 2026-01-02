@@ -6,7 +6,6 @@
 2. wait_for_completion 在检测到错误时不会将状态误设为 "completed"
 """
 
-import time
 import threading
 from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
 from routilux.flow.task import SlotActivationTask
@@ -213,7 +212,7 @@ class TestWaitForCompletionErrorDetectionFix:
         while not mock_queue.empty():
             try:
                 mock_queue.get_nowait()
-            except:
+            except Exception:
                 break
         flow._task_queue = mock_queue
         flow._execution_lock = threading.Lock()
@@ -246,7 +245,7 @@ class TestWaitForCompletionErrorDetectionFix:
         while not mock_queue.empty():
             try:
                 mock_queue.get_nowait()
-            except:
+            except Exception:
                 break
         flow._task_queue = mock_queue
         flow._execution_lock = threading.Lock()
@@ -281,7 +280,7 @@ class TestWaitForCompletionErrorDetectionFix:
         while not mock_queue.empty():
             try:
                 mock_queue.get_nowait()
-            except:
+            except Exception:
                 break
         flow._task_queue = mock_queue
         flow._execution_lock = threading.Lock()
@@ -314,7 +313,7 @@ class TestWaitForCompletionErrorDetectionFix:
         while not mock_queue.empty():
             try:
                 mock_queue.get_nowait()
-            except:
+            except Exception:
                 break
         flow._task_queue = mock_queue
         flow._execution_lock = threading.Lock()
@@ -346,7 +345,7 @@ class TestWaitForCompletionErrorDetectionFix:
         while not mock_queue.empty():
             try:
                 mock_queue.get_nowait()
-            except:
+            except Exception:
                 break
         flow._task_queue = mock_queue
         flow._execution_lock = threading.Lock()
@@ -417,7 +416,7 @@ class TestWaitForCompletionErrorDetectionFix:
         while not mock_queue.empty():
             try:
                 mock_queue.get_nowait()
-            except:
+            except Exception:
                 break
         flow._task_queue = mock_queue
         flow._execution_lock = threading.Lock()
@@ -449,7 +448,7 @@ class TestWaitForCompletionErrorDetectionFix:
         while not mock_queue.empty():
             try:
                 mock_queue.get_nowait()
-            except:
+            except Exception:
                 break
         flow._task_queue = mock_queue
         flow._execution_lock = threading.Lock()
@@ -476,7 +475,7 @@ class TestWaitForCompletionErrorDetectionFix:
         while not mock_queue.empty():
             try:
                 mock_queue.get_nowait()
-            except:
+            except Exception:
                 break
         flow._task_queue = mock_queue
         flow._execution_lock = threading.Lock()
@@ -550,7 +549,7 @@ class TestErrorHandlingStatusFixIntegration:
         while not mock_queue.empty():
             try:
                 mock_queue.get_nowait()
-            except:
+            except Exception:
                 break
         flow._task_queue = mock_queue
         flow._execution_lock = threading.Lock()

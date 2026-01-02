@@ -18,7 +18,6 @@ class TestTaskErrorHandling:
         from routilux.job_state import JobState
 
         job_state = JobState(flow.flow_id)
-        # job_state is now passed directly, no need to set thread-local storage
 
         class TestRoutine(Routine):
             def __init__(self):
@@ -50,7 +49,6 @@ class TestTaskErrorHandling:
         from routilux.job_state import JobState
 
         job_state = JobState(flow.flow_id)
-        # job_state is now passed directly, no need to set thread-local storage
 
         class TestRoutine(Routine):
             def __init__(self):
@@ -87,7 +85,6 @@ class TestTaskErrorHandling:
         from routilux.job_state import JobState
 
         job_state = JobState(flow.flow_id)
-        # job_state is now passed directly, no need to set thread-local storage
 
         class TestRoutine(Routine):
             def __init__(self):
@@ -175,8 +172,7 @@ class TestTaskErrorHandling:
         flow = Flow()
         from routilux.job_state import JobState
 
-        job_state = JobState(flow.flow_id)
-        # job_state is now passed directly, no need to set thread-local storage
+        _job_state = JobState(flow.flow_id)
 
         class TestRoutine(Routine):
             def __init__(self):

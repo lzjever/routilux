@@ -469,11 +469,11 @@ class Slot(Serializable):
 
                     logging.exception(f"Error in slot {self} handler: {e}")
                     # Errors are tracked in JobState execution history, not routine._stats
-                    if job_state and self.routine:
-                        # Try to get flow from parameter, then from routine
-                        if flow is None:
-                            flow = getattr(self.routine, "_current_flow", None)
-                        if flow:
+                    # Try to get job_state and flow from routine if available
+                    if self.routine:
+                        job_state = getattr(self.routine, "_job_state", None)
+                        flow = getattr(self.routine, "_current_flow", None)
+                        if job_state and flow:
                             # Find routine_id in flow using flow._get_routine_id()
                             routine_id = flow._get_routine_id(self.routine)
                             if routine_id:

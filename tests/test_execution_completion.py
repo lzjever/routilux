@@ -4,7 +4,6 @@ Execution completion mechanism tests.
 Tests for the systematic execution completion detection and waiting mechanism.
 """
 
-import time
 import pytest
 from routilux import Flow, Routine
 from routilux.job_state import JobState

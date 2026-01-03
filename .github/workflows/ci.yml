@@ -92,7 +92,7 @@ jobs:
       - name: Check package
         run: |
           uv pip install twine
-          twine check dist/*
+          uv run twine check dist/*
 
   docs:
     runs-on: ubuntu-latest

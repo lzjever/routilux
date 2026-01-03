@@ -5,7 +5,6 @@ Tests for the systematic execution completion detection and waiting mechanism.
 """
 
 import time
-import pytest
 from routilux import Flow, Routine
 from routilux.job_state import JobState
 from routilux.flow.completion import ensure_event_loop_running

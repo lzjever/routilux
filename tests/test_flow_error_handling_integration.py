@@ -15,9 +15,6 @@ class TestTaskErrorHandling:
     def test_handle_task_error_retry_strategy(self):
         """Test retry strategy in task error handling."""
         flow = Flow()
-        from routilux.job_state import JobState
-
-        job_state = JobState(flow.flow_id)
 
         class TestRoutine(Routine):
             def __init__(self):
@@ -170,9 +167,6 @@ class TestTaskErrorHandling:
     def test_handle_task_error_retry_max_reached(self):
         """Test retry when max retries already reached."""
         flow = Flow()
-        from routilux.job_state import JobState
-
-        _job_state = JobState(flow.flow_id)
 
         class TestRoutine(Routine):
             def __init__(self):

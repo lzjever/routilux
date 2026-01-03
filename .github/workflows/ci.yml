@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop, master ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop, master ]
+    branches: [ main, develop ]
 
 jobs:
   test:
@@ -28,7 +28,7 @@ jobs:
         run: |
           uv sync --group docs
       
-      - name: Run tests with coverage
+      - name: Run tests
         run: |
           uv run pytest tests/ routilux/builtin_routines/ \
             --cov=routilux \

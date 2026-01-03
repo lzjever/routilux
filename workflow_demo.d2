@@ -1,0 +1,93 @@
+# Workflow: demo_analyzer_workflow
+
+collector: "DataCollector" {
+  slots: {
+    trigger: "trigger"
+  }
+  events: {
+    data: "data"
+    error: "error"
+  }
+}
+
+processor: "DataProcessor" {
+  slots: {
+    input: "input"
+  }
+  events: {
+    output: "output"
+  }
+}
+
+validator: "DataValidator" {
+  slots: {
+    data: "data"
+    metadata: "metadata"
+  }
+  events: {
+    valid: "valid"
+    invalid: "invalid"
+  }
+}
+
+aggregator: "DataAggregator" {
+  slots: {
+    input: "input"
+  }
+  events: {
+    result: "result"
+  }
+}
+
+router: "DataRouter" {
+  slots: {
+    input: "input"
+  }
+  events: {
+    high_priority: "high_priority"
+    medium_priority: "medium_priority"
+    low_priority: "low_priority"
+  }
+}
+
+sink_high: "DataSink" {
+  slots: {
+    high_input: "high_input"
+    medium_input: "medium_input"
+    low_input: "low_input"
+  }
+  events: {
+    completed: "completed"
+  }
+}
+
+sink_medium: "DataSink" {
+  slots: {
+    high_input: "high_input"
+    medium_input: "medium_input"
+    low_input: "low_input"
+  }
+  events: {
+    completed: "completed"
+  }
+}
+
+sink_low: "DataSink" {
+  slots: {
+    high_input: "high_input"
+    medium_input: "medium_input"
+    low_input: "low_input"
+  }
+  events: {
+    completed: "completed"
+  }
+}
+
+collector.data -> processor.input: "data -> input"
+processor.output -> validator.data: "output -> data"
+validator.valid -> aggregator.input: "valid -> input"
+aggregator.result -> router.input: "result -> input"
+router.high_priority -> sink_high.high_input: "high_priority -> high_input"
+router.medium_priority -> sink_medium.medium_input: "medium_priority -> medium_input"
+router.low_priority -> sink_low.low_input: "low_priority -> low_input"
+validator.invalid -> aggregator.input: "invalid -> input (mapping: {'data': 'value'})"

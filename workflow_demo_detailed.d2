@@ -1,0 +1,195 @@
+# Workflow: demo_analyzer_workflow
+
+# Execution Strategy: concurrent
+# Max Workers: 3
+# Routines: 8
+# Connections: 8
+
+# Style configuration
+# Entry points: orange background (#fff4e6)
+# Regular routines: blue background (#e8f4f8)
+
+collector: "DataCollector" {
+  style: {
+    fill: "#fff4e6"
+    stroke: "#d97706"
+    stroke-width: 3
+  }
+  label: "DataCollector\n(Entry Point)"
+  slots: {
+    trigger: "trigger\n(handler: _handle_trigger)"
+  }
+  events: {
+    data: "data\n(collected_data, count, timestamp)"
+    error: "error\n(error_message, error_code)"
+  }
+}
+
+processor: "DataProcessor" {
+  style: {
+    fill: "#e8f4f8"
+    stroke: "#2c5aa0"
+    stroke-width: 2
+  }
+  slots: {
+    input: "input\n(handler: process)"
+  }
+  events: {
+    output: "output\n(processed_data, status)"
+  }
+}
+
+validator: "DataValidator" {
+  style: {
+    fill: "#e8f4f8"
+    stroke: "#2c5aa0"
+    stroke-width: 2
+  }
+  slots: {
+    data: "data\n(handler: validate)"
+    metadata: "metadata\n(handler: validate)"
+  }
+  events: {
+    valid: "valid\n(validated_data, score)"
+    invalid: "invalid\n(errors, data)"
+  }
+}
+
+aggregator: "DataAggregator" {
+  style: {
+    fill: "#e8f4f8"
+    stroke: "#2c5aa0"
+    stroke-width: 2
+  }
+  slots: {
+    input: "input\n(handler: aggregate)"
+  }
+  events: {
+    result: "result\n(aggregated_value, sources_count)"
+  }
+}
+
+router: "DataRouter" {
+  style: {
+    fill: "#e8f4f8"
+    stroke: "#2c5aa0"
+    stroke-width: 2
+  }
+  slots: {
+    input: "input\n(handler: route)"
+  }
+  events: {
+    high_priority: "high_priority\n(data, priority)"
+    medium_priority: "medium_priority\n(data, priority)"
+    low_priority: "low_priority\n(data, priority)"
+  }
+}
+
+sink_high: "DataSink" {
+  style: {
+    fill: "#e8f4f8"
+    stroke: "#2c5aa0"
+    stroke-width: 2
+  }
+  slots: {
+    high_input: "high_input\n(handler: save)"
+    medium_input: "medium_input\n(handler: save)"
+    low_input: "low_input\n(handler: save)"
+  }
+  events: {
+    completed: "completed\n(saved_count, timestamp)"
+  }
+}
+
+sink_medium: "DataSink" {
+  style: {
+    fill: "#e8f4f8"
+    stroke: "#2c5aa0"
+    stroke-width: 2
+  }
+  slots: {
+    high_input: "high_input\n(handler: save)"
+    medium_input: "medium_input\n(handler: save)"
+    low_input: "low_input\n(handler: save)"
+  }
+  events: {
+    completed: "completed\n(saved_count, timestamp)"
+  }
+}
+
+sink_low: "DataSink" {
+  style: {
+    fill: "#e8f4f8"
+    stroke: "#2c5aa0"
+    stroke-width: 2
+  }
+  slots: {
+    high_input: "high_input\n(handler: save)"
+    medium_input: "medium_input\n(handler: save)"
+    low_input: "low_input\n(handler: save)"
+  }
+  events: {
+    completed: "completed\n(saved_count, timestamp)"
+  }
+}
+
+# Connections
+collector.events.data -> processor.slots.input: "data → input" {
+  style: {
+    stroke: "#4a5568"
+    stroke-width: 2
+  }
+}
+processor.events.output -> validator.slots.data: "output → data" {
+  style: {
+    stroke: "#4a5568"
+    stroke-width: 2
+  }
+}
+validator.events.valid -> aggregator.slots.input: "valid → input" {
+  style: {
+    stroke: "#4a5568"
+    stroke-width: 2
+  }
+}
+aggregator.events.result -> router.slots.input: "result → input" {
+  style: {
+    stroke: "#4a5568"
+    stroke-width: 2
+  }
+}
+router.events.high_priority -> sink_high.slots.high_input: "high_priority → high_input" {
+  style: {
+    stroke: "#4a5568"
+    stroke-width: 2
+  }
+}
+router.events.medium_priority -> sink_medium.slots.medium_input: "medium_priority → medium_input" {
+  style: {
+    stroke: "#4a5568"
+    stroke-width: 2
+  }
+}
+router.events.low_priority -> sink_low.slots.low_input: "low_priority → low_input" {
+  style: {
+    stroke: "#4a5568"
+    stroke-width: 2
+  }
+}
+validator.events.invalid -> aggregator.slots.input: "invalid → input\n(mapping: data→value)" {
+  style: {
+    stroke: "#4a5568"
+    stroke-width: 2
+  }
+}
+
+# Dependency Graph
+# (Shows execution dependencies)
+
+# collector -> processor (dependency)
+# processor -> validator (dependency)
+# validator -> aggregator (dependency)
+# aggregator -> router (dependency)
+# router -> sink_high (dependency)
+# router -> sink_medium (dependency)
+# router -> sink_low (dependency)

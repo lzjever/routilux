@@ -1,0 +1,292 @@
+{
+  "flow_id": "simple_demo_workflow",
+  "execution_strategy": "sequential",
+  "max_workers": 1,
+  "execution_timeout": 300.0,
+  "routines": [
+    {
+      "routine_id": "collector",
+      "class_name": "DataCollector",
+      "docstring": "Collects data from multiple sources and aggregates them.\n\nThis routine demonstrates:\n- Trigger slot for entry point\n- Multiple output events\n- Configuration parameters",
+      "slots": [
+        {
+          "name": "trigger",
+          "handler": "_handle_trigger",
+          "merge_strategy": "override"
+        }
+      ],
+      "events": [
+        {
+          "name": "data",
+          "output_params": [
+            "collected_data",
+            "count",
+            "timestamp"
+          ]
+        },
+        {
+          "name": "error",
+          "output_params": [
+            "error_message",
+            "error_code"
+          ]
+        }
+      ],
+      "config": {
+        "collection_timeout": 30,
+        "max_items": 100,
+        "aggregation_mode": "sum"
+      },
+      "source_info": {
+        "name": "DataCollector",
+        "docstring": "Collects data from multiple sources and aggregates them.\n\nThis routine demonstrates:\n- Trigger slot for entry point\n- Multiple output events\n- Configuration parameters",
+        "slots": [
+          {
+            "name": "trigger",
+            "handler": "_handle_trigger",
+            "merge_strategy": "override"
+          }
+        ],
+        "events": [
+          {
+            "name": "data",
+            "output_params": [
+              "collected_data",
+              "count",
+              "timestamp"
+            ]
+          },
+          {
+            "name": "error",
+            "output_params": [
+              "error_message",
+              "error_code"
+            ]
+          }
+        ],
+        "config": {
+          "collection_timeout": 30,
+          "max_items": 100,
+          "aggregation_mode": "sum"
+        },
+        "methods": [
+          {
+            "name": "__init__",
+            "docstring": "",
+            "parameters": [
+              "self"
+            ],
+            "line_number": 21
+          },
+          {
+            "name": "_handle_trigger",
+            "docstring": "Handle trigger and collect data.",
+            "parameters": [
+              "self",
+              "source"
+            ],
+            "line_number": 37,
+            "emits": [
+              "data"
+            ]
+          }
+        ],
+        "line_number": 12
+      }
+    },
+    {
+      "routine_id": "processor",
+      "class_name": "DataProcessor",
+      "docstring": "Processes data with configurable transformations.\n\nThis routine demonstrates:\n- Input slot with handler\n- Append merge strategy\n- Multiple processing methods",
+      "slots": [
+        {
+          "name": "input",
+          "handler": "process",
+          "merge_strategy": "append"
+        }
+      ],
+      "events": [
+        {
+          "name": "output",
+          "output_params": [
+            "processed_data",
+            "status"
+          ]
+        }
+      ],
+      "config": {
+        "processing_mode": "batch",
+        "batch_size": 10,
+        "enable_validation": true
+      },
+      "source_info": {
+        "name": "DataProcessor",
+        "docstring": "Processes data with configurable transformations.\n\nThis routine demonstrates:\n- Input slot with handler\n- Append merge strategy\n- Multiple processing methods",
+        "slots": [
+          {
+            "name": "input",
+            "handler": "process",
+            "merge_strategy": "append"
+          }
+        ],
+        "events": [
+          {
+            "name": "output",
+            "output_params": [
+              "processed_data",
+              "status"
+            ]
+          }
+        ],
+        "config": {
+          "processing_mode": "batch",
+          "batch_size": 10,
+          "enable_validation": true
+        },
+        "methods": [
+          {
+            "name": "__init__",
+            "docstring": "",
+            "parameters": [
+              "self"
+            ],
+            "line_number": 60
+          },
+          {
+            "name": "process",
+            "docstring": "Process incoming data.",
+            "parameters": [
+              "self",
+              "data"
+            ],
+            "line_number": 79,
+            "emits": [
+              "output"
+            ]
+          }
+        ],
+        "line_number": 51
+      }
+    },
+    {
+      "routine_id": "sink",
+      "class_name": "DataSink",
+      "docstring": "Final destination for processed data.\n\nThis routine demonstrates:\n- Multiple input slots from different sources\n- Data storage/saving\n- Final output",
+      "slots": [
+        {
+          "name": "high_input",
+          "handler": "save",
+          "merge_strategy": "override"
+        },
+        {
+          "name": "medium_input",
+          "handler": "save",
+          "merge_strategy": "override"
+        },
+        {
+          "name": "low_input",
+          "handler": "save",
+          "merge_strategy": "override"
+        }
+      ],
+      "events": [
+        {
+          "name": "completed",
+          "output_params": [
+            "saved_count",
+            "timestamp"
+          ]
+        }
+      ],
+      "config": {
+        "output_format": "json",
+        "save_to_file": false
+      },
+      "source_info": {
+        "name": "DataSink",
+        "docstring": "Final destination for processed data.\n\nThis routine demonstrates:\n- Multiple input slots from different sources\n- Data storage/saving\n- Final output",
+        "slots": [
+          {
+            "name": "high_input",
+            "handler": "save",
+            "merge_strategy": "override"
+          },
+          {
+            "name": "medium_input",
+            "handler": "save",
+            "merge_strategy": "override"
+          },
+          {
+            "name": "low_input",
+            "handler": "save",
+            "merge_strategy": "override"
+          }
+        ],
+        "events": [
+          {
+            "name": "completed",
+            "output_params": [
+              "saved_count",
+              "timestamp"
+            ]
+          }
+        ],
+        "config": {
+          "output_format": "json",
+          "save_to_file": false
+        },
+        "methods": [
+          {
+            "name": "__init__",
+            "docstring": "",
+            "parameters": [
+              "self"
+            ],
+            "line_number": 255
+          },
+          {
+            "name": "save",
+            "docstring": "Save incoming data.",
+            "parameters": [
+              "self",
+              "data"
+            ],
+            "line_number": 271,
+            "emits": [
+              "completed"
+            ]
+          }
+        ],
+        "line_number": 246
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source_routine_id": "collector",
+      "source_event": "data",
+      "target_routine_id": "processor",
+      "target_slot": "input",
+      "param_mapping": {}
+    },
+    {
+      "source_routine_id": "processor",
+      "source_event": "output",
+      "target_routine_id": "sink",
+      "target_slot": "low_input",
+      "param_mapping": {}
+    }
+  ],
+  "dependency_graph": {
+    "collector": [],
+    "processor": [
+      "collector"
+    ],
+    "sink": [
+      "processor"
+    ]
+  },
+  "entry_points": [
+    "collector"
+  ]
+}

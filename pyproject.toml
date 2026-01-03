@@ -7,7 +7,7 @@ name = "routilux"
 dynamic = ["version"]
 description = "Event-driven workflow orchestration framework with flexible connection, state management, and workflow orchestration capabilities"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.8,<3.15"
 license = "Apache-2.0"
 authors = [
     {name = "Routilux Team"}
@@ -21,11 +21,14 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 dependencies = [
-    "serilux>=0.2.0",
+    "serilux>=0.3.1",
 ]
 
 [project.optional-dependencies]

@@ -91,6 +91,11 @@ def handle_task_error(
                     flow._enqueue_task(retry_task)
                     return
             # Max retries reached or non-retryable exception, fall through to default
+            # Record error in execution history before marking as failed
+            if task.job_state and routine_id:
+                task.job_state.record_execution(
+                    routine_id, "error", {"slot": task.slot.name, "error": str(error)}
+                )
 
         elif error_handler.strategy.value == "continue":
             if task.job_state and routine_id:

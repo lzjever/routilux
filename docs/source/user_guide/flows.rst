@@ -531,10 +531,40 @@ Resume from a paused state:
    resumed_job_state = flow.resume(job_state)
 
 When resumed:
-- Pending tasks are deserialized and restored
+- Pending tasks are deserialized and restored from ``job_state.pending_tasks``
+- **Tasks are automatically recovered from slot data** (if not in pending_tasks)
 - Tasks are moved back to the queue
 - Event loop restarts if needed
 - Execution continues from where it paused
+- Retry state is preserved and continues correctly
+
+**Automatic Task Recovery**
+
+Starting from version 0.1.0, routilux automatically recovers tasks from slot data
+during ``resume()``. This means:
+
+- ✅ If a slot has data but no pending task, a task is automatically created
+- ✅ Retry state (retry_count, max_retries) is preserved
+- ✅ Connection information is automatically restored
+- ✅ You don't need to manually check slot data or create tasks
+
+**Example**:
+
+.. code-block:: python
+
+   # Host A: Save state (with or without pausing)
+   flow_data = flow.serialize()
+   job_state_data = job_state.serialize()
+   
+   # Host B: Restore and resume
+   new_flow = Flow()
+   new_flow.deserialize(flow_data)
+   new_job_state = JobState()
+   new_job_state.deserialize(job_state_data)
+   
+   # Resume automatically recovers tasks from slot data
+   resumed = new_flow.resume(new_job_state)
+   # ✅ Execution continues correctly, even if some tasks weren't in pending_tasks
 
 **Serialization Support**
 
@@ -542,16 +572,24 @@ Pending tasks are automatically serialized when pausing and deserialized when re
 
 .. code-block:: python
 
-   # Pause
-   flow.pause(reason="checkpoint")
+   # Pause (captures pending tasks)
+   flow.pause(job_state, reason="checkpoint")
    
-   # Serialize flow (includes pending tasks)
-   data = flow.serialize()
+   # Serialize flow and job_state separately
+   flow_data = flow.serialize()
+   job_state_data = job_state.serialize()
    
    # Later: Deserialize and resume
    new_flow = Flow()
-   new_flow.deserialize(data)
-   new_flow.resume(new_flow.job_state)
+   new_flow.deserialize(flow_data)
+   new_job_state = JobState()
+   new_job_state.deserialize(job_state_data)
+   
+   # Resume (automatically recovers tasks from slot data if needed)
+   resumed = new_flow.resume(new_job_state)
+
+**Note**: You can also serialize without pausing. Routilux will automatically recover
+tasks from slot data during resume. See :doc:`serialization` for best practices.
 
 Cancelling Execution
 --------------------

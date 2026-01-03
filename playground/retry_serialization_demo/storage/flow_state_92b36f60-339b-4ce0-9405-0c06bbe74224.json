@@ -1,0 +1,190 @@
+{
+  "flow": {
+    "_type": "Flow",
+    "routines": {
+      "long_running": {
+        "_type": "LongRunningRoutine",
+        "_id": "0x7f85f55b1ee0",
+        "_events": {
+          "output": {
+            "_type": "Event",
+            "name": "output",
+            "output_params": [
+              "result"
+            ]
+          }
+        },
+        "_slots": {
+          "trigger": {
+            "_type": "Slot",
+            "merge_strategy": "override",
+            "name": "trigger",
+            "_data": {
+              "data": "test_data"
+            },
+            "handler": {
+              "_type": "callable",
+              "callable_type": "method",
+              "class_name": "LongRunningRoutine",
+              "method_name": "process",
+              "object_id": "0x7f85f55b1ee0"
+            }
+          }
+        },
+        "_error_handler": null,
+        "_config": {}
+      },
+      "failing": {
+        "_type": "FailingRoutine",
+        "_id": "0x7f85f55b1fa0",
+        "_events": {
+          "output": {
+            "_type": "Event",
+            "name": "output",
+            "output_params": [
+              "result"
+            ]
+          }
+        },
+        "_slots": {
+          "input": {
+            "_type": "Slot",
+            "merge_strategy": "override",
+            "name": "input",
+            "_data": {
+              "result": "Long operation completed after 1.0s"
+            },
+            "handler": {
+              "_type": "callable",
+              "callable_type": "method",
+              "class_name": "FailingRoutine",
+              "method_name": "process",
+              "object_id": "0x7f85f55b1fa0"
+            }
+          }
+        },
+        "_error_handler": {
+          "_type": "ErrorHandler",
+          "retry_delay": 0.3,
+          "strategy": "retry",
+          "is_critical": false,
+          "max_retries": 4,
+          "retry_count": 2,
+          "retry_backoff": 1.5
+        },
+        "_config": {}
+      },
+      "success": {
+        "_type": "SuccessRoutine",
+        "_id": "0x7f85f55b2060",
+        "_events": {
+          "output": {
+            "_type": "Event",
+            "name": "output",
+            "output_params": [
+              "result"
+            ]
+          }
+        },
+        "_slots": {
+          "input": {
+            "_type": "Slot",
+            "merge_strategy": "override",
+            "name": "input",
+            "_data": {},
+            "handler": {
+              "_type": "callable",
+              "callable_type": "method",
+              "class_name": "SuccessRoutine",
+              "method_name": "process",
+              "object_id": "0x7f85f55b2060"
+            }
+          }
+        },
+        "_error_handler": null,
+        "_config": {}
+      }
+    },
+    "max_workers": 1,
+    "execution_strategy": "sequential",
+    "_paused": false,
+    "connections": [
+      {
+        "_type": "Connection",
+        "param_mapping": {},
+        "_source_event_name": "output",
+        "_target_slot_name": "input"
+      },
+      {
+        "_type": "Connection",
+        "param_mapping": {},
+        "_source_event_name": "output",
+        "_target_slot_name": "input"
+      }
+    ],
+    "error_handler": null,
+    "flow_id": "retry_serialization_demo"
+  },
+  "job_state": {
+    "_type": "JobState",
+    "created_at": "2026-01-03T21:51:51.913141",
+    "updated_at": "2026-01-03T21:51:54.215960",
+    "job_id": "92b36f60-339b-4ce0-9405-0c06bbe74224",
+    "current_routine_id": "long_running",
+    "output_log": [],
+    "execution_history": [
+      {
+        "_type": "ExecutionRecord",
+        "timestamp": "2026-01-03T21:51:51.913156",
+        "event_name": "start",
+        "routine_id": "long_running",
+        "data": {
+          "data": "test_data"
+        }
+      },
+      {
+        "_type": "ExecutionRecord",
+        "timestamp": "2026-01-03T21:51:52.913496",
+        "event_name": "output",
+        "routine_id": "long_running",
+        "data": {
+          "result": "Long operation completed after 1.0s"
+        }
+      },
+      {
+        "_type": "ExecutionRecord",
+        "timestamp": "2026-01-03T21:51:53.415112",
+        "event_name": "error",
+        "routine_id": "failing",
+        "data": {
+          "slot": "input",
+          "error": "Simulated failure on attempt 1"
+        }
+      },
+      {
+        "_type": "ExecutionRecord",
+        "timestamp": "2026-01-03T21:51:54.215948",
+        "event_name": "error",
+        "routine_id": "failing",
+        "data": {
+          "slot": "input",
+          "error": "Simulated failure on attempt 2"
+        }
+      }
+    ],
+    "status": "running",
+    "shared_data": {},
+    "pause_points": [],
+    "flow_id": "retry_serialization_demo",
+    "pending_tasks": [],
+    "shared_log": [],
+    "deferred_events": [],
+    "routine_states": {
+      "long_running": {
+        "status": "completed"
+      }
+    }
+  },
+  "saved_at": 1767448314.515852,
+  "retry_count": 2
+}

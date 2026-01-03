@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 import threading
 import queue
-from typing import Dict, Optional, Any, List, Set, TYPE_CHECKING
+from typing import Dict, Optional, Any, List, Set, Tuple, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor, Future
 
 if TYPE_CHECKING:
@@ -319,6 +319,50 @@ class Flow(Serializable):
             error_handler: ErrorHandler object.
         """
         self.error_handler = error_handler
+
+    def find_routines_by_type(self, routine_type: type) -> List[Tuple[str, "Routine"]]:
+        """Find routines by type.
+
+        Args:
+            routine_type: Type of routine to find (e.g., DataProcessRoutine).
+
+        Returns:
+            List of (routine_id, routine) tuples matching the type.
+
+        Examples:
+            Find all DataProcessRoutine instances:
+                >>> routines = flow.find_routines_by_type(DataProcessRoutine)
+                >>> for routine_id, routine in routines:
+                ...     print(f"Found {routine_id}: {routine}")
+        """
+        return [
+            (rid, routine)
+            for rid, routine in self.routines.items()
+            if isinstance(routine, routine_type)
+        ]
+
+    def get_routine_retry_count(self, routine_id: str) -> Optional[int]:
+        """Get retry count for a routine.
+
+        Args:
+            routine_id: Routine identifier.
+
+        Returns:
+            Retry count if routine has error handler with retry strategy, None otherwise.
+
+        Examples:
+            Get retry count for a routine:
+                >>> retry_count = flow.get_routine_retry_count("processor")
+                >>> if retry_count is not None:
+                ...     print(f"Current retry count: {retry_count}")
+        """
+        routine = self.routines.get(routine_id)
+        if not routine:
+            return None
+        error_handler = routine.get_error_handler()
+        if error_handler:
+            return error_handler.retry_count
+        return None
 
     def _get_error_handler_for_routine(
         self, routine: "Routine", routine_id: str

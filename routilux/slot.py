@@ -269,14 +269,54 @@ class Slot(Serializable):
                             # Find routine_id in flow using flow._get_routine_id()
                             routine_id = flow._get_routine_id(self.routine)
                             if routine_id:
+                                error_handler = self.routine.get_error_handler()
+
+                                # Check if this is a RETRY strategy and we have flow/job_state context
+                                # (indicating this was called from a task, not directly)
+                                if (
+                                    error_handler
+                                    and error_handler.strategy.value == "retry"
+                                    and flow
+                                    and job_state
+                                ):
+                                    # For RETRY strategy in task context, create a temporary task
+                                    # and call handle_task_error to trigger retry logic
+                                    from routilux.flow.task import SlotActivationTask, TaskPriority
+                                    from routilux.flow.error_handling import handle_task_error
+
+                                    # Record error in execution history first (for tracking and testing)
+                                    job_state.record_execution(
+                                        routine_id, "error", {"slot": self.name, "error": str(e)}
+                                    )
+
+                                    # Create a temporary task with current retry_count from error_handler
+                                    # Note: We use error_handler.retry_count as the initial retry_count
+                                    # The handle_task_error will increment it and check against max_retries
+                                    # Use original data (not merged_data) because retry will call _merge_data again
+                                    temp_task = SlotActivationTask(
+                                        slot=self,
+                                        data=data,  # Use original data, not merged_data (retry will merge again)
+                                        connection=None,  # Connection info not available here, but handle_task_error can work without it
+                                        priority=TaskPriority.NORMAL,
+                                        retry_count=error_handler.retry_count,  # Current retry count from error handler
+                                        max_retries=error_handler.max_retries,
+                                        job_state=job_state,
+                                    )
+
+                                    # Call handle_task_error to process retry logic
+                                    # This will check retry_count, increment it, and enqueue retry task if needed
+                                    handle_task_error(temp_task, e, flow)
+
+                                    # handle_task_error handles the retry logic and will record error again
+                                    # if max retries are reached, but we've already recorded the first error above
+                                    return
+
+                                # For non-RETRY strategies or direct calls (no flow/job_state), record error normally
                                 job_state.record_execution(
                                     routine_id, "error", {"slot": self.name, "error": str(e)}
                                 )
 
                                 # If routine has error handler with STOP strategy, mark as failed immediately
-                                # For RETRY strategy, we can't accurately determine if all retries are exhausted here,
-                                # so we rely on wait_for_completion to detect errors in execution history
-                                error_handler = self.routine.get_error_handler()
                                 if error_handler and error_handler.strategy.value == "stop":
                                     # STOP strategy: mark routine as failed immediately
                                     job_state.update_routine_state(

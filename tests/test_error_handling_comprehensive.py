@@ -750,10 +750,15 @@ class TestComplexScenarios:
         if optional_state is not None:
             assert optional_state["status"] == "error_continued"
 
-        # Critical在slot handler中失败，这不会触发routine级别的错误处理
-        # Slot handler的错误会被记录在routine的stats中，但不会停止flow
-        # Flow应该完成（因为source成功）
-        assert job_state.status == "completed"
+        # Critical在slot handler中失败，会触发routine级别的错误处理（RETRY策略）
+        # 如果重试用尽，routine状态会被设置为failed，flow也会失败
+        # 这是正确的行为：critical routine必须成功，否则flow失败
+        critical_state = job_state.get_routine_state("critical")
+        assert critical_state is not None
+        assert (
+            critical_state.get("status") == "failed"
+        ), "Critical routine should fail after retries exhausted"
+        assert job_state.status == "failed", "Flow should fail when critical routine fails"
 
 
 class TestErrorHandlerConfiguration:

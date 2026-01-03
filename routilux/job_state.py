@@ -715,6 +715,102 @@ class JobState(Serializable):
 
             time.sleep(check_interval)
 
+    @staticmethod
+    def wait_until_condition(
+        flow: "Flow",
+        job_state: "JobState",
+        condition: Callable[["Flow", "JobState"], bool],
+        timeout: Optional[float] = None,
+        check_interval: float = 0.1,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    ) -> bool:
+        """Wait until a condition is met.
+
+        This method continuously checks a condition function until it returns True,
+        or until a timeout occurs. Useful for waiting for specific states like
+        retry count reaching a threshold.
+
+        Args:
+            flow: Flow object to monitor.
+            job_state: JobState object to monitor.
+            condition: Callable that takes (flow, job_state) and returns bool.
+                Should return True when the condition is met.
+            timeout: Maximum time to wait in seconds. None for no timeout.
+            check_interval: Interval between checks in seconds.
+            progress_callback: Optional callback function called periodically with
+                (queue_size, active_count, status) tuple.
+
+        Returns:
+            True if condition was met before timeout, False if timeout occurred.
+
+        Examples:
+            Wait until retry count reaches 2:
+                >>> def condition(flow, job_state):
+                ...     retry_count = flow.get_routine_retry_count("processor")
+                ...     return retry_count is not None and retry_count >= 2
+                >>> JobState.wait_until_condition(flow, job_state, condition, timeout=30.0)
+
+            Wait until a specific routine completes:
+                >>> def condition(flow, job_state):
+                ...     state = job_state.get_routine_state("validator")
+                ...     return state is not None and state.get("status") == "completed"
+                >>> JobState.wait_until_condition(flow, job_state, condition)
+        """
+        start_time = time.time()
+        last_progress_time = 0.0
+        progress_interval = 5.0
+
+        while True:
+            if timeout is not None:
+                elapsed = time.time() - start_time
+                if elapsed >= timeout:
+                    logger.warning(
+                        f"Condition wait timed out after {timeout} seconds. "
+                        f"Status: {job_state.status}"
+                    )
+                    return False
+
+            # Check if condition is met
+            try:
+                if condition(flow, job_state):
+                    logger.debug("Condition met successfully")
+                    return True
+            except Exception as e:
+                logger.warning(f"Error checking condition: {e}")
+                # Continue waiting even if condition check fails
+
+            # Check if execution completed (condition might never be met)
+            if job_state.status in ["completed", "failed", "cancelled"]:
+                logger.debug(
+                    f"Execution completed with status '{job_state.status}' "
+                    f"before condition was met"
+                )
+                # Check condition one more time before returning
+                try:
+                    if condition(flow, job_state):
+                        return True
+                except Exception:
+                    pass
+                return False
+
+            # Call progress callback if provided
+            if progress_callback is not None:
+                current_time = time.time()
+                if current_time - last_progress_time >= progress_interval:
+                    try:
+                        queue_size = flow._task_queue.qsize()
+                    except AttributeError:
+                        queue_size = 0
+                    try:
+                        with flow._execution_lock:
+                            active_count = len([f for f in flow._active_tasks if not f.done()])
+                    except AttributeError:
+                        active_count = 0
+                    progress_callback(queue_size, active_count, job_state.status)
+                    last_progress_time = current_time
+
+            time.sleep(check_interval)
+
 
 class _ExecutionCompletionChecker:
     """Execution completion checker (internal)."""

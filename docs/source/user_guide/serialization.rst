@@ -702,6 +702,339 @@ for distributed execution and recovery.
           def setup(self, max_items):
               self.set_config(max_items=max_items)
 
+Serialization Best Practices
+----------------------------
+
+This section covers best practices for serializing and deserializing flows,
+including when to use pause vs direct serialization, and what to expect after recovery.
+
+When to Use Pause vs Direct Serialization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Option 1: Pause Before Serialization (Recommended for Active Executions)**
+
+Use ``flow.pause()`` when you want to capture the exact execution state at a specific point:
+
+.. code-block:: python
+
+   # Execute flow
+   job_state = flow.execute(entry_id)
+   
+   # Pause to capture state
+   flow.pause(job_state, reason="Saving checkpoint")
+   
+   # Serialize (pending tasks are already captured)
+   flow_data = flow.serialize()
+   job_state_data = job_state.serialize()
+   
+   # Save to file
+   save_data = {
+       "flow": flow_data,
+       "job_state": job_state_data
+   }
+
+**Benefits of Pausing**:
+
+- ✅ **Captures all pending tasks**: Tasks in the queue are moved to ``pending_tasks``
+- ✅ **Clean state**: Active tasks complete before serialization
+- ✅ **Predictable recovery**: Exact state is preserved
+- ✅ **Better for debugging**: Clear pause points in execution history
+
+**When to Use**:
+
+- Saving checkpoints during long-running executions
+- Transferring execution to another host at a known point
+- Debugging and inspection of execution state
+- When you need guaranteed consistency
+
+**Option 2: Direct Serialization (For Quick Saves)**
+
+You can serialize directly without pausing, especially useful for:
+
+.. code-block:: python
+
+   # Execute flow
+   job_state = flow.execute(entry_id)
+   
+   # Serialize immediately (without pausing)
+   flow_data = flow.serialize()
+   job_state_data = job_state.serialize()
+   
+   # Save to file
+   save_data = {
+       "flow": flow_data,
+       "job_state": job_state_data
+   }
+
+**Benefits of Direct Serialization**:
+
+- ✅ **Faster**: No need to wait for active tasks
+- ✅ **Non-blocking**: Can save state while execution continues
+- ✅ **Simpler**: Fewer steps in the code
+
+**When to Use**:
+
+- Quick state snapshots
+- Background persistence
+- When execution can continue after save
+- When you don't need to capture queue tasks
+
+**Important Note**: When using direct serialization, tasks that are in the execution queue
+may not be captured in ``pending_tasks``. However, **routilux automatically recovers tasks
+from slot data** during ``resume()``, so execution will continue correctly even if some
+tasks weren't in ``pending_tasks``.
+
+Automatic Task Recovery
+~~~~~~~~~~~~~~~~~~~~~~~
+
+**New Feature**: Starting from version 0.1.0, routilux automatically recovers tasks from
+slot data during ``resume()``. This means:
+
+- ✅ **Slot data is preserved**: Data in routine slots is serialized with the flow
+- ✅ **Automatic recovery**: Tasks are automatically rebuilt from slot data if needed
+- ✅ **Retry state preserved**: Error handler retry counts are correctly restored
+- ✅ **Connection recovery**: Connection information is automatically restored
+
+**How It Works**:
+
+When you call ``flow.resume(job_state)``, the system:
+
+1. Deserializes pending tasks from ``job_state.pending_tasks``
+2. **Automatically scans all routine slots for data**
+3. **Rebuilds tasks** for slots that have data but no pending tasks
+4. **Preserves retry state** from error handlers
+5. **Restores connections** automatically
+
+**Example**:
+
+.. code-block:: python
+
+   # Host A: Save state (without pausing)
+   job_state = flow.execute(entry_id)
+   flow_data = flow.serialize()
+   job_state_data = job_state.serialize()
+   # Some tasks may be in queue, not in pending_tasks
+   
+   # Host B: Restore and resume
+   new_flow = Flow()
+   new_flow.deserialize(flow_data)
+   
+   new_job_state = JobState()
+   new_job_state.deserialize(job_state_data)
+   
+   # Resume automatically recovers tasks from slot data
+   resumed = new_flow.resume(new_job_state)
+   # ✅ Execution continues correctly, even if some tasks weren't in pending_tasks
+
+**What Gets Recovered**:
+
+- Tasks for slots with data
+- Retry state (retry_count, max_retries)
+- Connection information
+- Task priority and metadata
+
+**What Doesn't Get Recovered**:
+
+- Tasks that were already completed
+- Tasks for routines that are already failed/cancelled
+- Tasks that exceed max_retries
+
+Expected Behavior After Recovery
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Status Transitions**:
+
+When you resume a flow, the status transitions as follows:
+
+.. code-block:: python
+
+   # Before resume
+   assert job_state.status == "paused"  # or "running"
+   
+   # After resume
+   resumed = flow.resume(job_state)
+   assert resumed.status == "running"  # Always becomes "running"
+   
+   # After completion
+   # Wait for completion...
+   assert resumed.status in ["completed", "failed", "cancelled"]
+
+**Execution Continuation**:
+
+- ✅ **Pending tasks are restored**: Tasks from ``pending_tasks`` are enqueued
+- ✅ **Slot data tasks are recovered**: Tasks are automatically rebuilt from slot data
+- ✅ **Retry state is preserved**: Error handler retry counts continue from saved state
+- ✅ **Execution history continues**: New events are appended to existing history
+
+**Retry Behavior**:
+
+When resuming a flow with retry-enabled routines:
+
+.. code-block:: python
+
+   # Host A: Save after 2 retries
+   # error_handler.retry_count = 2
+   # error_handler.max_retries = 4
+   
+   # Host B: Resume
+   resumed = flow.resume(job_state)
+   
+   # Retry state is preserved
+   assert error_handler.retry_count == 2  # ✅ Preserved
+   assert error_handler.max_retries == 4   # ✅ Preserved
+   
+   # Remaining retries will execute
+   # (2 more retries available: 3 and 4)
+
+**Routine State**:
+
+- ✅ **Completed routines**: Remain completed, don't re-execute
+- ✅ **Failed routines**: Remain failed (unless retries are available)
+- ✅ **Pending/running routines**: Will continue execution
+- ✅ **Skipped routines**: Remain skipped
+
+**Data Integrity**:
+
+- ✅ **Slot data**: Preserved and used for task recovery
+- ✅ **Shared data**: Preserved in ``job_state.shared_data``
+- ✅ **Execution history**: Preserved and continues
+- ✅ **Connection information**: Automatically restored
+
+**Error Handling**:
+
+If recovery encounters issues:
+
+.. code-block:: python
+
+   try:
+       resumed = flow.resume(job_state)
+   except ValueError as e:
+       # Flow ID mismatch, routine not found, etc.
+       print(f"Recovery failed: {e}")
+   except Exception as e:
+       # Other errors during recovery
+       print(f"Unexpected error: {e}")
+
+**Common Scenarios**:
+
+1. **Normal Recovery**:
+
+   .. code-block:: python
+
+      # Pause and save
+      flow.pause(job_state, reason="Checkpoint")
+      flow_data = flow.serialize()
+      job_state_data = job_state.serialize()
+      
+      # Restore and resume
+      new_flow = Flow()
+      new_flow.deserialize(flow_data)
+      new_job_state = JobState()
+      new_job_state.deserialize(job_state_data)
+      
+      resumed = new_flow.resume(new_job_state)
+      # ✅ All pending tasks restored
+      # ✅ Execution continues from pause point
+
+2. **Recovery with Slot Data**:
+
+   .. code-block:: python
+
+      # Save without pausing (some tasks in queue)
+      flow_data = flow.serialize()
+      job_state_data = job_state.serialize()
+      
+      # Restore and resume
+      new_flow = Flow()
+      new_flow.deserialize(flow_data)
+      new_job_state = JobState()
+      new_job_state.deserialize(job_state_data)
+      
+      resumed = new_flow.resume(new_job_state)
+      # ✅ Tasks automatically recovered from slot data
+      # ✅ Execution continues correctly
+
+3. **Recovery with Retries**:
+
+   .. code-block:: python
+
+      # Save after 2 retries (retry_count=2, max_retries=4)
+      flow_data = flow.serialize()
+      job_state_data = job_state.serialize()
+      
+      # Restore and resume
+      new_flow = Flow()
+      new_flow.deserialize(flow_data)
+      new_job_state = JobState()
+      new_job_state.deserialize(job_state_data)
+      
+      resumed = new_flow.resume(new_job_state)
+      # ✅ Retry state preserved (retry_count=2)
+      # ✅ Remaining retries will execute (3 and 4)
+
+Best Practices Summary
+~~~~~~~~~~~~~~~~~~~~~~
+
+1. **Always serialize Flow and JobState separately**:
+
+   .. code-block:: python
+
+      flow_data = flow.serialize()
+      job_state_data = job_state.serialize()
+      # Never assume flow.serialize() includes job_state
+
+2. **Use pause() for checkpoints**:
+
+   .. code-block:: python
+
+      flow.pause(job_state, reason="Checkpoint")
+      # Ensures all pending tasks are captured
+
+3. **Direct serialization is fine for quick saves**:
+
+   .. code-block:: python
+
+      # Can serialize without pausing
+      # Automatic recovery handles slot data
+
+4. **Register all custom routines**:
+
+   .. code-block:: python
+
+      @register_serializable
+      class MyRoutine(Routine):
+          def __init__(self):
+              super().__init__()
+
+5. **Test deserialization locally**:
+
+   .. code-block:: python
+
+      # Validate before transfer
+      test_flow = Flow()
+      test_flow.deserialize(flow_data)
+      test_job_state = JobState()
+      test_job_state.deserialize(job_state_data)
+
+6. **Handle errors gracefully**:
+
+   .. code-block:: python
+
+      try:
+          resumed = flow.resume(job_state)
+      except Exception as e:
+          # Log and handle error
+          logger.error(f"Recovery failed: {e}")
+
+7. **Trust automatic recovery**:
+
+   .. code-block:: python
+
+      # Don't manually check slot data or create tasks
+      # Routilux handles this automatically
+      resumed = flow.resume(job_state)
+      # ✅ Tasks are automatically recovered
+
 Related Topics
 --------------
 

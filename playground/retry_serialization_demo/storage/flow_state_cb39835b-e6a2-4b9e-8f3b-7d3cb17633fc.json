@@ -1,0 +1,170 @@
+{
+  "flow": {
+    "_type": "Flow",
+    "_paused": false,
+    "max_workers": 1,
+    "routines": {
+      "long_running": {
+        "_type": "LongRunningRoutine",
+        "_slots": {
+          "trigger": {
+            "_type": "Slot",
+            "_data": {
+              "data": "test_data"
+            },
+            "handler": {
+              "_type": "callable",
+              "callable_type": "method",
+              "class_name": "LongRunningRoutine",
+              "method_name": "process",
+              "object_id": "0x7f06a684ae40"
+            },
+            "merge_strategy": "override",
+            "name": "trigger"
+          }
+        },
+        "_events": {
+          "output": {
+            "_type": "Event",
+            "name": "output",
+            "output_params": [
+              "result"
+            ]
+          }
+        },
+        "_id": "0x7f06a684ae40",
+        "_config": {},
+        "_error_handler": null
+      },
+      "failing": {
+        "_type": "FailingRoutine",
+        "_slots": {
+          "input": {
+            "_type": "Slot",
+            "_data": {
+              "result": "Long operation completed after 1.0s"
+            },
+            "handler": {
+              "_type": "callable",
+              "callable_type": "method",
+              "class_name": "FailingRoutine",
+              "method_name": "process",
+              "object_id": "0x7f06a684af00"
+            },
+            "merge_strategy": "override",
+            "name": "input"
+          }
+        },
+        "_events": {
+          "output": {
+            "_type": "Event",
+            "name": "output",
+            "output_params": [
+              "result"
+            ]
+          }
+        },
+        "_id": "0x7f06a684af00",
+        "_config": {},
+        "_error_handler": {
+          "_type": "ErrorHandler",
+          "retry_backoff": 1.5,
+          "strategy": "retry",
+          "retry_count": 2,
+          "is_critical": false,
+          "max_retries": 4,
+          "retry_delay": 0.3
+        }
+      },
+      "success": {
+        "_type": "SuccessRoutine",
+        "_slots": {
+          "input": {
+            "_type": "Slot",
+            "_data": {},
+            "handler": {
+              "_type": "callable",
+              "callable_type": "method",
+              "class_name": "SuccessRoutine",
+              "method_name": "process",
+              "object_id": "0x7f06a684af90"
+            },
+            "merge_strategy": "override",
+            "name": "input"
+          }
+        },
+        "_events": {
+          "output": {
+            "_type": "Event",
+            "name": "output",
+            "output_params": [
+              "result"
+            ]
+          }
+        },
+        "_id": "0x7f06a684af90",
+        "_config": {},
+        "_error_handler": null
+      }
+    },
+    "error_handler": null,
+    "connections": [
+      {
+        "_type": "Connection",
+        "param_mapping": {},
+        "_source_event_name": "output",
+        "_target_slot_name": "input"
+      },
+      {
+        "_type": "Connection",
+        "param_mapping": {},
+        "_source_event_name": "output",
+        "_target_slot_name": "input"
+      }
+    ],
+    "flow_id": "retry_serialization_demo",
+    "execution_strategy": "sequential"
+  },
+  "job_state": {
+    "_type": "JobState",
+    "status": "running",
+    "created_at": "2026-01-03T21:30:31.831176",
+    "updated_at": "2026-01-03T21:30:32.832234",
+    "pending_tasks": [],
+    "shared_data": {},
+    "job_id": "cb39835b-e6a2-4b9e-8f3b-7d3cb17633fc",
+    "flow_id": "retry_serialization_demo",
+    "execution_history": [
+      {
+        "_type": "ExecutionRecord",
+        "routine_id": "long_running",
+        "data": {
+          "data": "test_data"
+        },
+        "timestamp": "2026-01-03T21:30:31.831191",
+        "event_name": "start"
+      },
+      {
+        "_type": "ExecutionRecord",
+        "routine_id": "long_running",
+        "data": {
+          "result": "Long operation completed after 1.0s"
+        },
+        "timestamp": "2026-01-03T21:30:32.831515",
+        "event_name": "output"
+      }
+    ],
+    "pause_points": [],
+    "output_log": [],
+    "routine_states": {
+      "long_running": {
+        "status": "completed"
+      }
+    },
+    "current_routine_id": "long_running",
+    "deferred_events": [],
+    "shared_log": []
+  },
+  "saved_at": 1767447034.434088,
+  "retry_count": 2
+}

@@ -1,0 +1,274 @@
+{
+  "flow": {
+    "_type": "Flow",
+    "flow_id": "data_processing_flow",
+    "routines": {
+      "data_fetch": {
+        "_type": "DataFetchRoutine",
+        "_error_handler": null,
+        "_slots": {
+          "trigger": {
+            "_type": "Slot",
+            "name": "trigger",
+            "_data": {
+              "request_id": "req_1767445144"
+            },
+            "handler": {
+              "_type": "callable",
+              "callable_type": "method",
+              "class_name": "DataFetchRoutine",
+              "method_name": "fetch_data",
+              "object_id": "0x7f7069af4440"
+            },
+            "merge_strategy": "override"
+          }
+        },
+        "_id": "0x7f7069af4440",
+        "_events": {
+          "output": {
+            "_type": "Event",
+            "name": "output",
+            "output_params": [
+              "data",
+              "metadata",
+              "timestamp"
+            ]
+          }
+        },
+        "_config": {}
+      },
+      "data_process": {
+        "_type": "DataProcessRoutine",
+        "_error_handler": {
+          "_type": "ErrorHandler",
+          "strategy": "retry",
+          "is_critical": false,
+          "retry_delay": 0.3,
+          "max_retries": 4,
+          "retry_backoff": 1.5,
+          "retry_count": 2
+        },
+        "_slots": {
+          "input": {
+            "_type": "Slot",
+            "name": "input",
+            "_data": {
+              "data": {
+                "user_id": "user_12345",
+                "items": [
+                  {
+                    "id": 1,
+                    "name": "Product A",
+                    "price": 29.99
+                  },
+                  {
+                    "id": 2,
+                    "name": "Product B",
+                    "price": 49.99
+                  },
+                  {
+                    "id": 3,
+                    "name": "Product C",
+                    "price": 19.99
+                  }
+                ],
+                "total_items": 3,
+                "request_id": "req_1767445144"
+              },
+              "metadata": {
+                "source": "external_api",
+                "fetch_time": 0.8,
+                "status": "success"
+              },
+              "timestamp": "2026-01-03T20:59:05.338459"
+            },
+            "handler": {
+              "_type": "callable",
+              "callable_type": "method",
+              "class_name": "DataProcessRoutine",
+              "method_name": "process_data",
+              "object_id": "0x7f7069af4500"
+            },
+            "merge_strategy": "override"
+          }
+        },
+        "_id": "0x7f7069af4500",
+        "_events": {
+          "output": {
+            "_type": "Event",
+            "name": "output",
+            "output_params": [
+              "processed_data",
+              "statistics",
+              "timestamp"
+            ]
+          }
+        },
+        "_config": {}
+      },
+      "data_validator": {
+        "_type": "DataValidatorRoutine",
+        "_error_handler": null,
+        "_slots": {
+          "input": {
+            "_type": "Slot",
+            "name": "input",
+            "_data": {},
+            "handler": {
+              "_type": "callable",
+              "callable_type": "method",
+              "class_name": "DataValidatorRoutine",
+              "method_name": "validate_data",
+              "object_id": "0x7f7069af45c0"
+            },
+            "merge_strategy": "override"
+          }
+        },
+        "_id": "0x7f7069af45c0",
+        "_events": {
+          "output": {
+            "_type": "Event",
+            "name": "output",
+            "output_params": [
+              "validated_data",
+              "validation_report",
+              "timestamp"
+            ]
+          }
+        },
+        "_config": {}
+      },
+      "data_storage": {
+        "_type": "DataStorageRoutine",
+        "_error_handler": null,
+        "_slots": {
+          "input": {
+            "_type": "Slot",
+            "name": "input",
+            "_data": {},
+            "handler": {
+              "_type": "callable",
+              "callable_type": "method",
+              "class_name": "DataStorageRoutine",
+              "method_name": "store_data",
+              "object_id": "0x7f7069af4680"
+            },
+            "merge_strategy": "override"
+          }
+        },
+        "_id": "0x7f7069af4680",
+        "_events": {
+          "output": {
+            "_type": "Event",
+            "name": "output",
+            "output_params": [
+              "storage_result",
+              "timestamp"
+            ]
+          }
+        },
+        "_config": {}
+      }
+    },
+    "error_handler": null,
+    "_paused": false,
+    "max_workers": 1,
+    "connections": [
+      {
+        "_type": "Connection",
+        "param_mapping": {},
+        "_source_event_name": "output",
+        "_target_slot_name": "input"
+      },
+      {
+        "_type": "Connection",
+        "param_mapping": {},
+        "_source_event_name": "output",
+        "_target_slot_name": "input"
+      },
+      {
+        "_type": "Connection",
+        "param_mapping": {},
+        "_source_event_name": "output",
+        "_target_slot_name": "input"
+      }
+    ],
+    "execution_strategy": "sequential"
+  },
+  "job_state": {
+    "_type": "JobState",
+    "shared_data": {},
+    "created_at": "2026-01-03T20:59:04.538073",
+    "execution_history": [
+      {
+        "_type": "ExecutionRecord",
+        "event_name": "start",
+        "routine_id": "data_fetch",
+        "data": {
+          "request_id": "req_1767445144"
+        },
+        "timestamp": "2026-01-03T20:59:04.538089"
+      },
+      {
+        "_type": "ExecutionRecord",
+        "event_name": "output",
+        "routine_id": "data_fetch",
+        "data": {
+          "data": {
+            "user_id": "user_12345",
+            "items": [
+              {
+                "id": 1,
+                "name": "Product A",
+                "price": 29.99
+              },
+              {
+                "id": 2,
+                "name": "Product B",
+                "price": 49.99
+              },
+              {
+                "id": 3,
+                "name": "Product C",
+                "price": 19.99
+              }
+            ],
+            "total_items": 3,
+            "request_id": "req_1767445144"
+          },
+          "metadata": {
+            "source": "external_api",
+            "fetch_time": 0.8,
+            "status": "success"
+          },
+          "timestamp": "2026-01-03T20:59:05.338459"
+        },
+        "timestamp": "2026-01-03T20:59:05.338539"
+      }
+    ],
+    "job_id": "9c321d6e-3992-434e-9800-f646da0e860a",
+    "updated_at": "2026-01-03T20:59:05.339049",
+    "flow_id": "data_processing_flow",
+    "status": "running",
+    "pause_points": [],
+    "shared_log": [],
+    "current_routine_id": "data_fetch",
+    "deferred_events": [],
+    "output_log": [],
+    "routine_states": {
+      "data_fetch": {
+        "status": "completed"
+      }
+    },
+    "pending_tasks": []
+  },
+  "saved_at": 1767445146.9409482,
+  "saved_at_iso": "2026-01-03T20:59:06.940949",
+  "retry_count": 2,
+  "execution_history_count": 2,
+  "monitor_summary": {
+    "events": 2,
+    "data_flows": 1,
+    "state_changes": 0
+  }
+}

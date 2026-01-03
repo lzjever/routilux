@@ -5,12 +5,15 @@ Handles pause, resume, cancel, and task serialization/deserialization.
 """
 
 import time
+import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from routilux.flow.flow import Flow
     from routilux.job_state import JobState
+
+logger = logging.getLogger(__name__)
 
 
 def pause_flow(
@@ -184,6 +187,124 @@ def deserialize_pending_tasks(flow: "Flow", job_state: "JobState") -> None:
         flow._pending_tasks.append(task)
 
 
+def _recover_slot_tasks(flow: "Flow", job_state: "JobState") -> None:
+    """Recover tasks from slot data that wasn't serialized in pending_tasks.
+
+    This handles the case where:
+    - Slot has data but no pending_tasks (e.g., retry tasks were in queue during serialization)
+    - Routine state indicates it should still be processing
+    - Error handler indicates retries are still available
+
+    This function automatically rebuilds SlotActivationTask objects from slot data
+    and enqueues them for execution, ensuring seamless recovery.
+
+    Args:
+        flow: Flow object.
+        job_state: JobState to recover tasks from.
+    """
+    from routilux.flow.task import SlotActivationTask, TaskPriority
+    from routilux.flow.error_handling import get_error_handler_for_routine
+
+    recovered_count = 0
+
+    # Iterate through all routines in the flow
+    for routine_id, routine in flow.routines.items():
+        # Skip entry routines (they use trigger slots, not input slots)
+        # We only recover tasks for non-entry routines that have input slots with data
+        if not hasattr(routine, "get_slot"):
+            continue
+
+        # Get routine state from job_state
+        routine_state = job_state.get_routine_state(routine_id)
+        if not routine_state:
+            # If no state, assume routine hasn't started yet
+            routine_status = "pending"
+        else:
+            routine_status = routine_state.get("status", "pending")
+
+        # Skip if routine is already completed or failed (no recovery needed)
+        if routine_status in ["completed", "failed", "cancelled"]:
+            continue
+
+        # Check all slots in the routine
+        # We need to check all slots, not just input_slot, because slots are stored in _slots dict
+        if not hasattr(routine, "_slots"):
+            continue
+
+        for slot_name, slot in routine._slots.items():
+            # Skip trigger slots (entry points)
+            if slot_name == "trigger":
+                continue
+
+            # Check if slot has data
+            if not hasattr(slot, "_data") or not slot._data:
+                continue
+
+            # Check if slot has a handler (otherwise no point in recovering)
+            if not hasattr(slot, "handler") or not slot.handler:
+                continue
+
+            # Get error handler for this routine
+            error_handler = get_error_handler_for_routine(routine, routine_id, flow)
+
+            # Check if retry is still available
+            should_recover = True
+            retry_count = 0
+            max_retries = 0
+
+            if error_handler:
+                # If error handler exists, check retry availability
+                if error_handler.strategy.value == "retry":
+                    retry_count = error_handler.retry_count
+                    max_retries = error_handler.max_retries
+                    # Only recover if retries are still available
+                    if retry_count >= max_retries:
+                        should_recover = False
+                # For other strategies (CONTINUE, SKIP), we can still recover
+                # to allow the routine to process the data
+
+            if not should_recover:
+                continue
+
+            # Find connection for this slot
+            # We need to find which event connects to this slot
+            connection = None
+            for conn in flow.connections:
+                if conn.target_slot == slot:
+                    connection = conn
+                    break
+
+            # If no connection found, try to find by slot's connected_events
+            if connection is None and hasattr(slot, "connected_events"):
+                for event in slot.connected_events:
+                    found_conn = flow._find_connection(event, slot)
+                    if found_conn:
+                        connection = found_conn
+                        break
+
+            # Create task to process the slot data
+            task = SlotActivationTask(
+                slot=slot,
+                data=slot._data.copy(),  # Use a copy to avoid modifying original
+                connection=connection,
+                priority=TaskPriority.NORMAL,
+                retry_count=retry_count,
+                max_retries=max_retries,
+                job_state=job_state,
+            )
+
+            # Enqueue the task
+            flow._enqueue_task(task)
+            recovered_count += 1
+            logger.debug(
+                f"Recovered task for routine '{routine_id}', slot '{slot_name}', "
+                f"retry_count={retry_count}/{max_retries}"
+            )
+
+    if recovered_count > 0:
+        logger.info(f"Recovered {recovered_count} task(s) from slot data during resume")
+
+
 def resume_flow(flow: "Flow", job_state: "JobState") -> "JobState":
     """Resume execution from paused or saved state.
 
@@ -219,6 +340,10 @@ def resume_flow(flow: "Flow", job_state: "JobState") -> "JobState":
         r._current_flow = flow
 
     deserialize_pending_tasks(flow, job_state)
+
+    # Recover tasks from slot data that wasn't serialized in pending_tasks
+    # This handles cases where retry tasks were in queue during serialization
+    _recover_slot_tasks(flow, job_state)
 
     # Process deferred events (emit them before processing pending tasks)
     for event_info in job_state.deferred_events:

@@ -224,42 +224,114 @@ class Slot(Serializable):
             # Call handler with merged data if handler is defined
             if self.handler is not None:
                 try:
-                    import inspect
-
-                    sig = inspect.signature(self.handler)
-                    params = list(sig.parameters.keys())
-
-                    # If handler accepts **kwargs, pass all data directly
-                    if self._is_kwargs_handler(self.handler):
-                        self.handler(**merged_data)
-                    elif len(params) == 1 and params[0] == "data":
-                        # Handler only accepts one 'data' parameter, pass entire dictionary
-                        self.handler(merged_data)
-                    elif len(params) == 1:
-                        # Handler only accepts one parameter, try to pass matching value
-                        param_name = params[0]
-                        if param_name in merged_data:
-                            self.handler(merged_data[param_name])
-                        else:
-                            # If no matching parameter, pass entire dictionary
-                            self.handler(merged_data)
+                    # Check for timeout
+                    timeout = None
+                    if self.routine:
+                        timeout = self.routine.get_config("timeout")
+                    
+                    # Execute handler with timeout if configured
+                    if timeout:
+                        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+                        
+                        def execute_handler():
+                            import inspect
+                            sig = inspect.signature(self.handler)
+                            params = list(sig.parameters.keys())
+                            
+                            if self._is_kwargs_handler(self.handler):
+                                return self.handler(**merged_data)
+                            elif len(params) == 1 and params[0] == "data":
+                                return self.handler(merged_data)
+                            elif len(params) == 1:
+                                param_name = params[0]
+                                if param_name in merged_data:
+                                    return self.handler(merged_data[param_name])
+                                else:
+                                    return self.handler(merged_data)
+                            else:
+                                matched_params = {}
+                                for param_name in params:
+                                    if param_name in merged_data:
+                                        matched_params[param_name] = merged_data[param_name]
+                                
+                                if matched_params:
+                                    return self.handler(**matched_params)
+                                else:
+                                    return self.handler(merged_data)
+                        
+                        with ThreadPoolExecutor(max_workers=1) as executor:
+                            future = executor.submit(execute_handler)
+                            try:
+                                future.result(timeout=timeout)
+                            except FuturesTimeoutError:
+                                raise TimeoutError(
+                                    f"Slot handler '{self.name}' in routine '{self.routine.__class__.__name__}' "
+                                    f"exceeded timeout of {timeout} seconds"
+                                )
                     else:
-                        # Multiple parameters, try to match
-                        matched_params = {}
-                        for param_name in params:
-                            if param_name in merged_data:
-                                matched_params[param_name] = merged_data[param_name]
+                        # No timeout, execute normally
+                        import inspect
 
-                        if matched_params:
-                            self.handler(**matched_params)
-                        else:
-                            # If no match, pass entire dictionary as first parameter
+                        sig = inspect.signature(self.handler)
+                        params = list(sig.parameters.keys())
+
+                        # If handler accepts **kwargs, pass all data directly
+                        if self._is_kwargs_handler(self.handler):
+                            self.handler(**merged_data)
+                        elif len(params) == 1 and params[0] == "data":
+                            # Handler only accepts one 'data' parameter, pass entire dictionary
                             self.handler(merged_data)
+                        elif len(params) == 1:
+                            # Handler only accepts one parameter, try to pass matching value
+                            param_name = params[0]
+                            if param_name in merged_data:
+                                self.handler(merged_data[param_name])
+                            else:
+                                # If no matching parameter, pass entire dictionary
+                                self.handler(merged_data)
+                        else:
+                            # Multiple parameters, try to match
+                            matched_params = {}
+                            for param_name in params:
+                                if param_name in merged_data:
+                                    matched_params[param_name] = merged_data[param_name]
+
+                            if matched_params:
+                                self.handler(**matched_params)
+                            else:
+                                # If no match, pass entire dictionary as first parameter
+                                self.handler(merged_data)
                 except Exception as e:
                     # Record exception but don't interrupt flow
                     import logging
-
-                    logging.exception(f"Error in slot {self} handler: {e}")
+                    
+                    # Build enhanced error context
+                    error_context = {
+                        "routine": self.routine.__class__.__name__ if self.routine else "Unknown",
+                        "slot": self.name,
+                        "routine_id": None,
+                        "job_id": job_state.job_id if job_state else None,
+                        "data_keys": list(merged_data.keys()) if isinstance(merged_data, dict) else str(type(merged_data)),
+                    }
+                    
+                    # Try to get routine_id from flow
+                    if flow and self.routine:
+                        error_context["routine_id"] = flow._get_routine_id(self.routine)
+                    elif self.routine:
+                        # Try to get flow from routine
+                        routine_flow = getattr(self.routine, "_current_flow", None)
+                        if routine_flow:
+                            error_context["routine_id"] = routine_flow._get_routine_id(self.routine)
+                    
+                    error_msg = (
+                        f"Error in slot handler: {error_context['routine']}.{error_context['slot']}\n"
+                        f"  Routine ID: {error_context['routine_id']}\n"
+                        f"  Job ID: {error_context['job_id']}\n"
+                        f"  Data keys: {error_context['data_keys']}\n"
+                        f"  Error: {type(e).__name__}: {str(e)}"
+                    )
+                    
+                    logging.exception(error_msg)
                     # Errors are tracked in JobState execution history, not routine._stats
                     if job_state and self.routine:
                         # Try to get flow from parameter, then from routine
@@ -499,23 +571,60 @@ class Slot(Serializable):
                         # If no match, pass entire dictionary as first parameter
                         self.handler(merged_data)
             except Exception as e:
+                # Build enhanced error context for all errors
+                import logging
+                
+                # Get context for error message
+                job_state = None
+                flow = None
+                routine_id = None
+                
+                # Try to get job_state from context variable
+                from routilux.routine import _current_job_state
+                job_state = _current_job_state.get(None)
+                
+                # Try to get flow from routine
+                if self.routine:
+                    flow = getattr(self.routine, "_current_flow", None)
+                    if flow:
+                        routine_id = flow._get_routine_id(self.routine)
+                
+                # Build error context
+                error_context = {
+                    "routine": self.routine.__class__.__name__ if self.routine else "Unknown",
+                    "slot": self.name,
+                    "routine_id": routine_id,
+                    "job_id": job_state.job_id if job_state else None,
+                    "data_keys": list(merged_data.keys()) if isinstance(merged_data, dict) else str(type(merged_data)),
+                }
+                
+                error_msg = (
+                    f"Error in slot handler: {error_context['routine']}.{error_context['slot']}\n"
+                    f"  Routine ID: {error_context['routine_id']}\n"
+                    f"  Job ID: {error_context['job_id']}\n"
+                    f"  Data keys: {error_context['data_keys']}\n"
+                    f"  Error: {type(e).__name__}: {str(e)}"
+                )
+                
+                logging.exception(error_msg)
+                
                 if propagate_exceptions:
                     # Re-raise exception for entry routine trigger slots
                     # This allows Flow's error handling strategies to work
                     raise
                 else:
                     # Record exception but don't interrupt flow (normal slot behavior)
-                    import logging
-
-                    logging.exception(f"Error in slot {self} handler: {e}")
                     # Errors are tracked in JobState execution history, not routine._stats
                     # Try to get job_state and flow from routine if available
                     if self.routine:
-                        job_state = getattr(self.routine, "_job_state", None)
-                        flow = getattr(self.routine, "_current_flow", None)
+                        if job_state is None:
+                            job_state = getattr(self.routine, "_job_state", None)
+                        if flow is None:
+                            flow = getattr(self.routine, "_current_flow", None)
                         if job_state and flow:
                             # Find routine_id in flow using flow._get_routine_id()
-                            routine_id = flow._get_routine_id(self.routine)
+                            if routine_id is None:
+                                routine_id = flow._get_routine_id(self.routine)
                             if routine_id:
                                 job_state.record_execution(
                                     routine_id, "error", {"slot": self.name, "error": str(e)}

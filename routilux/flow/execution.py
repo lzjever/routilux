@@ -68,9 +68,10 @@ def execute_sequential(
     from routilux.execution_tracker import ExecutionTracker
     from routilux.flow.event_loop import start_event_loop
     from routilux.flow.error_handling import get_error_handler_for_routine
+    from routilux.status import ExecutionStatus
 
     job_state = JobState(flow.flow_id)
-    job_state.status = "running"
+    job_state.status = ExecutionStatus.RUNNING
     job_state.current_routine_id = entry_routine_id
 
     flow.execution_tracker = ExecutionTracker(flow.flow_id)
@@ -132,7 +133,7 @@ def execute_sequential(
             )
 
             if error_handler.strategy.value == "continue":
-                job_state.status = "completed"
+                job_state.status = ExecutionStatus.COMPLETED
                 job_state.update_routine_state(
                     entry_routine_id,
                     {
@@ -143,7 +144,7 @@ def execute_sequential(
                 return job_state
 
             if error_handler.strategy.value == "skip":
-                job_state.status = "completed"
+                job_state.status = ExecutionStatus.COMPLETED
                 return job_state
 
             if should_continue and error_handler.strategy.value == "retry":
@@ -189,11 +190,11 @@ def execute_sequential(
                     )
                     if flow.execution_tracker:
                         flow.execution_tracker.record_routine_end(entry_routine_id, "completed")
-                    job_state.status = "completed"
+                    job_state.status = ExecutionStatus.COMPLETED
                     return job_state
 
         error_time = datetime.now()
-        job_state.status = "failed"
+        job_state.status = ExecutionStatus.FAILED
         job_state.update_routine_state(
             entry_routine_id,
             {"status": "failed", "error": str(e), "error_time": error_time.isoformat()},

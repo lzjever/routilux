@@ -5,7 +5,9 @@ Improved Routine mechanism supporting slots (input slots) and events (output eve
 """
 
 from __future__ import annotations
-from typing import Dict, Any, Callable, Optional, List, TYPE_CHECKING, NamedTuple
+from typing import Dict, Any, Callable, Optional, List, TYPE_CHECKING, NamedTuple, TypeVar
+
+T = TypeVar('T')
 from contextvars import ContextVar
 
 if TYPE_CHECKING:
@@ -524,7 +526,7 @@ class Routine(Serializable):
         """
         return self._events.get(name)
 
-    def set_config(self, **kwargs) -> None:
+    def set_config(self, **kwargs: Any) -> None:
         """Set configuration values in the _config dictionary.
 
         This is the recommended way to set routine configuration after object
@@ -534,6 +536,10 @@ class Routine(Serializable):
         Args:
             ``**kwargs``: Configuration key-value pairs to set. These will be stored
                 in self._config dictionary.
+
+        Raises:
+            RuntimeError: If called during execution (when routine is in a flow context).
+            ValueError: If any value is not serializable.
 
         Examples:
             >>> routine = MyRoutine()
@@ -545,12 +551,80 @@ class Routine(Serializable):
             >>> routine._config["custom_setting"] = "value"
 
         Note:
-            - Configuration can be set at any time after object creation.
+            - Configuration can be set at any time after object creation, but NOT during execution.
             - All values in _config are automatically serialized.
             - Use this method instead of constructor parameters to ensure
               proper serialization/deserialization support.
+            - During execution, use JobState.shared_data for execution-specific state.
         """
+        # Prevent modification during execution
+        if hasattr(self, "_current_flow") and getattr(self, "_current_flow", None):
+            raise RuntimeError(
+                "Cannot modify _config during execution. "
+                "Use JobState.shared_data for execution-specific state."
+            )
+        
+        # Validate serializability
+        for key, value in kwargs.items():
+            if not self._is_serializable(value):
+                raise ValueError(
+                    f"Config value for '{key}' must be serializable. "
+                    f"Got {type(value).__name__}"
+                )
+        
         self._config.update(kwargs)
+    
+    def _is_serializable(self, value: Any) -> bool:
+        """Check if value is serializable.
+        
+        Args:
+            value: Value to check.
+            
+        Returns:
+            True if value is serializable, False otherwise.
+            
+        Note:
+            Lists and dicts are always considered serializable, even if they
+            contain functions, because serilux can handle serialization of
+            callables within containers. Only top-level functions are rejected.
+        """
+        import json
+        import types
+        from serilux import Serializable
+        
+        # Basic types that are always serializable
+        if isinstance(value, (str, int, float, bool, type(None))):
+            return True
+        
+        # Lists and dicts are always serializable containers
+        # (functions within them are handled by serilux during serialization)
+        if isinstance(value, (list, tuple, dict)):
+            return True
+        
+        # Functions, methods, and callables at top level are NOT serializable
+        # (but they can be inside lists/dicts, which are handled by serilux)
+        if isinstance(value, (types.FunctionType, types.MethodType, types.BuiltinFunctionType)):
+            return False
+        if callable(value) and not isinstance(value, type):
+            return False
+        
+        # Serializable objects
+        if isinstance(value, Serializable):
+            return True
+        
+        # Try to serialize to JSON as a test (without default=str to catch real issues)
+        try:
+            json.dumps(value)
+            return True
+        except (TypeError, ValueError):
+            # Try with default=str as fallback, but only for basic types
+            try:
+                json.dumps(value, default=str)
+                # If it serializes with default=str, it's not truly serializable
+                # (functions, classes, etc. would serialize as strings)
+                return False
+            except (TypeError, ValueError):
+                return False
 
     def get_config(self, key: str, default: Any = None) -> Any:
         """Get a configuration value from the _config dictionary.
@@ -584,6 +658,19 @@ class Routine(Serializable):
             >>> print(config)  # {"name": "test", "timeout": 30}
         """
         return self._config.copy()
+    
+    def set_timeout(self, timeout: float) -> None:
+        """Set execution timeout for this routine.
+        
+        Args:
+            timeout: Timeout in seconds. If a slot handler takes longer than
+                this time, a TimeoutError will be raised.
+                
+        Examples:
+            >>> routine = MyRoutine()
+            >>> routine.set_timeout(30.0)  # 30 second timeout
+        """
+        self.set_config(timeout=timeout)
 
     def set_error_handler(self, error_handler: "ErrorHandler") -> None:
         """Set error handler for this routine.
@@ -694,22 +781,93 @@ class Routine(Serializable):
             This method only works when the routine is executing within a Flow
             context. For standalone usage or testing, it will return None.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # Get flow from routine context
         flow = getattr(self, "_current_flow", None)
         if flow is None:
+            logger.debug(
+                f"No flow context available for {self.__class__.__name__}. "
+                "This routine may not be executing within a Flow. "
+                "Make sure to call flow.execute() or flow.resume()."
+            )
             return None
 
         # Get job_state from context variable (thread-safe)
         # This method returns None if called outside of execution context
         job_state = _current_job_state.get(None)
         if job_state is None:
+            logger.debug(
+                f"No job_state in context for {self.__class__.__name__}. "
+                "This may indicate the routine is being called outside Flow.execute()."
+            )
             return None
 
         routine_id = flow._get_routine_id(self)
         if routine_id is None:
+            logger.warning(
+                f"Routine {self.__class__.__name__} is not registered in flow {flow.flow_id}. "
+                "Make sure to call flow.add_routine() before execution."
+            )
             return None
 
         return ExecutionContext(flow=flow, job_state=job_state, routine_id=routine_id)
+
+    @property
+    def job_state(self) -> Optional["JobState"]:
+        """Get current job_state, or None if not in execution context.
+        
+        This is a convenience property that provides direct access to the
+        current job_state without needing to call get_execution_context().
+        
+        Returns:
+            JobState object if in execution context, None otherwise.
+            
+        Examples:
+            >>> job_state = self.job_state
+            >>> if job_state:
+            ...     job_id = job_state.job_id
+            ...     job_state.update_routine_state(routine_id, {"status": "done"})
+        """
+        ctx = self.get_execution_context()
+        return ctx.job_state if ctx else None
+    
+    @property
+    def job_id(self) -> Optional[str]:
+        """Get current job_id, or None if not in execution context.
+        
+        This is a convenience property that provides direct access to the
+        current job_id without needing to call get_execution_context().
+        
+        Returns:
+            Job ID string if in execution context, None otherwise.
+            
+        Examples:
+            >>> job_id = self.job_id
+            >>> if not job_id:
+            ...     raise ValueError("job_id is required")
+        """
+        ctx = self.get_execution_context()
+        return ctx.job_state.job_id if ctx and ctx.job_state else None
+    
+    @property
+    def flow(self) -> Optional["Flow"]:
+        """Get current flow, or None if not in execution context.
+        
+        This is a convenience property that provides direct access to the
+        current flow without needing to call get_execution_context().
+        
+        Returns:
+            Flow object if in execution context, None otherwise.
+            
+        Examples:
+            >>> flow = self.flow
+            >>> if flow:
+            ...     routine_id = flow._get_routine_id(self)
+        """
+        ctx = self.get_execution_context()
+        return ctx.flow if ctx else None
 
     def emit_deferred_event(self, event_name: str, **kwargs) -> None:
         """Emit a deferred event that will be processed when the flow is resumed.

@@ -112,7 +112,8 @@ def handle_task_error(
 
     # Update JobState on failure
     if task.job_state:
-        task.job_state.status = "failed"
+        from routilux.status import ExecutionStatus
+        task.job_state.status = ExecutionStatus.FAILED
         if routine_id:
             task.job_state.update_routine_state(
                 routine_id, {"status": "failed", "error": str(error)}

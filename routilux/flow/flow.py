@@ -278,7 +278,8 @@ class Flow(Serializable):
             target_routine_id: Identifier of the routine that receives the data.
             target_slot: Name of the slot to connect to.
             param_mapping: Optional dictionary mapping event parameter names to
-                slot parameter names.
+                slot parameter names. If None, auto-detects identity mapping
+                when event and slot parameter names match.
 
         Returns:
             Connection object representing this connection.
@@ -302,6 +303,19 @@ class Flow(Serializable):
         if target_slot_obj is None:
             raise ValueError(f"Slot '{target_slot}' not found in routine '{target_routine_id}'")
 
+        # Auto-detect identity mapping if param_mapping is None
+        if param_mapping is None:
+            if self._params_match(source_event_obj, target_slot_obj):
+                param_mapping = {}  # No mapping needed
+            else:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(
+                    f"Parameter names don't match between {source_routine_id}.{source_event} "
+                    f"and {target_routine_id}.{target_slot}. "
+                    f"Consider providing param_mapping explicitly."
+                )
+
         from routilux.connection import Connection
 
         connection = Connection(source_event_obj, target_slot_obj, param_mapping)
@@ -311,6 +325,46 @@ class Flow(Serializable):
         self._event_slot_connections[key] = connection
 
         return connection
+    
+    def _params_match(self, event: "Event", slot: "Slot") -> bool:
+        """Check if event and slot parameters match (for identity mapping).
+        
+        Args:
+            event: Event object.
+            slot: Slot object.
+            
+        Returns:
+            True if all event parameters match slot parameters, False otherwise.
+        """
+        # Get event output parameters
+        event_params = set(event.output_params) if event.output_params else set()
+        
+        # For slots, we need to check the handler signature to determine expected parameters
+        # This is a simplified check - in practice, slots can accept any parameters via **kwargs
+        # So we consider it a match if event has parameters and slot handler accepts **kwargs
+        if not event_params:
+            return True  # No parameters to match
+        
+        # Check if slot handler accepts **kwargs (most flexible)
+        if slot.handler:
+            import inspect
+            try:
+                sig = inspect.signature(slot.handler)
+                params = list(sig.parameters.keys())
+                
+                # If handler accepts **kwargs, it can accept any parameters
+                if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+                    return True
+                
+                # Check if all event params are in handler params
+                handler_params = set(params)
+                return event_params.issubset(handler_params)
+            except (ValueError, TypeError):
+                # Can't inspect signature, assume it matches
+                return True
+        
+        # If no handler, assume it matches (handler might be set later)
+        return True
 
     def set_error_handler(self, error_handler: "ErrorHandler") -> None:
         """Set error handler for the flow.
@@ -539,6 +593,30 @@ class Flow(Serializable):
         with self._execution_lock:
             self._active_tasks.clear()
 
+    def validate(self) -> List[str]:
+        """Validate flow structure and return list of issues.
+        
+        This method checks for common configuration errors that could cause
+        problems during execution:
+        - Circular dependencies (errors)
+        - Unconnected events (warnings)
+        - Unconnected slots (warnings)
+        - Invalid connections (errors)
+        
+        Returns:
+            List of validation error/warning messages. Empty list means valid.
+            
+        Examples:
+            >>> flow = Flow()
+            >>> # ... add routines and connections ...
+            >>> issues = flow.validate()
+            >>> if issues:
+            ...     raise ValueError(f"Flow validation failed:\\n" + "\\n".join(issues))
+        """
+        from routilux.flow.validation import validate_flow
+        
+        return validate_flow(self)
+
     def serialize(self) -> Dict[str, Any]:
         """Serialize Flow, including all routines and connections.
 
@@ -570,3 +648,85 @@ class Flow(Serializable):
         from routilux.flow.serialization import deserialize_flow
 
         deserialize_flow(self, data)
+    
+    @classmethod
+    def from_dict(cls, spec: Dict[str, Any]) -> "Flow":
+        """Create Flow from specification dictionary (JSON/dict DSL).
+        
+        This method allows creating flows from Python dictionaries or JSON,
+        providing a declarative way to define workflows.
+        
+        Args:
+            spec: Flow specification dictionary. See DSL documentation for format.
+            
+        Returns:
+            Constructed Flow object.
+            
+        Examples:
+            >>> flow = Flow.from_dict({
+            ...     "flow_id": "my_flow",
+            ...     "routines": {
+            ...         "reader": {
+            ...             "class": "mymodule.DocxReader",
+            ...             "config": {"output_dir": "/tmp"}
+            ...         }
+            ...     },
+            ...     "connections": [
+            ...         {"from": "reader.output", "to": "processor.input"}
+            ...     ]
+            ... })
+        """
+        from routilux.dsl.loader import load_flow_from_spec
+        
+        return load_flow_from_spec(spec)
+    
+    @classmethod
+    def from_yaml(cls, yaml_str: str) -> "Flow":
+        """Create Flow from YAML string.
+        
+        This method parses a YAML string and creates a Flow from it.
+        Requires the 'pyyaml' package to be installed.
+        
+        Args:
+            yaml_str: YAML string containing flow specification.
+            
+        Returns:
+            Constructed Flow object.
+            
+        Raises:
+            ValueError: If YAML is invalid or specification is invalid.
+            
+        Note:
+            pyyaml is a core dependency, so this method is always available.
+            
+        Examples:
+            >>> yaml_content = '''
+            ... flow_id: my_flow
+            ... routines:
+            ...   reader:
+            ...     class: mymodule.DocxReader
+            ...     config:
+            ...       output_dir: /tmp
+            ... connections:
+            ...   - from: reader.output
+            ...     to: processor.input
+            ... '''
+            >>> flow = Flow.from_yaml(yaml_content)
+        """
+        try:
+            import yaml
+        except ImportError:
+            raise ImportError(
+                "YAML support requires 'pyyaml' package. "
+                "Install it with: pip install pyyaml"
+            )
+        
+        try:
+            spec = yaml.safe_load(yaml_str)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML: {e}")
+        
+        if spec is None:
+            raise ValueError("YAML string is empty or invalid")
+        
+        return cls.from_dict(spec)

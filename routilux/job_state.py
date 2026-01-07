@@ -7,13 +7,16 @@ Used for recording flow execution state.
 import uuid
 import time
 import logging
+import threading
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Callable, TYPE_CHECKING
+from typing import Dict, Any, List, Optional, Callable, TYPE_CHECKING, Union
 from serilux import register_serializable, Serializable
 import json
 
 if TYPE_CHECKING:
     from routilux.flow.flow import Flow
+
+from routilux.status import ExecutionStatus, RoutineStatus
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +132,7 @@ class JobState(Serializable):
         super().__init__()
         self.flow_id: str = flow_id
         self.job_id: str = str(uuid.uuid4())
-        self.status: str = "pending"  # pending, running, paused, completed, failed, cancelled
+        self.status: Union[str, "ExecutionStatus"] = ExecutionStatus.PENDING
         self.pause_points: List[Dict[str, Any]] = []
         self.current_routine_id: Optional[str] = None
         self.routine_states: Dict[str, Dict[str, Any]] = {}
@@ -143,6 +146,7 @@ class JobState(Serializable):
 
         # Shared data area for execution-wide data storage
         self.shared_data: Dict[str, Any] = {}
+        self._shared_data_lock: threading.RLock = threading.RLock()
         self.shared_log: List[Dict[str, Any]] = []
 
         # Output handler for this execution (not serialized)
@@ -216,6 +220,29 @@ class JobState(Serializable):
         """
         self.routine_states[routine_id] = state.copy()
         self.updated_at = datetime.now()
+
+    def update_shared_data(self, key: str, value: Any) -> None:
+        """Thread-safe update of shared data.
+        
+        Args:
+            key: Key to update.
+            value: Value to set.
+        """
+        with self._shared_data_lock:
+            self.shared_data[key] = value
+    
+    def get_shared_data(self, key: str, default: Any = None) -> Any:
+        """Thread-safe get of shared data.
+        
+        Args:
+            key: Key to retrieve.
+            default: Default value if key doesn't exist.
+            
+        Returns:
+            Value for key, or default if key doesn't exist.
+        """
+        with self._shared_data_lock:
+            return self.shared_data.get(key, default)
 
     def get_routine_state(self, routine_id: str) -> Optional[Dict[str, Any]]:
         """Get execution state for a specific routine.
@@ -357,7 +384,7 @@ class JobState(Serializable):
             reason: Reason for pausing.
             checkpoint: Checkpoint data.
         """
-        self.status = "paused"
+        self.status = ExecutionStatus.PAUSED
         pause_point = {
             "timestamp": datetime.now().isoformat(),
             "reason": reason,
@@ -369,8 +396,8 @@ class JobState(Serializable):
 
     def _set_running(self) -> None:
         """Internal method: Set running state (called by Flow)."""
-        if self.status == "paused":
-            self.status = "running"
+        if self.status in (ExecutionStatus.PAUSED, "paused"):
+            self.status = ExecutionStatus.RUNNING
             self.updated_at = datetime.now()
 
     def _set_cancelled(self, reason: str = "") -> None:
@@ -379,7 +406,7 @@ class JobState(Serializable):
         Args:
             reason: Reason for cancellation.
         """
-        self.status = "cancelled"
+        self.status = ExecutionStatus.CANCELLED
         self.updated_at = datetime.now()
         if reason:
             self.routine_states.setdefault("_cancellation", {})["reason"] = reason
@@ -697,11 +724,11 @@ class JobState(Serializable):
                             "Execution completed but critical failures detected in routine states. "
                             "Setting status to 'failed' instead of 'completed'."
                         )
-                        job_state.status = "failed"
+                        job_state.status = ExecutionStatus.FAILED
                     else:
                         # No critical failures: errors in execution history are tolerated
                         # (either CONTINUE strategy or slot handler errors that were caught)
-                        job_state.status = "completed"
+                        job_state.status = ExecutionStatus.COMPLETED
                 return True
 
             if progress_callback is not None:
@@ -833,7 +860,7 @@ class _ExecutionCompletionChecker:
         if self.job_state.status in ["paused", "cancelled"]:
             return True
 
-        if self.job_state.status == "failed":
+        if self.job_state.status in (ExecutionStatus.FAILED, "failed"):
             return True
 
         queue_empty = self.flow._task_queue.empty()
@@ -844,7 +871,7 @@ class _ExecutionCompletionChecker:
         if queue_empty and active_count == 0:
             if self.job_state.status in ["completed", "failed", "paused", "cancelled"]:
                 return True
-            if self.job_state.status == "running":
+            if self.job_state.status in (ExecutionStatus.RUNNING, "running"):
                 return True
 
         return False

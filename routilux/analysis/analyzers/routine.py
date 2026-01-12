@@ -409,9 +409,7 @@ class RoutineAnalyzer:
         """
         return json.dumps(data, indent=indent, ensure_ascii=False)
 
-    def save_json(
-        self, data: dict[str, Any], output_path: str | Path, indent: int = 2
-    ) -> None:
+    def save_json(self, data: dict[str, Any], output_path: str | Path, indent: int = 2) -> None:
         """Save analysis result to JSON file.
 
         Args:

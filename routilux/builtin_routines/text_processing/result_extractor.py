@@ -19,9 +19,7 @@ logger = logging.getLogger(__name__)
 class ExtractorProtocol(Protocol):
     """Protocol for custom extractors."""
 
-    def extract(
-        self, data: Any, config: dict[str, Any]
-    ) -> tuple[Any, str, dict[str, Any]] | None:
+    def extract(self, data: Any, config: dict[str, Any]) -> tuple[Any, str, dict[str, Any]] | None:
         """Extract data from input.
 
         Args:

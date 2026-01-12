@@ -70,9 +70,7 @@ class TextRenderer(Routine):
         # Emit result
         self.emit("output", rendered_text=rendered_text, original_type=original_type)
 
-    def _render_object(
-        self, data: Any, indent_level: int = 0, visited: set | None = None
-    ) -> str:
+    def _render_object(self, data: Any, indent_level: int = 0, visited: set | None = None) -> str:
         """Recursively render an object.
 
         Args:

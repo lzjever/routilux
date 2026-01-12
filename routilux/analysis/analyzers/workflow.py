@@ -323,9 +323,7 @@ class WorkflowAnalyzer:
         serializable_data = self._make_json_serializable(data)
         return json.dumps(serializable_data, indent=indent, ensure_ascii=False)
 
-    def save_json(
-        self, data: dict[str, Any], output_path: str | Path, indent: int = 2
-    ) -> None:
+    def save_json(self, data: dict[str, Any], output_path: str | Path, indent: int = 2) -> None:
         """Save analysis result to JSON file.
 
         Args:

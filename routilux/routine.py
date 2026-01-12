@@ -20,9 +20,7 @@ from serilux import Serializable, register_serializable
 
 # Context variable for thread-safe job_state access
 # Each execution context has its own value, even in the same thread
-_current_job_state: ContextVar[JobState | None] = ContextVar(
-    "_current_job_state", default=None
-)
+_current_job_state: ContextVar[JobState | None] = ContextVar("_current_job_state", default=None)
 
 
 class ExecutionContext(NamedTuple):

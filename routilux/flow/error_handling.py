@@ -4,13 +4,13 @@ Error handling logic for Flow execution.
 Handles task errors and error handler resolution.
 """
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from routilux.routine import Routine
-    from routilux.flow.task import SlotActivationTask
     from routilux.error_handler import ErrorHandler
     from routilux.flow.flow import Flow
+    from routilux.flow.task import SlotActivationTask
+    from routilux.routine import Routine
 
 
 def get_error_handler_for_routine(

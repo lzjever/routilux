@@ -16,11 +16,11 @@ Features demonstrated:
 - Serialization of concurrent flows
 """
 
-import time
 import json
-from typing import Dict, Any
-from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
+import time
+from typing import Any, Dict
 
+from routilux import ErrorHandler, ErrorStrategy, Flow, Routine
 
 # ============================================================================
 # Routine Definitions

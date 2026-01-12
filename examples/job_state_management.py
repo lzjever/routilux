@@ -11,8 +11,10 @@ This example demonstrates:
 
 import json
 import tempfile
-from routilux import Flow, Routine, JobState
+
 from serilux import register_serializable
+
+from routilux import Flow, JobState, Routine
 
 
 @register_serializable
@@ -106,7 +108,7 @@ def test_job_state_serialization():
     print(f"Saved to: {temp_file}")
 
     # Load and verify
-    with open(temp_file, "r") as f:
+    with open(temp_file) as f:
         loaded = json.load(f)
 
     new_flow = Flow()

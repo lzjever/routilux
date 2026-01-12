@@ -4,7 +4,7 @@ ExecutionTracker 综合测试用例
 
 import time
 
-from routilux import Flow, Routine, ExecutionTracker
+from routilux import ExecutionTracker, Flow, Routine
 
 
 class TestExecutionTrackerBasic:

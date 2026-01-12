@@ -6,14 +6,15 @@ Combines with routine_analyzer to provide complete workflow information.
 """
 
 from __future__ import annotations
-import json
-import inspect
-from typing import Dict, Any, List, Optional, Union
-from pathlib import Path
 
+import inspect
+import json
+from pathlib import Path
+from typing import Any
+
+from routilux.analysis.analyzers.routine import RoutineAnalyzer
 from routilux.flow import Flow
 from routilux.routine import Routine
-from routilux.analysis.analyzers.routine import RoutineAnalyzer
 
 
 class WorkflowAnalyzer:
@@ -30,7 +31,7 @@ class WorkflowAnalyzer:
     conversion to visualization formats like D2.
     """
 
-    def __init__(self, routine_analyzer: Optional[RoutineAnalyzer] = None):
+    def __init__(self, routine_analyzer: RoutineAnalyzer | None = None):
         """Initialize the workflow analyzer.
 
         Args:
@@ -39,7 +40,7 @@ class WorkflowAnalyzer:
         """
         self.routine_analyzer = routine_analyzer or RoutineAnalyzer()
 
-    def analyze_flow(self, flow: Flow, include_source_analysis: bool = True) -> Dict[str, Any]:
+    def analyze_flow(self, flow: Flow, include_source_analysis: bool = True) -> dict[str, Any]:
         """Analyze a Flow object.
 
         Args:
@@ -109,7 +110,7 @@ class WorkflowAnalyzer:
 
     def _analyze_routine(
         self, routine_id: str, routine: Routine, include_source_analysis: bool
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze a routine instance.
 
         Args:
@@ -169,7 +170,7 @@ class WorkflowAnalyzer:
 
         return routine_info
 
-    def _analyze_routine_source(self, routine: Routine) -> Optional[Dict[str, Any]]:
+    def _analyze_routine_source(self, routine: Routine) -> dict[str, Any] | None:
         """Attempt to analyze routine source file.
 
         Args:
@@ -195,7 +196,7 @@ class WorkflowAnalyzer:
 
         return None
 
-    def _get_routine_id(self, routine: Routine, flow: Flow) -> Optional[str]:
+    def _get_routine_id(self, routine: Routine, flow: Flow) -> str | None:
         """Find the ID of a Routine object within a Flow.
 
         Args:
@@ -210,7 +211,7 @@ class WorkflowAnalyzer:
                 return rid
         return None
 
-    def _analyze_connection(self, connection, flow: Flow) -> Optional[Dict[str, Any]]:
+    def _analyze_connection(self, connection, flow: Flow) -> dict[str, Any] | None:
         """Analyze a connection.
 
         Args:
@@ -242,7 +243,7 @@ class WorkflowAnalyzer:
 
         return conn_info
 
-    def _build_dependency_graph(self, flow: Flow) -> Dict[str, List[str]]:
+    def _build_dependency_graph(self, flow: Flow) -> dict[str, list[str]]:
         """Build dependency graph from connections.
 
         Args:
@@ -270,7 +271,7 @@ class WorkflowAnalyzer:
 
         return dependency_graph
 
-    def _find_entry_points(self, flow: Flow) -> List[str]:
+    def _find_entry_points(self, flow: Flow) -> list[str]:
         """Find entry point routines (those with trigger slots).
 
         Args:
@@ -309,7 +310,7 @@ class WorkflowAnalyzer:
             # Convert non-serializable objects to string
             return str(obj)
 
-    def to_json(self, data: Dict[str, Any], indent: int = 2) -> str:
+    def to_json(self, data: dict[str, Any], indent: int = 2) -> str:
         """Convert analysis result to JSON string.
 
         Args:
@@ -322,9 +323,7 @@ class WorkflowAnalyzer:
         serializable_data = self._make_json_serializable(data)
         return json.dumps(serializable_data, indent=indent, ensure_ascii=False)
 
-    def save_json(
-        self, data: Dict[str, Any], output_path: Union[str, Path], indent: int = 2
-    ) -> None:
+    def save_json(self, data: dict[str, Any], output_path: str | Path, indent: int = 2) -> None:
         """Save analysis result to JSON file.
 
         Args:
@@ -341,9 +340,9 @@ class WorkflowAnalyzer:
 
     def to_d2_format(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         mode: str = "standard",
-        routine_analysis: Optional[Union[str, Path, Dict[str, Any]]] = None,
+        routine_analysis: str | Path | dict[str, Any] | None = None,
     ) -> str:
         """Convert workflow analysis to D2 format string.
 
@@ -367,7 +366,7 @@ class WorkflowAnalyzer:
         else:
             return self._to_d2_format_standard(data)
 
-    def _to_d2_format_standard(self, data: Dict[str, Any]) -> str:
+    def _to_d2_format_standard(self, data: dict[str, Any]) -> str:
         """Generate standard D2 format (backward compatible)."""
         lines = []
         lines.append("# Workflow: " + data.get("flow_id", "unknown"))
@@ -415,8 +414,8 @@ class WorkflowAnalyzer:
 
     def _to_d2_format_ultimate(
         self,
-        data: Dict[str, Any],
-        routine_analysis: Optional[Union[str, Path, Dict[str, Any]]] = None,
+        data: dict[str, Any],
+        routine_analysis: str | Path | dict[str, Any] | None = None,
     ) -> str:
         """Generate ultimate D2 format with enhanced styling and detailed information."""
         # Load routine analysis if provided
@@ -486,8 +485,8 @@ class WorkflowAnalyzer:
         return "\n".join(lines)
 
     def _load_routine_analysis(
-        self, routine_analysis: Optional[Union[str, Path, Dict[str, Any]]]
-    ) -> Optional[Dict[str, Any]]:
+        self, routine_analysis: str | Path | dict[str, Any] | None
+    ) -> dict[str, Any] | None:
         """Load routine analysis data from file or return dict if already loaded.
 
         Args:
@@ -506,7 +505,7 @@ class WorkflowAnalyzer:
         try:
             file_path = Path(routine_analysis)
             if file_path.exists():
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     return json.load(f)
         except (OSError, json.JSONDecodeError) as e:
             # Silently fail - will use basic info
@@ -516,8 +515,8 @@ class WorkflowAnalyzer:
         return None
 
     def _get_enhanced_routine_info(
-        self, routine: Dict[str, Any], routine_analysis_data: Optional[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
+        self, routine: dict[str, Any], routine_analysis_data: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
         """Get enhanced routine information from analysis data.
 
         Args:
@@ -541,8 +540,8 @@ class WorkflowAnalyzer:
         return None
 
     def _format_ultimate_routine_node(
-        self, routine: Dict[str, Any], enhanced_info: Optional[Dict[str, Any]], is_entry: bool
-    ) -> List[str]:
+        self, routine: dict[str, Any], enhanced_info: dict[str, Any] | None, is_entry: bool
+    ) -> list[str]:
         """Format a routine node in ultimate D2 format with enhanced styling.
 
         Args:
@@ -709,7 +708,7 @@ class WorkflowAnalyzer:
 
         return lines
 
-    def _format_ultimate_connection(self, conn: Dict[str, Any]) -> List[str]:
+    def _format_ultimate_connection(self, conn: dict[str, Any]) -> list[str]:
         """Format a connection in ultimate D2 format with enhanced styling.
 
         Args:
@@ -803,8 +802,8 @@ class WorkflowAnalyzer:
         return lines
 
     def _format_dependency_section(
-        self, dependency_graph: Dict[str, List[str]], entry_points: set
-    ) -> List[str]:
+        self, dependency_graph: dict[str, list[str]], entry_points: set
+    ) -> list[str]:
         """Format dependency graph section.
 
         Args:
@@ -865,10 +864,10 @@ class WorkflowAnalyzer:
 
     def save_d2(
         self,
-        data: Dict[str, Any],
-        output_path: Union[str, Path],
+        data: dict[str, Any],
+        output_path: str | Path,
         mode: str = "standard",
-        routine_analysis: Optional[Union[str, Path, Dict[str, Any]]] = None,
+        routine_analysis: str | Path | dict[str, Any] | None = None,
     ) -> None:
         """Save workflow analysis as D2 format file.
 
@@ -891,7 +890,7 @@ class WorkflowAnalyzer:
             f.write(d2_content)
 
 
-def analyze_workflow(flow: Flow, include_source_analysis: bool = True) -> Dict[str, Any]:
+def analyze_workflow(flow: Flow, include_source_analysis: bool = True) -> dict[str, Any]:
     """Convenience function to analyze a workflow.
 
     Args:

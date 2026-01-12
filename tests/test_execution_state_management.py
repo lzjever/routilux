@@ -7,7 +7,8 @@ updated during execution in both main thread and worker threads.
 """
 
 import threading
-from routilux import Flow, Routine, JobState, ErrorHandler, ErrorStrategy
+
+from routilux import ErrorHandler, ErrorStrategy, Flow, JobState, Routine
 
 
 class TestMultipleIndependentExecutions:

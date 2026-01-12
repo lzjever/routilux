@@ -3,6 +3,7 @@ Test cases for aggregator pattern - waiting for all expected messages.
 """
 
 import time
+
 from routilux import Flow, Routine
 
 

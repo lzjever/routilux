@@ -5,13 +5,16 @@ Routes data to different outputs based on conditions.
 """
 
 from __future__ import annotations
-from typing import Dict, Any, Callable, Optional, Union
-from routilux.routine import Routine
+
+from typing import Any, Callable
+
 from serilux import (
+    deserialize_callable,
     register_serializable,
     serialize_callable_with_fallback,
-    deserialize_callable,
 )
+
+from routilux.routine import Routine
 
 
 @register_serializable
@@ -213,7 +216,7 @@ class ConditionalRouter(Routine):
                 self.emit("output", data=data, route="unmatched")
                 # Statistics tracking removed - use JobState for execution state
 
-    def _evaluate_dict_condition(self, data: Any, condition: Dict[str, Any]) -> bool:
+    def _evaluate_dict_condition(self, data: Any, condition: dict[str, Any]) -> bool:
         """Evaluate a dictionary-based condition.
 
         Args:
@@ -298,7 +301,7 @@ class ConditionalRouter(Routine):
         except Exception:
             return False
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         """Serialize ConditionalRouter, handling lambda functions in routes.
 
         Callable conditions are automatically serialized using the serialization module's
@@ -336,7 +339,7 @@ class ConditionalRouter(Routine):
 
         return data
 
-    def deserialize(self, data: Dict[str, Any], registry: Optional[Any] = None) -> None:
+    def deserialize(self, data: dict[str, Any], registry: Any | None = None) -> None:
         """Deserialize ConditionalRouter, restoring callable conditions from routes.
 
         Callable conditions are automatically deserialized by the serialization module,
@@ -398,7 +401,7 @@ class ConditionalRouter(Routine):
         # Update config
         self.set_config(routes=deserialized_routes)
 
-    def add_route(self, route_name: str, condition: Union[Callable, Dict[str, Any], str]) -> None:
+    def add_route(self, route_name: str, condition: Callable | dict[str, Any] | str) -> None:
         """Add a routing condition.
 
         Args:

@@ -7,9 +7,10 @@
 """
 
 import threading
-from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
-from routilux.flow.task import SlotActivationTask
+
+from routilux import ErrorHandler, ErrorStrategy, Flow, Routine
 from routilux.flow.error_handling import handle_task_error
+from routilux.flow.task import SlotActivationTask
 from routilux.job_state import JobState
 
 

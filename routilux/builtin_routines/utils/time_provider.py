@@ -5,9 +5,11 @@ Provides current time in various formats.
 """
 
 from __future__ import annotations
-from typing import Dict, Any, Optional
-from datetime import datetime
+
 import time
+from datetime import datetime
+from typing import Any
+
 from routilux.routine import Routine
 
 
@@ -50,7 +52,7 @@ class TimeProvider(Routine):
             "output", ["time_string", "timestamp", "datetime", "formatted"]
         )
 
-    def _handle_request(self, data: Optional[Dict[str, Any]] = None, **kwargs):
+    def _handle_request(self, data: dict[str, Any] | None = None, **kwargs):
         """Handle time request.
 
         Args:

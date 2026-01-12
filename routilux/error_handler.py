@@ -5,15 +5,17 @@ Defines error handling strategies and retry mechanisms.
 """
 
 from __future__ import annotations
-from typing import Optional, Dict, Any, TYPE_CHECKING
-from enum import Enum
-import time
+
 import logging
-from serilux import register_serializable, Serializable
+import time
+from enum import Enum
+from typing import TYPE_CHECKING, Any
+
+from serilux import Serializable, register_serializable
 
 if TYPE_CHECKING:
-    from routilux.routine import Routine
     from routilux.flow import Flow
+    from routilux.routine import Routine
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +119,7 @@ class ErrorHandler(Serializable):
         max_retries: int = 3,
         retry_delay: float = 1.0,
         retry_backoff: float = 2.0,
-        retryable_exceptions: Optional[tuple] = None,
+        retryable_exceptions: tuple | None = None,
         is_critical: bool = False,
     ):
         """Initialize ErrorHandler with configuration.
@@ -194,11 +196,11 @@ class ErrorHandler(Serializable):
     def handle_error(
         self,
         error: Exception,
-        routine: "Routine",
+        routine: Routine,
         routine_id: str,
-        flow: "Flow",
+        flow: Flow,
         job_state=None,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> bool:
         """Handle an error according to the configured strategy.
 
@@ -326,7 +328,7 @@ class ErrorHandler(Serializable):
         """Reset the retry count."""
         self.retry_count = 0
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         """Serialize the ErrorHandler.
 
         Returns:
@@ -338,7 +340,7 @@ class ErrorHandler(Serializable):
             data["strategy"] = data["strategy"].value
         return data
 
-    def deserialize(self, data: Dict[str, Any], registry: Optional[Any] = None) -> None:
+    def deserialize(self, data: dict[str, Any], registry: Any | None = None) -> None:
         """Deserialize the ErrorHandler.
 
         Args:

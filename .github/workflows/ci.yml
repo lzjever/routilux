@@ -43,7 +43,7 @@ jobs:
       
       - name: Check formatting
         run: |
-          uv run black --check routilux/ tests/ examples/
+          uv run ruff format --check routilux/ tests/ examples/
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

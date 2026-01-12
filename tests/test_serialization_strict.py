@@ -6,8 +6,10 @@
 """
 
 import json
+
 import pytest
-from routilux import Flow, Routine, ErrorHandler, ErrorStrategy, JobState
+
+from routilux import ErrorHandler, ErrorStrategy, Flow, JobState, Routine
 
 
 class TestRoutineConfigSerialization:

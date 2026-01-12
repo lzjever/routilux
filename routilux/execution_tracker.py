@@ -5,9 +5,11 @@ Tracks flow execution state and performance metrics.
 """
 
 from __future__ import annotations
-from typing import Dict, Any, List, Optional
+
 from datetime import datetime
-from serilux import register_serializable, Serializable
+from typing import Any
+
+from serilux import Serializable, register_serializable
 
 
 @register_serializable
@@ -59,16 +61,16 @@ class ExecutionTracker(Serializable):
         """
         super().__init__()
         self.flow_id: str = flow_id
-        self.routine_executions: Dict[str, List[Dict[str, Any]]] = {}
-        self.event_flow: List[Dict[str, Any]] = []
-        self.performance_metrics: Dict[str, Any] = {}
+        self.routine_executions: dict[str, list[dict[str, Any]]] = {}
+        self.event_flow: list[dict[str, Any]] = []
+        self.performance_metrics: dict[str, Any] = {}
 
         # Register serializable fields
         self.add_serializable_fields(
             ["flow_id", "routine_executions", "event_flow", "performance_metrics"]
         )
 
-    def record_routine_start(self, routine_id: str, params: Dict[str, Any] = None) -> None:
+    def record_routine_start(self, routine_id: str, params: dict[str, Any] = None) -> None:
         """Record the start of a routine execution.
 
         This method is called when a routine begins execution. It creates
@@ -109,7 +111,7 @@ class ExecutionTracker(Serializable):
         routine_id: str,
         status: str = "completed",
         result: Any = None,
-        error: Optional[str] = None,
+        error: str | None = None,
     ) -> None:
         """Record the end of a routine execution.
 
@@ -174,8 +176,8 @@ class ExecutionTracker(Serializable):
         self,
         source_routine_id: str,
         event_name: str,
-        target_routine_id: Optional[str] = None,
-        data: Dict[str, Any] = None,
+        target_routine_id: str | None = None,
+        data: dict[str, Any] = None,
     ) -> None:
         """Record an event emission in the event flow.
 
@@ -217,7 +219,7 @@ class ExecutionTracker(Serializable):
         }
         self.event_flow.append(event_record)
 
-    def get_routine_performance(self, routine_id: str) -> Optional[Dict[str, Any]]:
+    def get_routine_performance(self, routine_id: str) -> dict[str, Any] | None:
         """Get performance metrics for a routine.
 
         Args:
@@ -254,7 +256,7 @@ class ExecutionTracker(Serializable):
             "max_execution_time": max_time,
         }
 
-    def get_flow_performance(self) -> Dict[str, Any]:
+    def get_flow_performance(self) -> dict[str, Any]:
         """Get performance metrics for the entire flow.
 
         This method aggregates performance metrics across all routines in

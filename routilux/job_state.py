@@ -4,13 +4,14 @@ JobState and ExecutionRecord classes.
 Used for recording flow execution state.
 """
 
-import uuid
-import time
-import logging
-from datetime import datetime
-from typing import Dict, Any, List, Optional, Callable, TYPE_CHECKING
-from serilux import register_serializable, Serializable
 import json
+import logging
+import time
+import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+
+from serilux import Serializable, register_serializable
 
 if TYPE_CHECKING:
     from routilux.flow.flow import Flow
@@ -424,7 +425,7 @@ class JobState(Serializable):
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"JobState file not found: {filepath}")
 
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             data = json.load(f)
 
         # Validate data format

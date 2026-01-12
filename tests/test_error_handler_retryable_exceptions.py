@@ -2,7 +2,7 @@
 Test retryable_exceptions functionality in ErrorHandler.
 """
 
-from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
+from routilux import ErrorHandler, ErrorStrategy, Flow, Routine
 
 
 class TestRetryableExceptions:

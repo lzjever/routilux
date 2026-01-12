@@ -5,9 +5,10 @@ Tests for the systematic execution completion detection and waiting mechanism.
 """
 
 import time
+
 from routilux import Flow, Routine
-from routilux.job_state import JobState
 from routilux.flow.completion import ensure_event_loop_running
+from routilux.job_state import JobState
 
 
 class TestWaitForExecutionCompletion:
@@ -35,8 +36,8 @@ class TestWaitForExecutionCompletion:
     def test_wait_for_completion_with_timeout(self):
         """Test waiting with timeout."""
         flow = Flow()
-        from routilux.job_state import JobState
         from routilux.flow.task import SlotActivationTask
+        from routilux.job_state import JobState
 
         job_state = JobState(flow.flow_id)
         job_state.status = "running"
@@ -157,8 +158,8 @@ class TestEnsureEventLoopRunning:
     def test_ensure_event_loop_running_when_stopped(self):
         """Test ensuring event loop runs when stopped with tasks in queue."""
         flow = Flow()
-        from routilux.job_state import JobState
         from routilux.flow.task import SlotActivationTask
+        from routilux.job_state import JobState
 
         job_state = JobState(flow.flow_id)
 

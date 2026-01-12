@@ -15,9 +15,9 @@ It demonstrates all Routilux features including:
 
 import json
 import time
-from typing import Dict, Any, List
-from routilux import Flow, Routine, JobState, ErrorHandler, ErrorStrategy
+from typing import Any, Dict, List
 
+from routilux import ErrorHandler, ErrorStrategy, Flow, JobState, Routine
 
 # ============================================================================
 # Routine Definitions

@@ -5,9 +5,12 @@ Flattens nested data structures into flat dictionaries.
 """
 
 from __future__ import annotations
-from typing import Any, Dict, Optional, Tuple
-from routilux.routine import Routine
+
+from typing import Any
+
 from serilux import Serializable
+
+from routilux.routine import Routine
 
 
 class DataFlattener(Routine):
@@ -71,8 +74,8 @@ class DataFlattener(Routine):
         self.emit("output", flattened_data=flattened_data, original_type=original_type, depth=depth)
 
     def _flatten(
-        self, value: Any, prefix: str = "", depth: int = 0, visited: Optional[set] = None
-    ) -> Tuple[Dict[str, Any], str, int]:
+        self, value: Any, prefix: str = "", depth: int = 0, visited: set | None = None
+    ) -> tuple[dict[str, Any], str, int]:
         """Recursively flatten a value.
 
         Args:

@@ -5,7 +5,8 @@
 import json
 
 import pytest
-from routilux import Flow, Routine, JobState
+
+from routilux import Flow, JobState, Routine
 
 
 class TestBasicResume:
@@ -60,7 +61,7 @@ class TestBasicResume:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         # 加载并反序列化状态
-        with open(temp_file, "r", encoding="utf-8") as f:
+        with open(temp_file, encoding="utf-8") as f:
             loaded_data = json.load(f)
         job_state2 = JobState()
         job_state2.deserialize(loaded_data)
@@ -96,7 +97,7 @@ class TestBasicResume:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         # 加载并反序列化
-        with open(temp_file, "r", encoding="utf-8") as f:
+        with open(temp_file, encoding="utf-8") as f:
             loaded_data = json.load(f)
         job_state2 = JobState()
         job_state2.deserialize(loaded_data)
@@ -131,7 +132,7 @@ class TestBasicResume:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         # 加载并反序列化
-        with open(temp_file, "r", encoding="utf-8") as f:
+        with open(temp_file, encoding="utf-8") as f:
             loaded_data = json.load(f)
         job_state2 = JobState()
         job_state2.deserialize(loaded_data)
@@ -168,7 +169,7 @@ class TestResumeConsistency:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         # 加载并反序列化
-        with open(temp_file, "r", encoding="utf-8") as f:
+        with open(temp_file, encoding="utf-8") as f:
             loaded_data = json.load(f)
         job_state2 = JobState()
         job_state2.deserialize(loaded_data)
@@ -240,7 +241,7 @@ class TestResumeConsistency:
         flow2.connect("B", "output", "C", "input")
 
         # 加载并反序列化
-        with open(temp_file, "r", encoding="utf-8") as f:
+        with open(temp_file, encoding="utf-8") as f:
             loaded_data = json.load(f)
         job_state2 = JobState()
         job_state2.deserialize(loaded_data)
@@ -269,7 +270,7 @@ class TestResumeEdgeCases:
 
         # 加载到不包含该 routine 的 flow
         flow = Flow(flow_id="test_flow")
-        with open(temp_file, "r", encoding="utf-8") as f:
+        with open(temp_file, encoding="utf-8") as f:
             loaded_data = json.load(f)
         job_state2 = JobState()
         job_state2.deserialize(loaded_data)
@@ -287,7 +288,7 @@ class TestResumeEdgeCases:
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        with open(temp_file, "r", encoding="utf-8") as f:
+        with open(temp_file, encoding="utf-8") as f:
             loaded_data = json.load(f)
         job_state2 = JobState()
         job_state2.deserialize(loaded_data)

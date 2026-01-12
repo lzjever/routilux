@@ -5,9 +5,10 @@
 """
 
 from serilux import (
-    serialize_callable,
     deserialize_callable,
+    serialize_callable,
 )
+
 from routilux import Routine
 
 

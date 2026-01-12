@@ -4,7 +4,8 @@ Serialization logic for Flow.
 Handles serialization and deserialization of Flow objects.
 """
 
-from typing import Dict, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
+
 from serilux import Serializable
 
 if TYPE_CHECKING:

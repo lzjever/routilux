@@ -6,14 +6,14 @@ This example demonstrates how to use the built-in routines in Routilux.
 
 from routilux import Flow
 from routilux.builtin_routines import (
-    TextClipper,
-    TextRenderer,
-    TimeProvider,
+    ConditionalRouter,
     DataFlattener,
     DataTransformer,
     DataValidator,
-    ConditionalRouter,
     RetryHandler,
+    TextClipper,
+    TextRenderer,
+    TimeProvider,
 )
 
 

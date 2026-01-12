@@ -5,6 +5,7 @@ Tests all routines to ensure they work correctly and handle edge cases.
 """
 
 import unittest
+
 from routilux.builtin_routines.control_flow import (
     ConditionalRouter,
 )

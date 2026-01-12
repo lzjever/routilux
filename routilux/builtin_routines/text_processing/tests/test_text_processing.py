@@ -6,10 +6,11 @@ Tests all routines to ensure they work correctly and handle edge cases.
 """
 
 import unittest
+
 from routilux.builtin_routines.text_processing import (
+    ResultExtractor,
     TextClipper,
     TextRenderer,
-    ResultExtractor,
 )
 from routilux.slot import Slot
 

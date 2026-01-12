@@ -5,7 +5,9 @@ Validates data against schemas or validation rules.
 """
 
 from __future__ import annotations
-from typing import Dict, Any, Callable, Optional, Union, Tuple
+
+from typing import Any, Callable
+
 from routilux.routine import Routine
 
 
@@ -72,7 +74,7 @@ class DataValidator(Routine):
             self._builtin_validators = {}
         self._builtin_validators.update(builtins)
 
-    def _handle_input(self, data: Any = None, rules: Optional[Dict] = None, **kwargs):
+    def _handle_input(self, data: Any = None, rules: dict | None = None, **kwargs):
         """Handle input data and validate it.
 
         Args:
@@ -146,8 +148,8 @@ class DataValidator(Routine):
             self.emit("valid", validated_data=data)
 
     def _validate_field(
-        self, field_name: str, value: Any, validator: Union[Callable, str]
-    ) -> Tuple[bool, Optional[str]]:
+        self, field_name: str, value: Any, validator: Callable | str
+    ) -> tuple[bool, str | None]:
         """Validate a single field.
 
         Args:

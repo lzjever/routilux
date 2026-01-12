@@ -5,6 +5,6 @@ This module contains the Flow class and related components for workflow orchestr
 """
 
 from routilux.flow.flow import Flow
-from routilux.flow.task import TaskPriority, SlotActivationTask
+from routilux.flow.task import SlotActivationTask, TaskPriority
 
 __all__ = ["Flow", "TaskPriority", "SlotActivationTask"]

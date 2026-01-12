@@ -4,10 +4,10 @@ State management for Flow execution.
 Handles pause, resume, cancel, and task serialization/deserialization.
 """
 
-import time
 import logging
+import time
 from datetime import datetime
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
     from routilux.flow.flow import Flow
@@ -202,8 +202,8 @@ def _recover_slot_tasks(flow: "Flow", job_state: "JobState") -> None:
         flow: Flow object.
         job_state: JobState to recover tasks from.
     """
-    from routilux.flow.task import SlotActivationTask, TaskPriority
     from routilux.flow.error_handling import get_error_handler_for_routine
+    from routilux.flow.task import SlotActivationTask, TaskPriority
 
     recovered_count = 0
 

@@ -5,10 +5,11 @@ Analyzes routine Python files using AST to generate structured descriptions.
 """
 
 from __future__ import annotations
+
 import ast
 import json
-from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
+from typing import Any
 
 
 class RoutineAnalyzer:
@@ -28,9 +29,9 @@ class RoutineAnalyzer:
 
     def __init__(self):
         """Initialize the routine analyzer."""
-        self.routines: List[Dict[str, Any]] = []
+        self.routines: list[dict[str, Any]] = []
 
-    def analyze_file(self, file_path: Union[str, Path]) -> Dict[str, Any]:
+    def analyze_file(self, file_path: str | Path) -> dict[str, Any]:
         """Analyze a routine Python file.
 
         Args:
@@ -57,7 +58,7 @@ class RoutineAnalyzer:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             source_code = f.read()
 
         tree = ast.parse(source_code, filename=str(file_path))
@@ -95,7 +96,7 @@ class RoutineAnalyzer:
 
     def _analyze_routine_class(
         self, class_node: ast.ClassDef, source_code: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Analyze a routine class definition.
 
         Args:
@@ -130,7 +131,7 @@ class RoutineAnalyzer:
 
         return routine_info
 
-    def _find_method(self, class_node: ast.ClassDef, method_name: str) -> Optional[ast.FunctionDef]:
+    def _find_method(self, class_node: ast.ClassDef, method_name: str) -> ast.FunctionDef | None:
         """Find a method in a class.
 
         Args:
@@ -145,7 +146,7 @@ class RoutineAnalyzer:
                 return node
         return None
 
-    def _extract_slots(self, init_method: ast.FunctionDef) -> List[Dict[str, Any]]:
+    def _extract_slots(self, init_method: ast.FunctionDef) -> list[dict[str, Any]]:
         """Extract slot definitions from __init__ method.
 
         Args:
@@ -167,7 +168,7 @@ class RoutineAnalyzer:
 
         return slots
 
-    def _extract_events(self, init_method: ast.FunctionDef) -> List[Dict[str, Any]]:
+    def _extract_events(self, init_method: ast.FunctionDef) -> list[dict[str, Any]]:
         """Extract event definitions from __init__ method.
 
         Args:
@@ -189,7 +190,7 @@ class RoutineAnalyzer:
 
         return events
 
-    def _extract_config(self, init_method: ast.FunctionDef) -> Dict[str, Any]:
+    def _extract_config(self, init_method: ast.FunctionDef) -> dict[str, Any]:
         """Extract configuration from __init__ method.
 
         Args:
@@ -209,7 +210,7 @@ class RoutineAnalyzer:
 
         return config
 
-    def _parse_define_slot_call(self, call_node: ast.Call) -> Optional[Dict[str, Any]]:
+    def _parse_define_slot_call(self, call_node: ast.Call) -> dict[str, Any] | None:
         """Parse a define_slot call.
 
         Args:
@@ -241,7 +242,7 @@ class RoutineAnalyzer:
 
         return slot_info
 
-    def _parse_define_event_call(self, call_node: ast.Call) -> Optional[Dict[str, Any]]:
+    def _parse_define_event_call(self, call_node: ast.Call) -> dict[str, Any] | None:
         """Parse a define_event call.
 
         Args:
@@ -266,7 +267,7 @@ class RoutineAnalyzer:
 
         return event_info
 
-    def _parse_set_config_call(self, call_node: ast.Call) -> Dict[str, Any]:
+    def _parse_set_config_call(self, call_node: ast.Call) -> dict[str, Any]:
         """Parse a set_config call.
 
         Args:
@@ -284,7 +285,7 @@ class RoutineAnalyzer:
 
         return config
 
-    def _extract_string_value(self, node: ast.AST) -> Optional[str]:
+    def _extract_string_value(self, node: ast.AST) -> str | None:
         """Extract string value from AST node.
 
         Args:
@@ -328,7 +329,7 @@ class RoutineAnalyzer:
             return result
         return None
 
-    def _extract_list_of_strings(self, node: ast.AST) -> List[str]:
+    def _extract_list_of_strings(self, node: ast.AST) -> list[str]:
         """Extract list of strings from AST node.
 
         Args:
@@ -346,7 +347,7 @@ class RoutineAnalyzer:
             return result
         return []
 
-    def _extract_function_reference(self, node: ast.AST) -> Optional[str]:
+    def _extract_function_reference(self, node: ast.AST) -> str | None:
         """Extract function reference from AST node.
 
         Args:
@@ -363,7 +364,7 @@ class RoutineAnalyzer:
                 return node.attr
         return None
 
-    def _analyze_method(self, method_node: ast.FunctionDef) -> Dict[str, Any]:
+    def _analyze_method(self, method_node: ast.FunctionDef) -> dict[str, Any]:
         """Analyze a method definition.
 
         Args:
@@ -396,7 +397,7 @@ class RoutineAnalyzer:
 
         return method_info
 
-    def to_json(self, data: Dict[str, Any], indent: int = 2) -> str:
+    def to_json(self, data: dict[str, Any], indent: int = 2) -> str:
         """Convert analysis result to JSON string.
 
         Args:
@@ -408,9 +409,7 @@ class RoutineAnalyzer:
         """
         return json.dumps(data, indent=indent, ensure_ascii=False)
 
-    def save_json(
-        self, data: Dict[str, Any], output_path: Union[str, Path], indent: int = 2
-    ) -> None:
+    def save_json(self, data: dict[str, Any], output_path: str | Path, indent: int = 2) -> None:
         """Save analysis result to JSON file.
 
         Args:
@@ -425,7 +424,7 @@ class RoutineAnalyzer:
             json.dump(data, f, indent=indent, ensure_ascii=False)
 
 
-def analyze_routine_file(file_path: Union[str, Path]) -> Dict[str, Any]:
+def analyze_routine_file(file_path: str | Path) -> dict[str, Any]:
     """Convenience function to analyze a routine file.
 
     Args:

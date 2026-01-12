@@ -5,8 +5,9 @@ Demonstrates how to create a routine that waits for all expected messages
 before processing and emitting results.
 """
 
-from routilux import Flow, Routine
 import time
+
+from routilux import Flow, Routine
 
 
 class SearchTask(Routine):

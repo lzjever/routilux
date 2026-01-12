@@ -13,24 +13,21 @@ All routines inherit from Routine which provides common utilities like
 _extract_input_data() and _track_operation().
 """
 
-from routilux.builtin_routines.text_processing import (
-    TextClipper,
-    TextRenderer,
-    ResultExtractor,
+from routilux.builtin_routines.control_flow import (
+    ConditionalRouter,
 )
-
-from routilux.builtin_routines.utils import (
-    TimeProvider,
-    DataFlattener,
-)
-
 from routilux.builtin_routines.data_processing import (
     DataTransformer,
     DataValidator,
 )
-
-from routilux.builtin_routines.control_flow import (
-    ConditionalRouter,
+from routilux.builtin_routines.text_processing import (
+    ResultExtractor,
+    TextClipper,
+    TextRenderer,
+)
+from routilux.builtin_routines.utils import (
+    DataFlattener,
+    TimeProvider,
 )
 
 __all__ = [

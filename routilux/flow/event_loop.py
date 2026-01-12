@@ -4,15 +4,15 @@ Event loop and task queue management for Flow execution.
 Handles task queuing, event loop execution, and task execution.
 """
 
+import logging
 import queue
 import threading
 import time
-import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from routilux.flow.task import SlotActivationTask
     from routilux.flow.flow import Flow
+    from routilux.flow.task import SlotActivationTask
 
 
 def start_event_loop(flow: "Flow") -> None:

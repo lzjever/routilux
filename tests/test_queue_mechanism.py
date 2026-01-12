@@ -8,8 +8,9 @@
 - Pause/Resume 序列化
 """
 
-import time
 import threading
+import time
+
 from routilux import Flow, Routine
 from routilux.job_state import JobState
 

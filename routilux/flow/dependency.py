@@ -4,11 +4,11 @@ Dependency graph management for Flow execution.
 Handles building and querying routine dependency graphs.
 """
 
-from typing import Dict, Set, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Set
 
 if TYPE_CHECKING:
-    from routilux.routine import Routine
     from routilux.connection import Connection
+    from routilux.routine import Routine
 
 
 def build_dependency_graph(

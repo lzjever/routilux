@@ -6,7 +6,7 @@ Handles sequential and concurrent execution of workflows.
 
 import logging
 from datetime import datetime
-from typing import Dict, Optional, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
     from routilux.flow.flow import Flow
@@ -64,10 +64,10 @@ def execute_sequential(
     Returns:
         JobState object.
     """
-    from routilux.job_state import JobState
     from routilux.execution_tracker import ExecutionTracker
-    from routilux.flow.event_loop import start_event_loop
     from routilux.flow.error_handling import get_error_handler_for_routine
+    from routilux.flow.event_loop import start_event_loop
+    from routilux.job_state import JobState
 
     job_state = JobState(flow.flow_id)
     job_state.status = "running"

@@ -5,13 +5,14 @@ Input slot for receiving data from other routines.
 """
 
 from __future__ import annotations
-from typing import Callable, Optional, List, Dict, Any, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
-    from routilux.routine import Routine
     from routilux.event import Event
+    from routilux.routine import Routine
 
-from serilux import register_serializable, Serializable
+from serilux import Serializable, register_serializable
 
 
 @register_serializable
@@ -87,8 +88,8 @@ class Slot(Serializable):
     def __init__(
         self,
         name: str = "",
-        routine: Optional["Routine"] = None,
-        handler: Optional[Callable] = None,
+        routine: Routine | None = None,
+        handler: Callable | None = None,
         merge_strategy: str = "override",
     ):
         """Initialize Slot.
@@ -127,11 +128,11 @@ class Slot(Serializable):
         """
         super().__init__()
         self.name: str = name
-        self.routine: "Routine" = routine
-        self.handler: Optional[Callable] = handler
+        self.routine: Routine = routine
+        self.handler: Callable | None = handler
         self.merge_strategy: Any = merge_strategy
-        self.connected_events: List["Event"] = []
-        self._data: Dict[str, Any] = {}
+        self.connected_events: list[Event] = []
+        self._data: dict[str, Any] = {}
 
         # Register serializable fields
         # handler and merge_strategy are automatically serialized if they're callables
@@ -144,7 +145,7 @@ class Slot(Serializable):
         else:
             return f"Slot[{self.name}]"
 
-    def connect(self, event: "Event", param_mapping: Optional[Dict[str, str]] = None) -> None:
+    def connect(self, event: Event, param_mapping: dict[str, str] | None = None) -> None:
         """Connect to an event.
 
         Args:
@@ -157,7 +158,7 @@ class Slot(Serializable):
             if self not in event.connected_slots:
                 event.connected_slots.append(self)
 
-    def disconnect(self, event: "Event") -> None:
+    def disconnect(self, event: Event) -> None:
         """Disconnect from an event.
 
         Args:
@@ -169,7 +170,7 @@ class Slot(Serializable):
             if self in event.connected_slots:
                 event.connected_slots.remove(self)
 
-    def receive(self, data: Dict[str, Any], job_state=None, flow=None) -> None:
+    def receive(self, data: dict[str, Any], job_state=None, flow=None) -> None:
         """Receive data, merge with existing data, and call handler.
 
         This method is called automatically when a connected event is emitted.
@@ -281,8 +282,8 @@ class Slot(Serializable):
                                 ):
                                     # For RETRY strategy in task context, create a temporary task
                                     # and call handle_task_error to trigger retry logic
-                                    from routilux.flow.task import SlotActivationTask, TaskPriority
                                     from routilux.flow.error_handling import handle_task_error
+                                    from routilux.flow.task import SlotActivationTask, TaskPriority
 
                                     # Record error in execution history first (for tracking and testing)
                                     job_state.record_execution(
@@ -331,7 +332,7 @@ class Slot(Serializable):
             else:
                 _current_job_state.set(None)
 
-    def _merge_data(self, new_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _merge_data(self, new_data: dict[str, Any]) -> dict[str, Any]:
         """Merge new data into existing data according to merge_strategy.
 
         This method implements the core merge logic based on the configured
@@ -433,7 +434,7 @@ class Slot(Serializable):
             self._data = new_data.copy()
             return self._data
 
-    def call_handler(self, data: Dict[str, Any], propagate_exceptions: bool = False) -> None:
+    def call_handler(self, data: dict[str, Any], propagate_exceptions: bool = False) -> None:
         """Call handler with data, optionally propagating exceptions.
 
         This method is used for entry routine trigger slots where exceptions
@@ -539,7 +540,7 @@ class Slot(Serializable):
                 return True
         return False
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         """Serialize Slot.
 
         Callables (handler, merge_strategy) are automatically handled by Serializable base class.
@@ -556,7 +557,7 @@ class Slot(Serializable):
 
         return data
 
-    def deserialize(self, data: Dict[str, Any], registry: Optional[Any] = None) -> None:
+    def deserialize(self, data: dict[str, Any], registry: Any | None = None) -> None:
         """Deserialize Slot.
 
         Callables (handler, merge_strategy) are automatically handled by Serializable base class.

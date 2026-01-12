@@ -2,7 +2,7 @@
 Connection 测试用例
 """
 
-from routilux import Routine, Connection
+from routilux import Connection, Routine
 
 
 class TestConnectionCreation:

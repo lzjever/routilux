@@ -4,7 +4,8 @@ Workflow D2 formatter.
 Converts workflow analysis JSON into beautiful D2 diagram format.
 """
 
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
 from routilux.analysis.exporters.base import BaseFormatter
 
 

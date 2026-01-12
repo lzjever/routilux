@@ -5,7 +5,9 @@ Clips text to a maximum length while preserving important information.
 """
 
 from __future__ import annotations
-from typing import Any, Optional, Tuple
+
+from typing import Any
+
 from routilux.routine import Routine
 
 
@@ -46,7 +48,7 @@ class TextClipper(Routine):
             "output", ["clipped_text", "was_clipped", "original_length"]
         )
 
-    def _handle_input(self, text: Any = None, max_length: Optional[int] = None, **kwargs):
+    def _handle_input(self, text: Any = None, max_length: int | None = None, **kwargs):
         """Handle input text and clip if necessary.
 
         Args:
@@ -109,7 +111,7 @@ class TextClipper(Routine):
             original_length=original_length,
         )
 
-    def _clip_text(self, text: str, max_length: int) -> Tuple[str, bool]:
+    def _clip_text(self, text: str, max_length: int) -> tuple[str, bool]:
         """Clip text to maximum length.
 
         Args:

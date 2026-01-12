@@ -5,15 +5,16 @@ Output events for sending data to other routines.
 """
 
 from __future__ import annotations
+
 from datetime import datetime
-from typing import List, Optional, Dict, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from routilux.flow import Flow
     from routilux.routine import Routine
     from routilux.slot import Slot
-    from routilux.flow import Flow
 
-from serilux import register_serializable, Serializable
+from serilux import Serializable, register_serializable
 
 
 @register_serializable
@@ -59,8 +60,8 @@ class Event(Serializable):
     def __init__(
         self,
         name: str = "",
-        routine: Optional["Routine"] = None,
-        output_params: Optional[List[str]] = None,
+        routine: Routine | None = None,
+        output_params: list[str] | None = None,
     ):
         """Initialize an Event.
 
@@ -71,14 +72,14 @@ class Event(Serializable):
         """
         super().__init__()
         self.name: str = name
-        self.routine: "Routine" = routine
-        self.output_params: List[str] = output_params or []
-        self.connected_slots: List["Slot"] = []
+        self.routine: Routine = routine
+        self.output_params: list[str] = output_params or []
+        self.connected_slots: list[Slot] = []
 
         # Register serializable fields
         self.add_serializable_fields(["name", "output_params"])
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         """Serialize the Event.
 
         Returns:
@@ -90,7 +91,7 @@ class Event(Serializable):
         # Flow will add routine_id when serializing routines
         return super().serialize()
 
-    def deserialize(self, data: Dict[str, Any], registry: Optional[Any] = None) -> None:
+    def deserialize(self, data: dict[str, Any], registry: Any | None = None) -> None:
         """Deserialize the Event.
 
         Args:
@@ -108,7 +109,7 @@ class Event(Serializable):
         else:
             return f"Event[{self.name}]"
 
-    def connect(self, slot: "Slot", param_mapping: Optional[Dict[str, str]] = None) -> None:
+    def connect(self, slot: Slot, param_mapping: dict[str, str] | None = None) -> None:
         """Connect to a slot.
 
         Args:
@@ -122,7 +123,7 @@ class Event(Serializable):
             if self not in slot.connected_events:
                 slot.connected_events.append(self)
 
-    def disconnect(self, slot: "Slot") -> None:
+    def disconnect(self, slot: Slot) -> None:
         """Disconnect from a slot.
 
         Args:
@@ -134,7 +135,7 @@ class Event(Serializable):
             if self in slot.connected_events:
                 slot.connected_events.remove(self)
 
-    def emit(self, flow: Optional["Flow"] = None, **kwargs) -> None:
+    def emit(self, flow: Flow | None = None, **kwargs) -> None:
         """Emit the event and send data to all connected slots.
 
         This method transmits data to all slots connected to this event using

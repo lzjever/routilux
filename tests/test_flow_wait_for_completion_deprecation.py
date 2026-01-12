@@ -3,7 +3,8 @@
 """
 
 import warnings
-from routilux import Flow, Routine, JobState
+
+from routilux import Flow, JobState, Routine
 
 
 class TestFlowWaitForCompletionDeprecation:

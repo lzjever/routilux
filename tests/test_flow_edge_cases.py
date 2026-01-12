@@ -5,7 +5,8 @@ Flow 边界情况和错误处理测试
 """
 
 import pytest
-from routilux import Flow, Routine, JobState, ErrorHandler, ErrorStrategy
+
+from routilux import ErrorHandler, ErrorStrategy, Flow, JobState, Routine
 
 
 class TestFlowDeserializeEdgeCases:

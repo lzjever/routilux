@@ -8,7 +8,7 @@ This example demonstrates:
 - Error recovery
 """
 
-from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
+from routilux import ErrorHandler, ErrorStrategy, Flow, Routine
 
 
 class UnreliableRoutine(Routine):

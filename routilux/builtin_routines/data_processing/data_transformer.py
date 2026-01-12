@@ -5,7 +5,9 @@ Transforms data using configurable transformation functions.
 """
 
 from __future__ import annotations
-from typing import Any, Callable, Optional, List
+
+from typing import Any, Callable
+
 from routilux.routine import Routine
 
 
@@ -71,7 +73,7 @@ class DataTransformer(Routine):
         current_map.update(builtins)
         self._config["transformation_map"] = current_map
 
-    def _handle_input(self, data: Any = None, transformations: Optional[List] = None, **kwargs):
+    def _handle_input(self, data: Any = None, transformations: list | None = None, **kwargs):
         """Handle input data and apply transformations.
 
         Args:

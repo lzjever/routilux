@@ -5,7 +5,8 @@ Converts routine analysis JSON into beautiful, professional Markdown documentati
 """
 
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
 from routilux.analysis.exporters.base import BaseFormatter
 
 

@@ -5,13 +5,14 @@ Represents a connection from an event to a slot.
 """
 
 from __future__ import annotations
-from typing import Dict, Optional, Any, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from routilux.event import Event
     from routilux.slot import Slot
 
-from serilux import register_serializable, Serializable
+from serilux import Serializable, register_serializable
 
 
 @register_serializable
@@ -67,9 +68,9 @@ class Connection(Serializable):
 
     def __init__(
         self,
-        source_event: Optional["Event"] = None,
-        target_slot: Optional["Slot"] = None,
-        param_mapping: Optional[Dict[str, str]] = None,
+        source_event: Event | None = None,
+        target_slot: Slot | None = None,
+        param_mapping: dict[str, str] | None = None,
     ):
         """Initialize a Connection between an event and a slot.
 
@@ -110,9 +111,9 @@ class Connection(Serializable):
                 >>> # slot receives {"data": "x", "state": "ok"}
         """
         super().__init__()
-        self.source_event: Optional["Event"] = source_event
-        self.target_slot: Optional["Slot"] = target_slot
-        self.param_mapping: Dict[str, str] = param_mapping or {}
+        self.source_event: Event | None = source_event
+        self.target_slot: Slot | None = target_slot
+        self.param_mapping: dict[str, str] = param_mapping or {}
 
         # Establish connection if both event and slot are provided
         if source_event is not None and target_slot is not None:
@@ -121,7 +122,7 @@ class Connection(Serializable):
         # Register serializable fields
         self.add_serializable_fields(["param_mapping"])
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         """Serialize the Connection.
 
         Returns:
@@ -141,7 +142,7 @@ class Connection(Serializable):
 
         return data
 
-    def deserialize(self, data: Dict[str, Any]) -> None:
+    def deserialize(self, data: dict[str, Any]) -> None:
         """Deserialize the Connection.
 
         Args:
@@ -171,7 +172,7 @@ class Connection(Serializable):
         """Return string representation of the Connection."""
         return f"Connection[{self.source_event} -> {self.target_slot}]"
 
-    def activate(self, data: Dict[str, Any]) -> None:
+    def activate(self, data: dict[str, Any]) -> None:
         """Activate the connection and transmit data to the target slot.
 
         This method is called automatically when the source event is emitted.
@@ -207,7 +208,7 @@ class Connection(Serializable):
         # Transmit to target slot
         self.target_slot.receive(mapped_data)
 
-    def _apply_mapping(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _apply_mapping(self, data: dict[str, Any]) -> dict[str, Any]:
         """Apply parameter mapping to transform data dictionary.
 
         This method transforms parameter names according to the param_mapping

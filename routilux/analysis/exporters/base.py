@@ -3,8 +3,8 @@ Base formatter class for analysis results.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Union
 from pathlib import Path
+from typing import Any, Dict, Union
 
 
 class BaseFormatter(ABC):

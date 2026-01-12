@@ -2,7 +2,7 @@
 ErrorHandler 综合测试用例
 """
 
-from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
+from routilux import ErrorHandler, ErrorStrategy, Flow, Routine
 
 
 class TestErrorHandlerStrategies:

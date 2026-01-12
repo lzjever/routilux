@@ -5,14 +5,15 @@ Contains TaskPriority enum and SlotActivationTask dataclass.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Optional, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from routilux.slot import Slot
     from routilux.connection import Connection
+    from routilux.slot import Slot
 
 
 class TaskPriority(Enum):
@@ -32,14 +33,14 @@ class SlotActivationTask:
     the correct JobState, even when running concurrently.
     """
 
-    slot: "Slot"
-    data: Dict[str, Any]
-    connection: Optional["Connection"] = None
+    slot: Slot
+    data: dict[str, Any]
+    connection: Connection | None = None
     priority: TaskPriority = TaskPriority.NORMAL
     retry_count: int = 0
     max_retries: int = 0
-    created_at: Optional[datetime] = None
-    job_state: Optional[Any] = None  # JobState for this execution
+    created_at: datetime | None = None
+    job_state: Any | None = None  # JobState for this execution
 
     def __post_init__(self):
         if self.created_at is None:

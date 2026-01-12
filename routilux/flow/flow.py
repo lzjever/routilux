@@ -5,22 +5,23 @@ Flow manager responsible for managing multiple Routine nodes and execution flow.
 """
 
 from __future__ import annotations
-import uuid
-import threading
+
 import queue
-from typing import Dict, Optional, Any, List, Set, Tuple, TYPE_CHECKING
-from concurrent.futures import ThreadPoolExecutor, Future
+import threading
+import uuid
+from concurrent.futures import Future, ThreadPoolExecutor
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from routilux.routine import Routine
     from routilux.connection import Connection
-    from routilux.job_state import JobState
-    from routilux.event import Event
-    from routilux.slot import Slot
-    from routilux.execution_tracker import ExecutionTracker
     from routilux.error_handler import ErrorHandler
+    from routilux.event import Event
+    from routilux.execution_tracker import ExecutionTracker
+    from routilux.job_state import JobState
+    from routilux.routine import Routine
+    from routilux.slot import Slot
 
-from serilux import register_serializable, Serializable
+from serilux import Serializable, register_serializable
 
 from routilux.flow.task import SlotActivationTask
 
@@ -81,10 +82,10 @@ class Flow(Serializable):
 
     def __init__(
         self,
-        flow_id: Optional[str] = None,
+        flow_id: str | None = None,
         execution_strategy: str = "sequential",
         max_workers: int = 5,
-        execution_timeout: Optional[float] = None,
+        execution_timeout: float | None = None,
     ):
         """Initialize Flow.
 
@@ -97,28 +98,28 @@ class Flow(Serializable):
         """
         super().__init__()
         self.flow_id: str = flow_id or str(uuid.uuid4())
-        self.routines: Dict[str, "Routine"] = {}
-        self.connections: List["Connection"] = []
-        self._current_flow: Optional["Flow"] = None
-        self.execution_tracker: Optional["ExecutionTracker"] = None
-        self.error_handler: Optional["ErrorHandler"] = None
+        self.routines: dict[str, Routine] = {}
+        self.connections: list[Connection] = []
+        self._current_flow: Flow | None = None
+        self.execution_tracker: ExecutionTracker | None = None
+        self.error_handler: ErrorHandler | None = None
         self._paused: bool = False
 
         self.execution_strategy: str = execution_strategy
         self.max_workers: int = max_workers if execution_strategy == "concurrent" else 1
-        self.execution_timeout: Optional[float] = (
+        self.execution_timeout: float | None = (
             execution_timeout if execution_timeout is not None else 300.0
         )
 
         self._task_queue: queue.Queue = queue.Queue()
-        self._pending_tasks: List[SlotActivationTask] = []
+        self._pending_tasks: list[SlotActivationTask] = []
 
-        self._execution_thread: Optional[threading.Thread] = None
+        self._execution_thread: threading.Thread | None = None
         self._execution_lock: threading.Lock = threading.Lock()
         self._running: bool = False
 
-        self._executor: Optional[ThreadPoolExecutor] = None
-        self._active_tasks: Set[Future] = set()
+        self._executor: ThreadPoolExecutor | None = None
+        self._active_tasks: set[Future] = set()
 
         self.add_serializable_fields(
             [
@@ -132,13 +133,13 @@ class Flow(Serializable):
             ]
         )
 
-        self._event_slot_connections: Dict[tuple, "Connection"] = {}
+        self._event_slot_connections: dict[tuple, Connection] = {}
 
     def __repr__(self) -> str:
         """Return string representation of the Flow."""
         return f"Flow[{self.flow_id}]"
 
-    def set_execution_strategy(self, strategy: str, max_workers: Optional[int] = None) -> None:
+    def set_execution_strategy(self, strategy: str, max_workers: int | None = None) -> None:
         """Set execution strategy.
 
         Args:
@@ -172,7 +173,7 @@ class Flow(Serializable):
             self._executor = ThreadPoolExecutor(max_workers=self.max_workers)
         return self._executor
 
-    def _get_routine_id(self, routine: "Routine") -> Optional[str]:
+    def _get_routine_id(self, routine: Routine) -> str | None:
         """Find the ID of a Routine object within this Flow.
 
         Args:
@@ -186,7 +187,7 @@ class Flow(Serializable):
                 return rid
         return None
 
-    def _build_dependency_graph(self) -> Dict[str, Set[str]]:
+    def _build_dependency_graph(self) -> dict[str, set[str]]:
         """Build routine dependency graph.
 
         Returns:
@@ -197,8 +198,8 @@ class Flow(Serializable):
         return build_dependency_graph(self.routines, self.connections)
 
     def _get_ready_routines(
-        self, completed: Set[str], dependency_graph: Dict[str, Set[str]], running: Set[str]
-    ) -> List[str]:
+        self, completed: set[str], dependency_graph: dict[str, set[str]], running: set[str]
+    ) -> list[str]:
         """Get routines ready for execution.
 
         Args:
@@ -213,7 +214,7 @@ class Flow(Serializable):
 
         return get_ready_routines(completed, dependency_graph, running)
 
-    def _find_connection(self, event: "Event", slot: "Slot") -> Optional["Connection"]:
+    def _find_connection(self, event: Event, slot: Slot) -> Connection | None:
         """Find Connection from event to slot.
 
         Args:
@@ -242,7 +243,7 @@ class Flow(Serializable):
 
         start_event_loop(self)
 
-    def add_routine(self, routine: "Routine", routine_id: Optional[str] = None) -> str:
+    def add_routine(self, routine: Routine, routine_id: str | None = None) -> str:
         """Add a routine to the flow.
 
         Args:
@@ -268,8 +269,8 @@ class Flow(Serializable):
         source_event: str,
         target_routine_id: str,
         target_slot: str,
-        param_mapping: Optional[Dict[str, str]] = None,
-    ) -> "Connection":
+        param_mapping: dict[str, str] | None = None,
+    ) -> Connection:
         """Connect two routines by linking a source event to a target slot.
 
         Args:
@@ -312,7 +313,7 @@ class Flow(Serializable):
 
         return connection
 
-    def set_error_handler(self, error_handler: "ErrorHandler") -> None:
+    def set_error_handler(self, error_handler: ErrorHandler) -> None:
         """Set error handler for the flow.
 
         Args:
@@ -320,7 +321,7 @@ class Flow(Serializable):
         """
         self.error_handler = error_handler
 
-    def find_routines_by_type(self, routine_type: type) -> List[Tuple[str, "Routine"]]:
+    def find_routines_by_type(self, routine_type: type) -> list[tuple[str, Routine]]:
         """Find routines by type.
 
         Args:
@@ -341,7 +342,7 @@ class Flow(Serializable):
             if isinstance(routine, routine_type)
         ]
 
-    def get_routine_retry_count(self, routine_id: str) -> Optional[int]:
+    def get_routine_retry_count(self, routine_id: str) -> int | None:
         """Get retry count for a routine.
 
         Args:
@@ -365,8 +366,8 @@ class Flow(Serializable):
         return None
 
     def _get_error_handler_for_routine(
-        self, routine: "Routine", routine_id: str
-    ) -> Optional["ErrorHandler"]:
+        self, routine: Routine, routine_id: str
+    ) -> ErrorHandler | None:
         """Get error handler for a routine.
 
         Args:
@@ -381,7 +382,7 @@ class Flow(Serializable):
         return get_error_handler_for_routine(routine, routine_id, self)
 
     def pause(
-        self, job_state: "JobState", reason: str = "", checkpoint: Optional[Dict[str, Any]] = None
+        self, job_state: JobState, reason: str = "", checkpoint: dict[str, Any] | None = None
     ) -> None:
         """Pause execution.
 
@@ -401,7 +402,7 @@ class Flow(Serializable):
             )
         pause_flow(self, job_state, reason, checkpoint)
 
-    def resume(self, job_state: "JobState") -> "JobState":
+    def resume(self, job_state: JobState) -> JobState:
         """Resume execution from paused or saved state.
 
         Args:
@@ -417,7 +418,7 @@ class Flow(Serializable):
 
         return resume_flow(self, job_state)
 
-    def cancel(self, job_state: "JobState", reason: str = "") -> None:
+    def cancel(self, job_state: JobState, reason: str = "") -> None:
         """Cancel execution.
 
         Args:
@@ -438,10 +439,10 @@ class Flow(Serializable):
     def execute(
         self,
         entry_routine_id: str,
-        entry_params: Optional[Dict[str, Any]] = None,
-        execution_strategy: Optional[str] = None,
-        timeout: Optional[float] = None,
-    ) -> "JobState":
+        entry_params: dict[str, Any] | None = None,
+        execution_strategy: str | None = None,
+        timeout: float | None = None,
+    ) -> JobState:
         """Execute the flow starting from the specified entry routine.
 
         Args:
@@ -463,7 +464,7 @@ class Flow(Serializable):
         return execute_flow(self, entry_routine_id, entry_params, execution_strategy, timeout)
 
     def wait_for_completion(
-        self, timeout: Optional[float] = None, job_state: Optional["JobState"] = None
+        self, timeout: float | None = None, job_state: JobState | None = None
     ) -> bool:
         """Wait for all tasks to complete.
 
@@ -512,7 +513,7 @@ class Flow(Serializable):
             return not self._execution_thread.is_alive()
         return True
 
-    def shutdown(self, wait: bool = True, timeout: Optional[float] = None) -> None:
+    def shutdown(self, wait: bool = True, timeout: float | None = None) -> None:
         """Shutdown Flow's executor and event loop.
 
         Args:
@@ -539,7 +540,7 @@ class Flow(Serializable):
         with self._execution_lock:
             self._active_tasks.clear()
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         """Serialize Flow, including all routines and connections.
 
         Returns:
@@ -561,7 +562,7 @@ class Flow(Serializable):
 
         return serialize_flow(self)
 
-    def deserialize(self, data: Dict[str, Any]) -> None:
+    def deserialize(self, data: dict[str, Any]) -> None:
         """Deserialize Flow, restoring all routines and connections.
 
         Args:

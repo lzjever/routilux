@@ -4,15 +4,17 @@ Comprehensive tests for Flow state management.
 Tests pause, resume, cancel, and task serialization/deserialization.
 """
 
-import pytest
 import time
-from routilux import Flow, Routine, JobState
+
+import pytest
+
+from routilux import Flow, JobState, Routine
 from routilux.flow.state_management import (
+    cancel_flow,
+    deserialize_pending_tasks,
     pause_flow,
     resume_flow,
-    cancel_flow,
     serialize_pending_tasks,
-    deserialize_pending_tasks,
     wait_for_active_tasks,
 )
 

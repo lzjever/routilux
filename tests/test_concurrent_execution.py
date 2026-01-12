@@ -12,11 +12,13 @@
 - 性能对比
 """
 
-import time
 import threading
-import pytest
+import time
 from concurrent.futures import ThreadPoolExecutor
-from routilux import Flow, Routine, ErrorHandler, ErrorStrategy
+
+import pytest
+
+from routilux import ErrorHandler, ErrorStrategy, Flow, Routine
 from routilux.job_state import JobState
 
 

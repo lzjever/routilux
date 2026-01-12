@@ -8,8 +8,8 @@
 """
 
 import sys
-import time
 import threading
+import time
 
 # Try to import routilux - if it fails, provide helpful error message
 try:

@@ -10,7 +10,6 @@ This example demonstrates:
 
 import json
 
-
 from routilux import Flow, Routine
 
 

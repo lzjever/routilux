@@ -4,8 +4,10 @@
 
 import json
 import os
+
 import pytest
-from routilux import Flow, Routine, JobState
+
+from routilux import Flow, JobState, Routine
 
 
 class TestFlowPersistence:
@@ -39,7 +41,7 @@ class TestFlowPersistence:
         assert os.path.exists(temp_file)
 
         # 验证文件格式（JSON）
-        with open(temp_file, "r") as f:
+        with open(temp_file) as f:
             loaded_data = json.load(f)
             assert loaded_data["flow_id"] == "test_flow"
             assert len(loaded_data["routines"]) == 2
@@ -63,7 +65,7 @@ class TestFlowPersistence:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         # 从文件加载并反序列化
-        with open(temp_file, "r", encoding="utf-8") as f:
+        with open(temp_file, encoding="utf-8") as f:
             loaded_data = json.load(f)
 
         flow2 = Flow()
@@ -96,7 +98,7 @@ class TestFlowPersistence:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         # 加载并反序列化
-        with open(temp_file, "r", encoding="utf-8") as f:
+        with open(temp_file, encoding="utf-8") as f:
             loaded_data = json.load(f)
 
         flow2 = Flow()
@@ -125,7 +127,7 @@ class TestJobStatePersistence:
         assert os.path.exists(temp_file)
 
         # 验证文件格式
-        with open(temp_file, "r") as f:
+        with open(temp_file) as f:
             data = json.load(f)
             assert data["flow_id"] == "test_flow"
             assert data["status"] == "running"
@@ -196,7 +198,7 @@ class TestPersistenceEdgeCases:
 
         # 应该报错
         with pytest.raises((json.JSONDecodeError, ValueError)):
-            with open(temp_file, "r", encoding="utf-8") as f:
+            with open(temp_file, encoding="utf-8") as f:
                 data = json.load(f)
             flow = Flow()
             flow.deserialize(data)
@@ -208,7 +210,7 @@ class TestPersistenceEdgeCases:
             json.dump({"invalid": "structure"}, f)
 
         # 应该报错或返回空 flow
-        with open(temp_file, "r", encoding="utf-8") as f:
+        with open(temp_file, encoding="utf-8") as f:
             data = json.load(f)
 
         try:
@@ -394,7 +396,7 @@ class TestSerializationComprehensive:
 
         try:
             # 从文件加载
-            with open(temp_file, "r", encoding="utf-8") as f:
+            with open(temp_file, encoding="utf-8") as f:
                 loaded_data = json.load(f)
 
             # 反序列化

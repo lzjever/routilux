@@ -5,12 +5,13 @@ Extracts and formats results from various output formats with extensible archite
 """
 
 from __future__ import annotations
-from typing import Dict, Any, List, Optional, Union, Tuple, Callable, Protocol
-import json
-import re
-import logging
-from routilux.routine import Routine
 
+import json
+import logging
+import re
+from typing import Any, Callable, Protocol
+
+from routilux.routine import Routine
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,7 @@ logger = logging.getLogger(__name__)
 class ExtractorProtocol(Protocol):
     """Protocol for custom extractors."""
 
-    def extract(
-        self, data: Any, config: Dict[str, Any]
-    ) -> Optional[Tuple[Any, str, Dict[str, Any]]]:
+    def extract(self, data: Any, config: dict[str, Any]) -> tuple[Any, str, dict[str, Any]] | None:
         """Extract data from input.
 
         Args:
@@ -107,7 +106,7 @@ class ResultExtractor(Routine):
     def _register_builtin_extractors(self):
         """Register built-in extractor functions."""
         if not hasattr(self, "_extractors"):
-            self._extractors: Dict[str, Callable] = {}
+            self._extractors: dict[str, Callable] = {}
 
         # Specialized extractors (higher priority)
         # Interpreter output extractor (should check before generic list)
@@ -138,7 +137,7 @@ class ResultExtractor(Routine):
         self._extractors["dict_extractor"] = self._extract_dict
         self._extractors["list_extractor"] = self._extract_list
 
-    def _handle_input(self, data: Union[str, List, Dict] = None, **kwargs):
+    def _handle_input(self, data: str | list | dict = None, **kwargs):
         """Handle input data and extract results.
 
         Args:
@@ -163,7 +162,7 @@ class ResultExtractor(Routine):
         # Emit result
         self.emit("output", **result)
 
-    def _extract_with_strategy(self, data: Any) -> Dict[str, Any]:
+    def _extract_with_strategy(self, data: Any) -> dict[str, Any]:
         """Extract data using configured strategy.
 
         Args:
@@ -254,7 +253,7 @@ class ResultExtractor(Routine):
         else:
             raise ValueError(f"All extractors failed. Errors: {errors}")
 
-    def _get_extractor_order(self) -> List[Tuple[str, Callable]]:
+    def _get_extractor_order(self) -> list[tuple[str, Callable]]:
         """Get extractors in the correct order based on configuration.
 
         Returns:
@@ -294,7 +293,7 @@ class ResultExtractor(Routine):
 
         return all_extractors
 
-    def _calculate_confidence(self, data: Any, format_type: str, metadata: Dict[str, Any]) -> float:
+    def _calculate_confidence(self, data: Any, format_type: str, metadata: dict[str, Any]) -> float:
         """Calculate confidence score for extraction result.
 
         Args:
@@ -328,8 +327,8 @@ class ResultExtractor(Routine):
     # Built-in extractors
 
     def _extract_json_code_block(
-        self, data: Any, config: Dict[str, Any]
-    ) -> Optional[Tuple[Any, str, Dict[str, Any]]]:
+        self, data: Any, config: dict[str, Any]
+    ) -> tuple[Any, str, dict[str, Any]] | None:
         """Extract JSON from markdown code blocks."""
         if not isinstance(data, str) or not config.get("extract_json_blocks", True):
             return None
@@ -356,8 +355,8 @@ class ResultExtractor(Routine):
         return None
 
     def _extract_json_string(
-        self, data: Any, config: Dict[str, Any]
-    ) -> Optional[Tuple[Any, str, Dict[str, Any]]]:
+        self, data: Any, config: dict[str, Any]
+    ) -> tuple[Any, str, dict[str, Any]] | None:
         """Extract JSON from plain string."""
         if not isinstance(data, str) or not config.get("parse_json_strings", True):
             return None
@@ -374,8 +373,8 @@ class ResultExtractor(Routine):
         return None
 
     def _extract_code_block(
-        self, data: Any, config: Dict[str, Any]
-    ) -> Optional[Tuple[Any, str, Dict[str, Any]]]:
+        self, data: Any, config: dict[str, Any]
+    ) -> tuple[Any, str, dict[str, Any]] | None:
         """Extract code blocks of various languages."""
         if not isinstance(data, str) or not config.get("extract_code_blocks", True):
             return None
@@ -397,8 +396,8 @@ class ResultExtractor(Routine):
         return None
 
     def _extract_yaml_code_block(
-        self, data: Any, config: Dict[str, Any]
-    ) -> Optional[Tuple[Any, str, Dict[str, Any]]]:
+        self, data: Any, config: dict[str, Any]
+    ) -> tuple[Any, str, dict[str, Any]] | None:
         """Extract YAML from markdown code blocks."""
         if not isinstance(data, str) or not config.get("extract_yaml_blocks", False):
             return None
@@ -429,8 +428,8 @@ class ResultExtractor(Routine):
         return None
 
     def _extract_yaml_string(
-        self, data: Any, config: Dict[str, Any]
-    ) -> Optional[Tuple[Any, str, Dict[str, Any]]]:
+        self, data: Any, config: dict[str, Any]
+    ) -> tuple[Any, str, dict[str, Any]] | None:
         """Extract YAML from plain string."""
         if not isinstance(data, str) or not config.get("parse_yaml_strings", False):
             return None
@@ -450,8 +449,8 @@ class ResultExtractor(Routine):
         return None
 
     def _extract_xml_code_block(
-        self, data: Any, config: Dict[str, Any]
-    ) -> Optional[Tuple[Any, str, Dict[str, Any]]]:
+        self, data: Any, config: dict[str, Any]
+    ) -> tuple[Any, str, dict[str, Any]] | None:
         """Extract XML from markdown code blocks."""
         if not isinstance(data, str) or not config.get("extract_xml_blocks", False):
             return None
@@ -468,8 +467,8 @@ class ResultExtractor(Routine):
         )
 
     def _format_interpreter_output(
-        self, data: Any, config: Dict[str, Any]
-    ) -> Optional[Tuple[Any, str, Dict[str, Any]]]:
+        self, data: Any, config: dict[str, Any]
+    ) -> tuple[Any, str, dict[str, Any]] | None:
         """Format code interpreter output list.
 
         This extractor specifically handles lists of output dictionaries
@@ -515,22 +514,22 @@ class ResultExtractor(Routine):
         return None
 
     def _extract_dict(
-        self, data: Any, config: Dict[str, Any]
-    ) -> Optional[Tuple[Any, str, Dict[str, Any]]]:
+        self, data: Any, config: dict[str, Any]
+    ) -> tuple[Any, str, dict[str, Any]] | None:
         """Extract from dictionary."""
         if isinstance(data, dict):
             return data, "dict", {"extraction_method": "direct", "key_count": len(data)}
         return None
 
     def _extract_list(
-        self, data: Any, config: Dict[str, Any]
-    ) -> Optional[Tuple[Any, str, Dict[str, Any]]]:
+        self, data: Any, config: dict[str, Any]
+    ) -> tuple[Any, str, dict[str, Any]] | None:
         """Extract from list."""
         if isinstance(data, list):
             return data, "list", {"extraction_method": "direct", "item_count": len(data)}
         return None
 
-    def _extract_code_blocks(self, text: str, language: str) -> List[str]:
+    def _extract_code_blocks(self, text: str, language: str) -> list[str]:
         """Extract code blocks of specified language from markdown text.
 
         Args:
@@ -556,7 +555,7 @@ class ResultExtractor(Routine):
     def register_extractor(
         self,
         name: str,
-        extractor: Callable[[Any, Dict[str, Any]], Optional[Tuple[Any, str, Dict[str, Any]]]],
+        extractor: Callable[[Any, dict[str, Any]], tuple[Any, str, dict[str, Any]] | None],
     ) -> None:
         """Register a custom extractor function.
 

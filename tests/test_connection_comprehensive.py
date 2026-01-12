@@ -2,7 +2,7 @@
 Connection 综合测试用例 - 补充缺失的功能测试
 """
 
-from routilux import Routine, Connection
+from routilux import Connection, Routine
 
 
 class TestConnectionDisconnect:

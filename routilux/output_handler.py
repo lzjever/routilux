@@ -6,8 +6,8 @@ Output handlers are bound to JobState (execution), not Flow.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Dict
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 
 class OutputHandler(ABC):

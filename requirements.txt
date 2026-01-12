@@ -4,12 +4,10 @@
 # Development dependencies (install with: pip install -r requirements-dev.txt)
 # pytest>=7.0.0
 # pytest-cov>=4.0.0
-# black>=22.0.0
-# flake8>=5.0.0
+# ruff>=0.1.0
 # mypy>=0.991
 
 # Documentation dependencies (install with: pip install -r requirements-docs.txt)
 # sphinx>=5.0.0
 # sphinx-rtd-theme>=1.0.0
 # sphinx-autodoc-typehints>=1.19.0
-

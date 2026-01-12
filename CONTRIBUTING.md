@@ -73,8 +73,8 @@ make format-check # Can still check formatting
 
 ## Code Quality
 
-- **Linting**: `make lint` (uses flake8)
-- **Formatting**: `make format` (uses black)
+- **Linting**: `make lint` (uses ruff)
+- **Formatting**: `make format` (uses ruff)
 - **Type checking**: `mypy` (optional, not enforced in CI)
 - **Tests**: `make test` (uses pytest)
 

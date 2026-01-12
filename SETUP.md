@@ -56,7 +56,7 @@ make check          # Run all checks
 
 This project uses dependency groups for development dependencies:
 
-- **`dev`**: Development dependencies (pytest, black, flake8, etc.) - **installed by default** with `uv sync`
+- **`dev`**: Development dependencies (pytest, ruff, etc.) - **installed by default** with `uv sync`
 - **`docs`**: Documentation dependencies (sphinx, themes, etc.) - install with `--group docs`
 
 Dependency groups are **not published to PyPI** and are only for local development.
@@ -88,4 +88,3 @@ uv sync --group docs --all-extras
 ```
 
 For more details, see [CONTRIBUTING.md](CONTRIBUTING.md).
-

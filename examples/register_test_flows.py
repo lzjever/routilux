@@ -11,10 +11,10 @@ from routilux.monitoring.storage import flow_store
 def register_test_flows():
     """Register all test flows to flow_store"""
     from debugger_test_app import (
-        create_linear_flow,
         create_branching_flow,
         create_complex_flow,
         create_error_flow,
+        create_linear_flow,
     )
 
     print("Registering test flows...")

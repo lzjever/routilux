@@ -228,3 +228,6 @@ exports/
 # Profiling data
 .prof
 
+# Pre-commit
+.pre-commit-cache/
+

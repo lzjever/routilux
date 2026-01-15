@@ -1,0 +1,44 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff-check
+        entry: uv run ruff check --force-exclude
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: ruff-format
+        name: ruff-format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types: [python]
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: trailing-whitespace
+        types: [python, markdown]
+
+      - id: end-of-file-fixer
+        name: end-of-file-fixer
+        types: [python, markdown]
+
+      - id: check-yaml
+        name: check-yaml
+        types: [yaml]
+
+      - id: check-toml
+        name: check-toml
+        types: [toml]
+
+      - id: check-added-large-files
+        name: check-added-large-files
+        args: ['--maxkb=1000']
+
+      - id: check-merge-conflict
+        name: check-merge-conflict

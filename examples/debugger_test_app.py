@@ -10,9 +10,9 @@ This application creates multiple flows with various patterns to test the debugg
 """
 
 import time
+
 from routilux import Flow, Routine
 from routilux.monitoring.registry import MonitoringRegistry
-
 
 # ===== Routines =====
 

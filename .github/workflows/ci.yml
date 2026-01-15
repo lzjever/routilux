@@ -8,44 +8,52 @@ on:
 
 jobs:
   test:
+    name: "Test (Python ${{ matrix.python-version }})"
     runs-on: ubuntu-latest
-    
+    fail-fast: false
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Set up Python 3.14
+
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
-      
+          python-version: ${{ matrix.python-version }}
+          cache: 'uv'
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
           version: "latest"
-      
+
       - name: Install dependencies
         run: |
           uv sync --group docs
-      
+
       - name: Run tests
         run: |
           uv run pytest tests/ \
             --cov=routilux \
             --cov-report=xml \
             --cov-report=term-missing \
-            --cov-report=html \
             -v
-      
+
       - name: Run linting
         run: |
           uv run ruff check routilux/ tests/ examples/
-      
+
       - name: Check formatting
         run: |
-          uv run ruff --check routilux/ tests/ examples/
-      
+          uv run ruff format --check routilux/ tests/ examples/
+
       - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.14'
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
@@ -53,10 +61,10 @@ jobs:
           name: codecov-umbrella
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
-      
+
       - name: Upload coverage reports
+        if: matrix.python-version == '3.14'
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: coverage-report
           path: htmlcov/

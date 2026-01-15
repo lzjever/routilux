@@ -116,15 +116,29 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short"
 
 [tool.mypy]
-python_version = "3.7"
+python_version = "3.8"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
+disallow_untyped_defs = false  # Future: set to true
 ignore_missing_imports = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
 
 [tool.coverage.run]
 source = ["routilux"]
-omit = ["*/tests/*", "*/test_*.py"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/site-packages/*"
+]
+fail_under = 60  # 60% minimum coverage requirement
 
 [tool.coverage.report]
 exclude_lines = [
@@ -134,8 +148,10 @@ exclude_lines = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
+    "@abstractmethod"
 ]
-# Minimum coverage threshold (optional, can be enabled later)
-# fail_under = 80
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 

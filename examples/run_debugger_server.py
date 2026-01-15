@@ -10,22 +10,22 @@ Usage:
     python run_debugger_server.py
 """
 
-import sys
 import os
+import sys
 
 # Add examples directory to path
 sys.path.insert(0, os.path.dirname(__file__))
 
-from routilux.monitoring.registry import MonitoringRegistry
-from routilux.monitoring.storage import flow_store
-
 # Import flow creators
 from debugger_test_app import (
-    create_linear_flow,
     create_branching_flow,
     create_complex_flow,
     create_error_flow,
+    create_linear_flow,
 )
+
+from routilux.monitoring.registry import MonitoringRegistry
+from routilux.monitoring.storage import flow_store
 
 
 def register_flows():
@@ -136,10 +136,10 @@ def print_instructions(flows_info):
     print("\n" + "=" * 60)
     print("API Server Information:")
     print("=" * 60)
-    print(f"Server URL: http://localhost:20555")
-    print(f"Health Check: http://localhost:20555/api/health")
-    print(f"API Docs: http://localhost:20555/docs")
-    print(f"\nPress Ctrl+C to stop the server")
+    print("Server URL: http://localhost:20555")
+    print("Health Check: http://localhost:20555/api/health")
+    print("API Docs: http://localhost:20555/docs")
+    print("\nPress Ctrl+C to stop the server")
     print("=" * 60 + "\n")
 
 

@@ -17,12 +17,10 @@ Date: 2025-01-15
 """
 
 import time
-import random
 from datetime import datetime
-from typing import List, Dict, Any
+
 from routilux import Flow, Routine
 from routilux.monitoring.registry import MonitoringRegistry
-
 
 # ===== Comprehensive Routines =====
 
@@ -538,11 +536,7 @@ def demo_conditional_flow(flow_store, condition="branch_a"):
     if flow:
         job_id = flow.start(
             entry_routine_id="source",
-            entry_params={
-                "data": "Conditional Test",
-                "steps": 5,
-                "condition": condition
-            }
+            entry_params={"data": "Conditional Test", "steps": 5, "condition": condition},
         )
         print(f"\n✓ Started conditional flow job ({condition}): {job_id}")
         return job_id
@@ -553,11 +547,7 @@ def demo_error_flow(flow_store, error_type="value_error"):
     flow = flow_store.get("error_flow")
     if flow:
         job_id = flow.start(
-            entry_routine_id="source",
-            entry_params={
-                "data": "Error Test",
-                "error_type": error_type
-            }
+            entry_routine_id="source", entry_params={"data": "Error Test", "error_type": error_type}
         )
         print(f"\n✓ Started error flow job ({error_type}): {job_id}")
         return job_id
@@ -567,10 +557,7 @@ def demo_performance_flow(flow_store):
     """Start a performance testing flow"""
     flow = flow_store.get("performance_flow")
     if flow:
-        job_id = flow.start(
-            entry_routine_id="source",
-            entry_params={"data": "Performance Test"}
-        )
+        job_id = flow.start(entry_routine_id="source", entry_params={"data": "Performance Test"})
         print(f"\n✓ Started performance flow job: {job_id}")
         return job_id
 

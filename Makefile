@@ -1,4 +1,4 @@
-.PHONY: help clean install dev-install test test-cov test-integration lint format format-check check build sdist wheel docs html clean-docs upload upload-test check-package setup-venv
+.PHONY: help clean install dev-install test test-cov test-integration test-unit test-api lint format format-check check build sdist wheel docs html clean-docs upload upload-test check-package setup-venv pre-commit-install pre-commit-run pre-commit-update type-check install-tools clean-all
 
 # Use uv if available, otherwise fall back to pip
 UV := $(shell command -v uv 2>/dev/null)
@@ -25,12 +25,18 @@ help:
 	@echo "  test          - Run all tests"
 	@echo "  test-cov      - Run tests with coverage report"
 	@echo "  test-integration - Run all integration tests (requires external services)"
+	@echo "  test-unit     - Run only unit tests"
+	@echo "  test-api      - Run API endpoint tests"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint          - Run linting checks (ruff)"
 	@echo "  format        - Format code with ruff"
 	@echo "  format-check  - Check code formatting"
+	@echo "  type-check    - Run mypy type checking"
 	@echo "  check         - Run all checks (lint + format check + tests)"
+	@echo "  pre-commit-install - Install pre-commit hooks"
+	@echo "  pre-commit-run     - Run pre-commit hooks manually on all files"
+	@echo "  pre-commit-update   - Update pre-commit hooks to latest versions"
 	@echo ""
 	@echo "Building:"
 	@echo "  build         - Build source and wheel distributions"
@@ -49,6 +55,8 @@ help:
 	@echo "Cleanup:"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  clean-docs    - Clean documentation build"
+	@echo "  clean-all     - Clean all build artifacts and cache files"
+	@echo "  install-tools - Install additional development tools"
 	@echo ""
 	@if [ -n "$(UV)" ]; then \
 		echo "Using uv for dependency management"; \
@@ -98,6 +106,14 @@ test-integration:
 	@echo "Running integration tests (requires external services)..."
 	$(PYTHON_CMD) -m pytest tests/ -v -m integration
 
+test-unit:
+	@echo "Running unit tests only..."
+	$(PYTHON_CMD) -m pytest tests/ -v -m "not integration"
+
+test-api:
+	@echo "Running API endpoint tests..."
+	$(PYTHON_CMD) -m pytest tests/ -v -m api
+
 lint:
 	$(PYTHON_CMD) -m ruff check routilux/ tests/ examples/ --output-format=concise
 
@@ -106,6 +122,10 @@ format:
 
 format-check:
 	$(PYTHON_CMD) -m ruff format --check routilux/ tests/ examples/
+
+type-check:
+	@echo "Running mypy type checking..."
+	$(PYTHON_CMD) -m mypy routilux/
 
 check: lint format-check test
 	@echo "All checks passed!"
@@ -196,3 +216,45 @@ clean:
 
 clean-docs:
 	cd docs && make clean
+
+# Pre-commit hooks
+pre-commit-install:
+	@echo "📦 Installing pre-commit hooks..."
+	@$(PYTHON_CMD) -m pip install pre-commit
+	@$(PYTHON_CMD) -m pre-commit install
+	@echo "✅ Pre-commit hooks installed!"
+
+pre-commit-run:
+	@echo "🔍 Running pre-commit hooks on all files..."
+	@$(PYTHON_CMD) -m pre-commit run --all-files
+
+pre-commit-update:
+	@echo "🔄 Updating pre-commit hooks..."
+	@$(PYTHON_CMD) -m pre-commit autoupdate
+	@echo "✅ Pre-commit hooks updated!"
+
+# Install additional development tools
+install-tools:
+	@echo "📦 Installing additional development tools..."
+	@if [ -n "$(UV)" ]; then \
+		uv add --dev \
+			pre-commit \
+			bandit \
+			pip-audit \
+			coverage; \
+	else \
+		$(PIP_CMD) install pre-commit bandit pip-audit coverage; \
+	fi
+	@echo "✅ Development tools installed!"
+
+# Clean all artifacts
+clean-all: clean clean-docs
+	@echo "🧹 Cleaning all build artifacts and cache files..."
+	@rm -rf .pytest_cache
+	@rm -rf .ruff_cache
+	@rm -rf .coverage
+	@rm -rf htmlcov
+	@rm -rf .pre-commit-cache
+	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete
+	@echo "✓ Clean complete"

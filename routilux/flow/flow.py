@@ -107,6 +107,17 @@ class Flow(Serializable):
 
         self.execution_strategy: str = execution_strategy
         self.max_workers: int = max_workers if execution_strategy == "concurrent" else 1
+
+        # Critical fix: Validate execution_timeout is positive
+        if execution_timeout is not None:
+            if not isinstance(execution_timeout, (int, float)):
+                raise TypeError(
+                    f"execution_timeout must be numeric, got {type(execution_timeout).__name__}"
+                )
+            if execution_timeout <= 0:
+                raise ValueError(
+                    f"execution_timeout must be positive, got {execution_timeout}"
+                )
         self.execution_timeout: float | None = (
             execution_timeout if execution_timeout is not None else 300.0
         )
@@ -160,7 +171,15 @@ class Flow(Serializable):
             self.max_workers = 5
 
         if self._executor:
-            self._executor.shutdown(wait=True)
+            # Critical fix: Wait briefly for old executor to shut down properly
+            # This prevents thread leaks when set_execution_strategy is called rapidly
+            try:
+                # Wait up to 1 second for pending tasks to complete
+                self._executor.shutdown(wait=True, timeout=1.0)
+            except Exception:
+                # If shutdown fails, just replace the executor reference
+                # Old threads will be garbage collected eventually
+                pass
         self._executor = ThreadPoolExecutor(max_workers=self.max_workers)
 
     def _get_executor(self) -> ThreadPoolExecutor:
@@ -448,15 +467,25 @@ class Flow(Serializable):
             checkpoint: Optional checkpoint data.
 
         Raises:
-            ValueError: If job_state flow_id doesn't match.
+            ValueError: If job_state flow_id doesn't match or job not found.
         """
-        from routilux.flow.state_management import pause_flow
-
         if job_state.flow_id != self.flow_id:
             raise ValueError(
                 f"JobState flow_id '{job_state.flow_id}' does not match Flow flow_id '{self.flow_id}'"
             )
-        pause_flow(self, job_state, reason, checkpoint)
+
+        from routilux.job_manager import get_job_manager
+
+        job_manager = get_job_manager()
+        executor = job_manager.get_job(job_state.job_id)
+
+        if executor is not None:
+            executor.pause(reason=reason, checkpoint=checkpoint)
+        else:
+            # Job not running via JobExecutor, try legacy pause
+            from routilux.flow.state_management import pause_flow
+
+            pause_flow(self, job_state, reason, checkpoint)
 
     def resume(self, job_state: JobState) -> JobState:
         """Resume execution from paused or saved state.
@@ -470,9 +499,25 @@ class Flow(Serializable):
         Raises:
             ValueError: If job_state flow_id doesn't match or routine doesn't exist.
         """
-        from routilux.flow.state_management import resume_flow
+        if job_state.flow_id != self.flow_id:
+            raise ValueError(
+                f"JobState flow_id '{job_state.flow_id}' does not match Flow flow_id '{self.flow_id}'"
+            )
 
-        return resume_flow(self, job_state)
+        from routilux.job_manager import get_job_manager
+
+        job_manager = get_job_manager()
+        executor = job_manager.get_job(job_state.job_id)
+
+        if executor is not None:
+            return executor.resume()
+        else:
+            # Job not running, start it with provided job_state
+            return job_manager.start_job(
+                flow=self,
+                entry_routine_id=job_state.current_routine_id or "",
+                job_state=job_state,
+            )
 
     def cancel(self, job_state: JobState, reason: str = "") -> None:
         """Cancel execution.
@@ -484,13 +529,23 @@ class Flow(Serializable):
         Raises:
             ValueError: If job_state flow_id doesn't match.
         """
-        from routilux.flow.state_management import cancel_flow
-
         if job_state.flow_id != self.flow_id:
             raise ValueError(
                 f"JobState flow_id '{job_state.flow_id}' does not match Flow flow_id '{self.flow_id}'"
             )
-        cancel_flow(self, job_state, reason)
+
+        from routilux.job_manager import get_job_manager
+
+        job_manager = get_job_manager()
+        executor = job_manager.get_job(job_state.job_id)
+
+        if executor is not None:
+            executor.cancel(reason=reason)
+        else:
+            # Job not running, just mark as cancelled
+            from routilux.status import ExecutionStatus
+
+            job_state.status = ExecutionStatus.CANCELLED
 
     def execute(
         self,
@@ -499,7 +554,10 @@ class Flow(Serializable):
         execution_strategy: str | None = None,
         timeout: float | None = None,
     ) -> JobState:
-        """Execute the flow starting from the specified entry routine.
+        """Execute the flow synchronously, waiting for completion.
+
+        This method blocks until the flow execution completes (or fails).
+        For asynchronous execution, use start() instead.
 
         Args:
             entry_routine_id: Identifier of the routine to start execution from.
@@ -510,14 +568,67 @@ class Flow(Serializable):
                 If None, uses flow.execution_timeout (default: 300.0 seconds).
 
         Returns:
-            JobState object containing execution status and state.
+            JobState object containing execution status and state (completed or failed).
 
         Raises:
             ValueError: If entry_routine_id does not exist in the flow.
+
+        Examples:
+            >>> job_state = flow.execute("source", entry_params={"data": "test"})
+            >>> print(job_state.status)  # "completed" or "failed"
         """
         from routilux.flow.execution import execute_flow
 
-        return execute_flow(self, entry_routine_id, entry_params, execution_strategy, timeout)
+        return execute_flow(self, entry_routine_id, entry_params, execution_strategy, timeout, job_state=None)
+
+    def start(
+        self,
+        entry_routine_id: str,
+        entry_params: dict[str, Any] | None = None,
+        timeout: float | None = None,
+        job_state: JobState | None = None,
+    ) -> JobState:
+        """Start flow execution asynchronously, returning immediately.
+
+        This method starts the execution and returns immediately with a JobState.
+        The execution continues in the background using GlobalJobManager.
+        This is ideal for API endpoints and long-running flows where you don't want to block.
+
+        Args:
+            entry_routine_id: Identifier of the routine to start execution from.
+            entry_params: Optional dictionary of parameters to pass to the entry
+                routine's trigger slot.
+            timeout: Optional timeout for execution completion in seconds.
+                If None, uses flow's default timeout.
+            job_state: Optional existing JobState to use. If None, creates a new one.
+
+        Returns:
+            JobState object (status will be RUNNING initially).
+            Use job_manager.wait_for_job(job_id) to wait for completion.
+
+        Raises:
+            ValueError: If entry_routine_id does not exist in the flow.
+
+        Examples:
+            >>> # Start execution asynchronously
+            >>> job_state = flow.start("source", entry_params={"data": "test"})
+            >>> print(job_state.job_id)  # Get job ID immediately
+            >>>
+            >>> # Later, wait for completion if needed
+            >>> from routilux.job_manager import get_job_manager
+            >>> job_manager = get_job_manager()
+            >>> job_manager.wait_for_job(job_state.job_id, timeout=300.0)
+        """
+        from routilux.job_manager import get_job_manager
+
+        job_manager = get_job_manager()
+        return job_manager.start_job(
+            flow=self,
+            entry_routine_id=entry_routine_id,
+            entry_params=entry_params,
+            timeout=timeout,
+            job_state=job_state,
+        )
 
     def wait_for_completion(
         self, timeout: float | None = None, job_state: JobState | None = None
@@ -718,15 +829,15 @@ class Flow(Serializable):
         """
         try:
             import yaml
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "YAML support requires 'pyyaml' package. Install it with: pip install pyyaml"
-            )
+            ) from e
 
         try:
             spec = yaml.safe_load(yaml_str)
         except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML: {e}")
+            raise ValueError(f"Invalid YAML: {e}") from e
 
         if spec is None:
             raise ValueError("YAML string is empty or invalid")

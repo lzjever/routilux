@@ -118,9 +118,17 @@ class JobStore:
             job_state = self._jobs.pop(job_id, None)
             if job_state:
                 flow_id = job_state.flow_id
+                # Fix: Use exception handling to avoid TOCTOU race condition
                 if flow_id in self._flow_jobs:
-                    self._flow_jobs[flow_id].remove(job_id)
-                    if not self._flow_jobs[flow_id]:
+                    job_list = self._flow_jobs[flow_id]
+                    # Use try-except to handle case where job_id removed by another thread
+                    try:
+                        job_list.remove(job_id)
+                    except ValueError:
+                        # job_id not in list - already removed by another thread
+                        pass
+                    # Clean up empty lists
+                    if not job_list:
                         del self._flow_jobs[flow_id]
 
     def get_by_flow(self, flow_id: str) -> List["JobState"]:

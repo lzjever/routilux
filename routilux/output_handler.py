@@ -50,7 +50,12 @@ class QueueOutputHandler(OutputHandler):
 
         Args:
             queue: Queue object (e.g., queue.Queue, multiprocessing.Queue).
+
+        Raises:
+            TypeError: If queue doesn't have a put() method.
         """
+        if not hasattr(queue, "put") or not callable(queue.put):
+            raise TypeError(f"queue must have a callable 'put' method, got {type(queue)}")
         self.queue = queue
 
     def handle(
@@ -83,7 +88,12 @@ class CallbackOutputHandler(OutputHandler):
 
         Args:
             callback: Function that takes (job_id, routine_id, output_type, data, timestamp).
+
+        Raises:
+            TypeError: If callback is not callable.
         """
+        if not callable(callback):
+            raise TypeError(f"callback must be callable, got {type(callback).__name__}")
         self.callback = callback
 
     def handle(

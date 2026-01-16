@@ -170,7 +170,10 @@ class Connection(Serializable):
 
     def __repr__(self) -> str:
         """Return string representation of the Connection."""
-        return f"Connection[{self.source_event} -> {self.target_slot}]"
+        # Fix: Handle None values in source_event and target_slot
+        source = f"{self.source_event.name}" if self.source_event else "None"
+        target = f"{self.target_slot.name}" if self.target_slot else "None"
+        return f"Connection[{source} -> {target}]"
 
     def activate(self, data: dict[str, Any]) -> None:
         """Activate the connection and transmit data to the target slot.
@@ -206,6 +209,19 @@ class Connection(Serializable):
         mapped_data = self._apply_mapping(data)
 
         # Transmit to target slot
+        # Critical fix: Check for None before accessing attributes in error messages
+        if self.source_event is None:
+            target_name = self.target_slot.name if self.target_slot else "None"
+            raise ValueError(
+                f"Cannot activate connection: source_event is None. "
+                f"Target: {target_name}"
+            )
+        if self.target_slot is None:
+            source_name = self.source_event.name if self.source_event else "None"
+            raise ValueError(
+                f"Cannot activate connection: target_slot is None. "
+                f"Source: {source_name}"
+            )
         self.target_slot.receive(mapped_data)
 
     def _apply_mapping(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -246,11 +262,18 @@ class Connection(Serializable):
                 >>> result = connection._apply_mapping(data)
                 >>> # result = {"x": 1, "y": 2, "c": 3}
         """
+        # Fix: Validate data type to prevent AttributeError
+        if not isinstance(data, dict):
+            data = {}
+
         if not self.param_mapping:
             # No mapping, return as is
             return data
 
         mapped_data = {}
+        # Fix: Cache param_mapping.values() for efficiency
+        mapped_values = set(self.param_mapping.values()) if self.param_mapping else set()
+
         for source_key, target_key in self.param_mapping.items():
             if source_key in data:
                 mapped_data[target_key] = data[source_key]
@@ -259,12 +282,22 @@ class Connection(Serializable):
         # Simplified handling: pass all unmapped parameters if target parameter name
         # matches source parameter name
         for key, value in data.items():
-            if key not in self.param_mapping.values() and key not in mapped_data:
+            if key not in mapped_values and key not in mapped_data:
                 # Check if it matches target parameter name (simplified, should check handler signature)
                 mapped_data[key] = value
 
         return mapped_data
 
     def disconnect(self) -> None:
-        """Disconnect the connection."""
-        self.source_event.disconnect(self.target_slot)
+        """Disconnect the connection.
+
+        Safely disconnects the event from the slot. If either endpoint is None,
+        this method does nothing (no-op).
+
+        Raises:
+            AttributeError: If source_event or target_slot are invalid (not None
+                but don't have the expected disconnect/connect methods).
+        """
+        # Fix: Add None checks to prevent AttributeError
+        if self.source_event is not None and self.target_slot is not None:
+            self.source_event.disconnect(self.target_slot)

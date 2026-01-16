@@ -2143,6 +2143,7 @@ docs = [
 dev = [
     { name = "build", version = "1.2.2.post1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "build", version = "1.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "httpx" },
     { name = "mypy", version = "1.14.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "mypy", version = "1.19.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "pytest", version = "8.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
@@ -2199,6 +2200,7 @@ provides-extras = ["api", "dev", "docs"]
 [package.metadata.requires-dev]
 dev = [
     { name = "build", specifier = ">=0.10.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "mypy", specifier = ">=0.991" },
     { name = "pytest", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },

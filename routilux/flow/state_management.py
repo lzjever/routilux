@@ -5,6 +5,7 @@ Handles pause, resume, cancel, and task serialization/deserialization.
 """
 
 import logging
+import queue
 import time
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, Optional
@@ -42,9 +43,22 @@ def pause_flow(
 
     wait_for_active_tasks(flow)
 
+    # Drain task queue with timeout to avoid blocking indefinitely
+    max_wait = 2.0
+    start_time = time.time()
     while not flow._task_queue.empty():
-        task = flow._task_queue.get()
-        flow._pending_tasks.append(task)
+        if time.time() - start_time > max_wait:
+            logger.warning(
+                f"pause_flow: Timeout draining task queue after {max_wait}s. "
+                f"Queue size: {flow._task_queue.qsize()}. Proceeding with pause."
+            )
+            break
+        try:
+            task = flow._task_queue.get(timeout=0.1)
+            flow._pending_tasks.append(task)
+        except queue.Empty:
+            # Queue is empty, we're done draining
+            break
 
     pause_point = {
         "timestamp": datetime.now().isoformat(),
@@ -77,7 +91,21 @@ def wait_for_active_tasks(flow: "Flow") -> None:
             if not active:
                 break
 
-        if time.time() - start_time > max_wait_time:
+        elapsed = time.time() - start_time
+        if elapsed > max_wait_time:
+            # Timeout reached - log warning and try to cancel remaining futures
+            logger.warning(
+                f"wait_for_active_tasks timed out after {max_wait_time}s. "
+                f"Active tasks: {len(active)}. Proceeding with pause."
+            )
+            # Try to cancel any remaining futures that can be cancelled
+            with flow._execution_lock:
+                for future in list(flow._active_tasks):
+                    if not future.done():
+                        try:
+                            future.cancel()
+                        except Exception:
+                            pass
             break
 
         time.sleep(check_interval)
@@ -346,6 +374,8 @@ def resume_flow(flow: "Flow", job_state: "JobState") -> "JobState":
     _recover_slot_tasks(flow, job_state)
 
     # Process deferred events (emit them before processing pending tasks)
+    # Critical fix: Only clear successfully processed events to prevent data loss
+    processed_events = []
     for event_info in job_state.deferred_events:
         routine_id = event_info.get("routine_id")
         event_name = event_info.get("event_name")
@@ -357,25 +387,32 @@ def resume_flow(flow: "Flow", job_state: "JobState") -> "JobState":
                 # Ensure routine has the corresponding event
                 if routine.get_event(event_name):
                     routine.emit(event_name, flow=flow, **event_data)
+                    processed_events.append(event_info)
                 else:
                     import warnings
 
                     warnings.warn(
-                        f"Deferred event '{event_name}' not found in routine '{routine_id}'"
+                        f"Deferred event '{event_name}' not found in routine '{routine_id}'. "
+                        f"Event will remain in deferred_events for retry."
                     )
             except Exception as e:
                 import warnings
 
                 warnings.warn(
-                    f"Failed to emit deferred event '{event_name}' from routine '{routine_id}': {e}"
+                    f"Failed to emit deferred event '{event_name}' from routine '{routine_id}': {e}. "
+                    f"Event will remain in deferred_events for retry."
                 )
         else:
             import warnings
 
-            warnings.warn(f"Routine '{routine_id}' not found in flow for deferred event")
+            warnings.warn(
+                f"Routine '{routine_id}' not found in flow for deferred event. "
+                f"Event will remain in deferred_events for retry."
+            )
 
-    # Clear deferred events (they have been processed)
-    job_state.deferred_events.clear()
+    # Remove only successfully processed events (failed events are preserved for retry)
+    for event_info in processed_events:
+        job_state.deferred_events.remove(event_info)
 
     for task in flow._pending_tasks:
         flow._task_queue.put(task)

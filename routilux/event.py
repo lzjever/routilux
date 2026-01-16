@@ -214,7 +214,8 @@ class Event(Serializable):
         if job_state and self.routine:
             from routilux.monitoring.hooks import execution_hooks
 
-            routine_id = flow._get_routine_id(self.routine) if flow else None
+            # Critical fix: Check if self.routine is not None before passing to _get_routine_id
+            routine_id = flow._get_routine_id(self.routine) if flow and self.routine else None
             if routine_id:
                 # Check if should pause (breakpoint check)
                 if not execution_hooks.on_event_emit(self, routine_id, job_state, kwargs):
@@ -227,11 +228,32 @@ class Event(Serializable):
                         if debug_store:
                             session = debug_store.get(job_state.job_id)
                             if session and session.status == "paused":
-                                # Wait for resume
+                                # Wait for resume (with timeout to prevent indefinite hangs)
                                 import time
 
+                                max_wait = 60  # Maximum 60 seconds wait for resume (reduced from 1 hour)
+                                start_wait = time.time()
                                 while session.status == "paused":
+                                    if time.time() - start_wait > max_wait:
+                                        raise TimeoutError(
+                                            f"Breakpoint wait timed out after {max_wait}s. "
+                                            f"Event: {self.name}, Job: {job_state.job_id}"
+                                        )
+                                    # Check if job was cancelled or failed while waiting
+                                    job_status = str(job_state.status)
+                                    if job_status in ["cancelled", "failed"]:
+                                        raise RuntimeError(
+                                            f"Job {job_state.job_id} was {job_status} while waiting for breakpoint resume"
+                                        )
                                     time.sleep(0.1)
+
+        # Try to route to JobExecutor if we have job_state
+        executor = None
+        if job_state is not None:
+            from routilux.job_manager import get_job_manager
+
+            job_manager = get_job_manager()
+            executor = job_manager.get_job(job_state.job_id)
 
         for slot in self.connected_slots:
             connection = flow._find_connection(self, slot)
@@ -246,7 +268,11 @@ class Event(Serializable):
                 job_state=job_state,  # Pass JobState to task
             )
 
-            # Enqueue (non-blocking)
-            flow._enqueue_task(task)
+            # Route to JobExecutor if available, otherwise use flow._enqueue_task()
+            if executor is not None:
+                executor.enqueue_task(task)
+            else:
+                # Legacy mode: use flow's queue
+                flow._enqueue_task(task)
 
         # Return immediately, no waiting

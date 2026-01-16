@@ -7,9 +7,14 @@ eliminating polling overhead in WebSocket connections.
 
 import asyncio
 import logging
+import threading
 from typing import AsyncIterator, Dict, Optional, Set
 
 logger = logging.getLogger(__name__)
+
+# Module-level lock for thread-safe singleton initialization
+_event_manager_lock = threading.Lock()
+_event_manager: "JobEventManager" = None
 
 
 class JobEventManager:
@@ -248,8 +253,10 @@ class JobEventManager:
         Returns:
             Number of active subscribers.
         """
-        # No lock needed for simple read
-        return len(self._subscribers.get(job_id, set()))
+        # Fix: Acquire lock when reading shared mutable state
+        # Even though we're just reading, the underlying dict could be modified concurrently
+        with self._lock:
+            return len(self._subscribers.get(job_id, set()))
 
     async def cleanup(self, job_id: str) -> None:
         """Clean up all resources for a job.
@@ -305,20 +312,22 @@ class JobEventManager:
         Note:
             This is a synchronous method for monitoring purposes.
         """
-        return {
-            "total_jobs": len(self._queues),
-            "total_subscribers": len(self._subscriber_info),
-            "jobs": {
-                job_id: {
-                    "subscribers": len(subs),
-                    "queue_size": self._queues[job_id].qsize() if job_id in self._queues else 0,
-                }
-                for job_id, subs in self._subscribers.items()
-            },
-        }
+        # Fix: Acquire lock when reading shared mutable state for consistency
+        with self._lock:
+            return {
+                "total_jobs": len(self._queues),
+                "total_subscribers": len(self._subscriber_info),
+                "jobs": {
+                    job_id: {
+                        "subscribers": len(subs),
+                        "queue_size": self._queues[job_id].qsize() if job_id in self._queues else 0,
+                    }
+                    for job_id, subs in self._subscribers.items()
+                },
+            }
 
 
-# Global singleton instance
+# Global singleton instance (redeclared for type checking)
 _event_manager: Optional[JobEventManager] = None
 
 
@@ -337,7 +346,10 @@ def get_event_manager() -> JobEventManager:
             await manager.publish("job_123", {"type": "event", "data": "..."})
     """
     global _event_manager
+    # Fix: Use double-checked locking with proper lock for thread safety
     if _event_manager is None:
-        _event_manager = JobEventManager()
-        logger.info("Created global event manager instance")
+        with _event_manager_lock:
+            if _event_manager is None:
+                _event_manager = JobEventManager()
+                logger.info("Created global event manager instance")
     return _event_manager

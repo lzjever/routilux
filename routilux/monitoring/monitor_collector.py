@@ -24,6 +24,9 @@ except ImportError:
 # Maximum events to store per job (ring buffer size)
 DEFAULT_MAX_EVENTS_PER_JOB = 1000
 
+# Lock for thread-safe access to DEFAULT_MAX_EVENTS_PER_JOB
+_max_events_lock = threading.Lock()
+
 
 def set_max_events_per_job(max_events: int) -> None:
     """Set the maximum number of events to store per job.
@@ -36,7 +39,9 @@ def set_max_events_per_job(max_events: int) -> None:
     global DEFAULT_MAX_EVENTS_PER_JOB
     if max_events <= 0:
         raise ValueError("max_events must be greater than 0")
-    DEFAULT_MAX_EVENTS_PER_JOB = max_events
+    # Fix: Use lock to prevent race condition when updating global variable
+    with _max_events_lock:
+        DEFAULT_MAX_EVENTS_PER_JOB = max_events
 
 
 @dataclass
@@ -222,21 +227,26 @@ class MonitorCollector:
         """
         if self._event_manager is not None:
             try:
-                # Use asyncio.create_task if in async context, otherwise run in thread
+                # Only publish if we're in an async context with a running event loop
+                # This prevents blocking in synchronous contexts (e.g., API routes)
                 import asyncio
+                import logging
 
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # In async context, create task
+                try:
+                    asyncio.get_running_loop()
+                    # In async context, create task without waiting
                     asyncio.create_task(self._event_manager.publish(event.job_id, event.to_dict()))
-                else:
-                    # Not in async context, run in thread pool
-                    asyncio.run_coroutine_threadsafe(
-                        self._event_manager.publish(event.job_id, event.to_dict()), loop
-                    )
-            except Exception:
-                # Event publishing failed, continue silently
-                pass
+                except RuntimeError:
+                    # No running event loop - skip publishing to avoid blocking
+                    # This is expected in synchronous API routes and flow execution
+                    logging.debug(f"No event loop running, skipping event publish for job {event.job_id}")
+            except (RuntimeError, AttributeError) as e:
+                # Expected errors when event manager is not available or in wrong context
+                logging.debug(f"Cannot publish event: {e}")
+            except Exception as e:
+                # Critical fix: Log unexpected errors instead of silently swallowing them
+                # This helps with debugging while not breaking execution
+                logging.error(f"Unexpected error publishing event for job {event.job_id}: {e}")
 
     def record_flow_start(self, flow_id: str, job_id: str) -> None:
         """Record flow execution start.
@@ -495,11 +505,16 @@ class MonitorCollector:
             try:
                 import asyncio
 
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
+                # Only attempt async cleanup if there's a running event loop
+                # This avoids deprecation warnings from get_event_loop()
+                try:
+                    asyncio.get_running_loop()
+                    # Loop is running, create a task
                     asyncio.create_task(self._event_manager.cleanup(job_id))
-                else:
-                    asyncio.run_coroutine_threadsafe(self._event_manager.cleanup(job_id), loop)
+                except RuntimeError:
+                    # No running loop available, skip async cleanup
+                    # This is safe - the cleanup is best-effort and not critical
+                    pass
             except Exception:
                 # Event cleanup failed, continue silently
                 pass

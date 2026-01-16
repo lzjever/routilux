@@ -138,6 +138,8 @@ class JobState(Serializable):
         self.current_routine_id: Optional[str] = None
         self.routine_states: Dict[str, Dict[str, Any]] = {}
         self.execution_history: List[ExecutionRecord] = []
+        # Critical fix: Reduce default limit to prevent memory issues in long-running workflows
+        self._max_execution_history: int = 1000  # Prevent unbounded memory growth (min 10)
         self.pending_tasks: List[Dict[str, Any]] = []  # Serialized pending tasks
         self.created_at: datetime = datetime.now()
         self.updated_at: datetime = datetime.now()
@@ -149,6 +151,12 @@ class JobState(Serializable):
         self.shared_data: Dict[str, Any] = {}
         self._shared_data_lock: threading.RLock = threading.RLock()
         self.shared_log: List[Dict[str, Any]] = []
+
+        # Critical fix: Add lock for routine_states to prevent race conditions
+        self._routine_states_lock: threading.RLock = threading.RLock()
+
+        # Critical fix: Add lock for execution_history to prevent race conditions
+        self._execution_history_lock: threading.RLock = threading.RLock()
 
         # Output handler for this execution (not serialized)
         self.output_handler: Optional[Any] = None  # OutputHandler, but avoid circular import
@@ -219,8 +227,17 @@ class JobState(Serializable):
                 ...     "error": "Connection timeout"
                 ... })
         """
-        self.routine_states[routine_id] = state.copy()
-        self.updated_at = datetime.now()
+        # Critical fix: Validate state is a dict to prevent AttributeError
+        if not isinstance(state, dict):
+            raise TypeError(
+                f"state must be a dict, got {type(state).__name__}"
+            )
+
+        # Critical fix: Use lock to prevent race conditions in concurrent mode
+        # Fix: Move updated_at inside lock to prevent race condition
+        with self._routine_states_lock:
+            self.routine_states[routine_id] = state.copy()
+            self.updated_at = datetime.now()
 
     def update_shared_data(self, key: str, value: Any) -> None:
         """Thread-safe update of shared data.
@@ -284,7 +301,9 @@ class JobState(Serializable):
                 >>> if state and "error" in state:
                 ...     print(f"Error: {state['error']}")
         """
-        return self.routine_states.get(routine_id)
+        # Critical fix: Use lock to prevent race conditions
+        with self._routine_states_lock:
+            return self.routine_states.get(routine_id)
 
     def record_execution(self, routine_id: str, event_name: str, data: Dict[str, Any]) -> None:
         """Record an execution event in the execution history.
@@ -331,8 +350,17 @@ class JobState(Serializable):
                 ... )
         """
         record = ExecutionRecord(routine_id, event_name, data)
-        self.execution_history.append(record)
-        self.updated_at = datetime.now()
+
+        # Critical fix: Use lock to prevent race conditions in concurrent mode
+        with self._execution_history_lock:
+            # Check limit BEFORE appending to prevent memory spike
+            if len(self.execution_history) >= self._max_execution_history:
+                # Critical fix: Use del to modify list in-place instead of creating a new list
+                # This prevents concurrent modification errors if other threads hold references
+                del self.execution_history[:-(self._max_execution_history - 1)]
+
+            self.execution_history.append(record)
+            self.updated_at = datetime.now()
 
     def get_execution_history(self, routine_id: Optional[str] = None) -> List[ExecutionRecord]:
         """Get execution history, optionally filtered by routine.
@@ -370,12 +398,14 @@ class JobState(Serializable):
                 >>> errors = [r for r in history if "error" in r.event_name]
                 >>> print(f"Found {len(errors)} error records")
         """
-        if routine_id is None:
-            history = self.execution_history
-        else:
-            history = [r for r in self.execution_history if r.routine_id == routine_id]
+        # Critical fix: Use lock to prevent race conditions when reading execution_history
+        with self._execution_history_lock:
+            if routine_id is None:
+                history = self.execution_history.copy()  # Return a copy to avoid external modification
+            else:
+                history = [r for r in self.execution_history if r.routine_id == routine_id]
 
-        # Sort by time
+        # Sort by time (outside lock to minimize lock hold time)
         return sorted(history, key=lambda x: x.timestamp)
 
     def _set_paused(self, reason: str = "", checkpoint: Optional[Dict[str, Any]] = None) -> None:
@@ -430,8 +460,13 @@ class JobState(Serializable):
         if isinstance(data.get("updated_at"), datetime):
             data["updated_at"] = data["updated_at"].isoformat()
 
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        # Fix: Add error handling for file operations
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except OSError as e:
+            logger.error(f"Failed to write job state to {filepath}: {e}")
+            raise
 
     @classmethod
     def load(cls, filepath: str) -> "JobState":
@@ -452,8 +487,13 @@ class JobState(Serializable):
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"JobState file not found: {filepath}")
 
-        with open(filepath, encoding="utf-8") as f:
-            data = json.load(f)
+        # Fix: Add error handling for file read operations
+        try:
+            with open(filepath, encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            logger.error(f"Failed to read job state from {filepath}: {e}")
+            raise
 
         # Validate data format
         if "_type" not in data or data["_type"] != "JobState":
@@ -494,15 +534,25 @@ class JobState(Serializable):
             records = []
             for record_data in data["execution_history"]:
                 if isinstance(record_data, dict):
+                    # Critical fix: Handle timestamp parsing errors gracefully
+                    timestamp = None
+                    try:
+                        if isinstance(record_data.get("timestamp"), str):
+                            timestamp = datetime.fromisoformat(record_data["timestamp"])
+                        else:
+                            timestamp = record_data.get("timestamp")
+                    except (ValueError, TypeError) as e:
+                        logger.warning(
+                            f"Invalid timestamp format in execution record: {record_data.get('timestamp')}. "
+                            f"Using current time as fallback. Error: {e}"
+                        )
+                        timestamp = datetime.now()
+
                     record = ExecutionRecord(
                         record_data.get("routine_id", ""),
                         record_data.get("event_name", ""),
                         record_data.get("data", {}),
-                        (
-                            datetime.fromisoformat(record_data["timestamp"])
-                            if isinstance(record_data.get("timestamp"), str)
-                            else None
-                        ),
+                        timestamp,
                     )
                     records.append(record)
             data["execution_history"] = records
@@ -530,7 +580,7 @@ class JobState(Serializable):
     def append_to_shared_log(self, entry: Dict[str, Any]) -> None:
         """Append entry to shared log.
 
-        Thread-safe in CPython (GIL protected).
+        Thread-safe - uses lock to protect the append operation.
 
         Args:
             entry: Dictionary to append to log.
@@ -538,13 +588,15 @@ class JobState(Serializable):
         if not isinstance(entry, dict):
             raise ValueError("Entry must be a dictionary")
 
-        # Automatically add timestamp if not present
-        if "timestamp" not in entry:
-            entry = entry.copy()
-            entry["timestamp"] = datetime.now().isoformat()
+        # Critical fix: Use lock to ensure atomicity of append + updated_at
+        with self._shared_data_lock:
+            # Automatically add timestamp if not present
+            if "timestamp" not in entry:
+                entry = entry.copy()
+                entry["timestamp"] = datetime.now().isoformat()
 
-        self.shared_log.append(entry)
-        self.updated_at = datetime.now()
+            self.shared_log.append(entry)
+            self.updated_at = datetime.now()
 
     def get_shared_log(
         self, filter_func: Optional[Callable[[Dict[str, Any]], bool]] = None
@@ -659,17 +711,36 @@ class JobState(Serializable):
         last_progress_time = 0.0
         progress_interval = 5.0
 
+        # Fix: Add default maximum timeout to prevent infinite loops
+        max_timeout = timeout if timeout is not None else 3600  # Default 1 hour max
+
         while True:
-            if timeout is not None:
-                elapsed = time.time() - start_time
-                if elapsed >= timeout:
+            elapsed = time.time() - start_time
+            if elapsed >= max_timeout:
+                # Critical fix: Use try-except and lock to prevent race conditions when accessing flow attributes
+                if flow is None:
                     logger.warning(
-                        f"Execution completion wait timed out after {timeout} seconds. "
-                        f"Queue size: {flow._task_queue.qsize()}, "
-                        f"Active tasks: {len([f for f in flow._active_tasks if not f.done()])}, "
+                        f"Execution completion wait timed out after {max_timeout} seconds. "
+                        f"Flow is None. "
                         f"Status: {job_state.status}"
                     )
-                    return False
+                else:
+                    # Critical fix: Use lock-protected access to prevent check-then-use race condition
+                    try:
+                        with flow._execution_lock:
+                            queue_size = flow._task_queue.qsize() if hasattr(flow, '_task_queue') and flow._task_queue else "N/A"
+                            active_tasks = len([f for f in flow._active_tasks if not f.done()]) if hasattr(flow, '_active_tasks') else "N/A"
+                    except (AttributeError, RuntimeError):
+                        # Flow may have been shutdown or modified by another thread
+                        queue_size = "N/A"
+                        active_tasks = "N/A"
+                    logger.warning(
+                        f"Execution completion wait timed out after {max_timeout} seconds. "
+                        f"Queue size: {queue_size}, "
+                        f"Active tasks: {active_tasks}, "
+                        f"Status: {job_state.status}"
+                    )
+                return False
 
             if checker.check_with_stability():
                 logger.debug("Execution completed successfully")
@@ -764,15 +835,17 @@ class JobState(Serializable):
         last_progress_time = 0.0
         progress_interval = 5.0
 
+        # Fix: Add default maximum timeout to prevent infinite loops
+        max_timeout = timeout if timeout is not None else 3600  # Default 1 hour max
+
         while True:
-            if timeout is not None:
-                elapsed = time.time() - start_time
-                if elapsed >= timeout:
-                    logger.warning(
-                        f"Condition wait timed out after {timeout} seconds. "
-                        f"Status: {job_state.status}"
-                    )
-                    return False
+            elapsed = time.time() - start_time
+            if elapsed >= max_timeout:
+                logger.warning(
+                    f"Condition wait timed out after {max_timeout} seconds. "
+                    f"Status: {job_state.status}"
+                )
+                return False
 
             # Check if condition is met
             try:

@@ -5,7 +5,10 @@ Parses flow specifications from dictionaries and validates structure.
 """
 
 import importlib
-from typing import Any, Dict, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, Type, Union
+
+if TYPE_CHECKING:
+    from routilux.routine import Routine  # noqa: F401
 
 
 def parse_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
@@ -109,6 +112,23 @@ def _load_class(class_spec: Union[str, Type]) -> Type:
 
     try:
         module = importlib.import_module(module_path)
-        return getattr(module, class_name)
+        cls = getattr(module, class_name)
+
+        # Validate that the loaded class is a Routine subclass
+        # Import here at runtime to avoid circular imports at module level
+        from routilux.routine import Routine
+
+        if not isinstance(cls, type):
+            raise ValueError(
+                f"Loaded object {class_spec} is not a class, it's {type(cls).__name__}"
+            )
+
+        if not issubclass(cls, Routine):
+            raise ValueError(
+                f"Class {class_spec} must be a subclass of Routine, "
+                f"but it's a subclass of {cls.__bases__}"
+            )
+
+        return cls
     except (ImportError, AttributeError) as e:
-        raise ValueError(f"Failed to load class {class_spec}: {e}")
+        raise ValueError(f"Failed to load class {class_spec}: {e}") from e

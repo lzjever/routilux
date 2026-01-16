@@ -6,6 +6,7 @@ Input slot for receiving data from other routines.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
@@ -248,10 +249,23 @@ class Slot(Serializable):
                                 session = debug_store.get_or_create(job_state.job_id)
                                 context = self.routine.get_execution_context()
                                 session.pause(context, reason=f"Breakpoint at routine {routine_id}")
-                                # Wait for resume
+                                # Wait for resume (with timeout to prevent indefinite hangs)
                                 import time
 
+                                max_wait = 60  # Maximum 60 seconds wait for resume (reduced from 1 hour)
+                                start_wait = time.time()
                                 while session.status == "paused":
+                                    if time.time() - start_wait > max_wait:
+                                        raise TimeoutError(
+                                            f"Breakpoint wait timed out after {max_wait}s. "
+                                            f"Routine: {routine_id}, Job: {job_state.job_id}"
+                                        )
+                                    # Check if job was cancelled or failed while waiting
+                                    job_status = str(job_state.status)
+                                    if job_status in ["cancelled", "failed"]:
+                                        raise RuntimeError(
+                                            f"Job {job_state.job_id} was {job_status} while waiting for breakpoint resume"
+                                        )
                                     time.sleep(0.1)
 
                     # Check if should pause at slot call (breakpoint check)
@@ -265,10 +279,23 @@ class Slot(Serializable):
                             if debug_store:
                                 session = debug_store.get(job_state.job_id)
                                 if session and session.status == "paused":
-                                    # Wait for resume
+                                    # Wait for resume (with timeout to prevent indefinite hangs)
                                     import time
 
+                                    max_wait = 60  # Maximum 60 seconds wait for resume (reduced from 1 hour)
+                                    start_wait = time.time()
                                     while session.status == "paused":
+                                        if time.time() - start_wait > max_wait:
+                                            raise TimeoutError(
+                                                f"Breakpoint wait timed out after {max_wait}s. "
+                                                f"Slot: {self.name}, Job: {job_state.job_id}"
+                                            )
+                                        # Check if job was cancelled or failed while waiting
+                                        job_status = str(job_state.status)
+                                        if job_status in ["cancelled", "failed"]:
+                                            raise RuntimeError(
+                                                f"Job {job_state.job_id} was {job_status} while waiting for breakpoint resume"
+                                            )
                                         time.sleep(0.1)
 
                 # Initialize error tracking (must be in outer scope)
@@ -281,51 +308,77 @@ class Slot(Serializable):
                     if self.routine:
                         timeout = self.routine.get_config("timeout")
 
+                    # Critical fix: Validate timeout is numeric before using
+                    if timeout is not None:
+                        if not isinstance(timeout, (int, float)):
+                            logging.getLogger(__name__).warning(
+                                f"Invalid timeout value: {timeout} (type: {type(timeout)}). "
+                                f"Timeout must be numeric. Ignoring timeout."
+                            )
+                            timeout = None
+                        elif timeout <= 0 or timeout != timeout or not __import__('math').isfinite(timeout):  # NaN and infinity check
+                            logging.getLogger(__name__).warning(
+                                f"Invalid timeout value: {timeout}. "
+                                f"Timeout must be positive and finite. Ignoring timeout."
+                            )
+                            timeout = None
+
                     # Execute handler with timeout if configured
                     if timeout:
-                        from concurrent.futures import (
-                            ThreadPoolExecutor,
-                        )
-                        from concurrent.futures import (
-                            TimeoutError as FuturesTimeoutError,
-                        )
+                        from concurrent.futures import ThreadPoolExecutor
+                        from concurrent.futures import TimeoutError as FuturesTimeoutError
 
                         def execute_handler():
                             import inspect
 
-                            sig = inspect.signature(self.handler)
-                            params = list(sig.parameters.keys())
+                            from routilux.routine import _current_job_state
 
-                            if self._is_kwargs_handler(self.handler):
-                                return self.handler(**merged_data)
-                            elif len(params) == 1 and params[0] == "data":
-                                return self.handler(merged_data)
-                            elif len(params) == 1:
-                                param_name = params[0]
-                                if param_name in merged_data:
-                                    return self.handler(merged_data[param_name])
-                                else:
+                            # Set job_state in context variable for this thread
+                            # This is necessary because ThreadPoolExecutor creates a new thread
+                            # and ContextVar is thread-local
+                            old_job_state = _current_job_state.get(None)
+                            _current_job_state.set(job_state)
+
+                            try:
+                                sig = inspect.signature(self.handler)
+                                params = list(sig.parameters.keys())
+
+                                if self._is_kwargs_handler(self.handler):
+                                    return self.handler(**merged_data)
+                                elif len(params) == 1 and params[0] == "data":
                                     return self.handler(merged_data)
-                            else:
-                                matched_params = {}
-                                for param_name in params:
+                                elif len(params) == 1:
+                                    param_name = params[0]
                                     if param_name in merged_data:
-                                        matched_params[param_name] = merged_data[param_name]
-
-                                if matched_params:
-                                    return self.handler(**matched_params)
+                                        return self.handler(merged_data[param_name])
+                                    else:
+                                        return self.handler(merged_data)
                                 else:
-                                    return self.handler(merged_data)
+                                    matched_params = {}
+                                    for param_name in params:
+                                        if param_name in merged_data:
+                                            matched_params[param_name] = merged_data[param_name]
+
+                                    if matched_params:
+                                        return self.handler(**matched_params)
+                                    else:
+                                        return self.handler(merged_data)
+                            finally:
+                                # Restore previous job_state in context variable
+                                if old_job_state is not None:
+                                    _current_job_state.set(old_job_state)
+                                else:
+                                    _current_job_state.set(None)
 
                         with ThreadPoolExecutor(max_workers=1) as executor:
                             future = executor.submit(execute_handler)
                             try:
                                 future.result(timeout=timeout)
-                            except FuturesTimeoutError:
+                            except FuturesTimeoutError as e:
                                 raise TimeoutError(
                                     f"Slot handler '{self.name}' in routine '{self.routine.__class__.__name__}' "
                                     f"exceeded timeout of {timeout} seconds"
-                                )
+                                ) from e
                     else:
                         # No timeout, execute normally
                         import inspect
@@ -359,6 +412,9 @@ class Slot(Serializable):
                             else:
                                 # If no match, pass entire dictionary as first parameter
                                 self.handler(merged_data)
+                # Fix: Don't catch SystemExit or KeyboardInterrupt - these should propagate
+                except (SystemExit, KeyboardInterrupt):
+                    raise
                 except Exception as e:
                     error_occurred = True
                     error_exception = e
@@ -403,7 +459,10 @@ class Slot(Serializable):
                             # Find routine_id in flow using flow._get_routine_id()
                             routine_id = flow._get_routine_id(self.routine)
                             if routine_id:
+                                # Critical fix: Get error handler from routine first, fall back to flow error handler
                                 error_handler = self.routine.get_error_handler()
+                                if error_handler is None and hasattr(flow, 'error_handler'):
+                                    error_handler = flow.error_handler
 
                                 # Check if this is a RETRY strategy and we have flow/job_state context
                                 # (indicating this was called from a task, not directly)
@@ -456,6 +515,10 @@ class Slot(Serializable):
                                     job_state.update_routine_state(
                                         routine_id, {"status": "failed", "error": str(e)}
                                     )
+                                    # Critical fix: Also mark job_state as FAILED for STOP strategy
+                                    # This ensures wait() and job status checks properly detect the failure
+                                    from routilux.status import ExecutionStatus
+                                    job_state.status = ExecutionStatus.FAILED
 
                 # Monitoring hook: Routine end (after handler execution)
                 if routine_id and job_state and self.routine:
@@ -530,6 +593,10 @@ class Slot(Serializable):
                 >>> merged = slot._merge_data({"a": 4})
                 >>> merged  # {"a": [1, 2, 4], "b": [3]}
         """
+        # Fix: Validate new_data type to prevent AttributeError
+        if not isinstance(new_data, dict):
+            new_data = {}
+
         if self.merge_strategy == "override":
             # Override strategy: new data completely replaces old data
             # Previous data in self._data is discarded

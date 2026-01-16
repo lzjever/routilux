@@ -55,9 +55,10 @@ class MonitoringRegistry:
         # First get the instance (without holding the lock)
         instance = cls.get_instance()
 
-        # Then enable and initialize services (with lock)
+        # Then initialize and enable services (with lock)
         with cls._lock:
-            cls._enabled = True
+            # Fix: Initialize services BEFORE setting _enabled to True
+            # This prevents race condition where other threads see enabled=True but services are None
 
             # Lazy initialization of services
             if instance._breakpoint_manager is None:
@@ -74,6 +75,9 @@ class MonitoringRegistry:
                 from routilux.monitoring.debug_session import DebugSessionStore
 
                 instance._debug_session_store = DebugSessionStore()
+
+            # Set enabled AFTER all services are initialized
+            cls._enabled = True
 
     @classmethod
     def disable(cls) -> None:

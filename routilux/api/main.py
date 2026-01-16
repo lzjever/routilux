@@ -78,6 +78,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Add examples directory to sys.path for DSL loading support
+# This allows flows to be created from DSL that references example routines
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+examples_dir = str(Path(__file__).parent.parent.parent / "examples")
+if examples_dir not in sys.path:
+    sys.path.insert(0, examples_dir)
+
 # CORS middleware for frontend access
 allowed_origins = os.getenv("ROUTILUX_CORS_ORIGINS", "*")
 
@@ -107,7 +116,7 @@ app.include_router(websocket.router, prefix="/api", tags=["websocket"])
 
 
 @app.get("/")
-async def root():
+def root():
     """Root endpoint."""
     return {
         "name": "Routilux API",
@@ -117,7 +126,7 @@ async def root():
 
 
 @app.get("/api/health")
-async def health():
+def health():
     """Health check endpoint."""
     return {"status": "healthy"}
 

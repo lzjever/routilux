@@ -35,20 +35,15 @@ def _publish_event_via_manager(job_id: str, event: dict) -> None:
         event_manager = get_event_manager()
 
         try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            # No event loop exists
-            return
-
-        if loop.is_running():
+            # Only publish if we're in an async context with a running event loop
+            # This prevents blocking in synchronous contexts
+            asyncio.get_running_loop()
             # In async context, create task without waiting
             asyncio.create_task(event_manager.publish(job_id, event))
-        else:
-            # In sync context with event loop, use threadsafe
-            asyncio.run_coroutine_threadsafe(
-                event_manager.publish(job_id, event),
-                loop,
-            )
+        except RuntimeError:
+            # No running event loop - skip publishing to avoid blocking
+            # This is expected in synchronous API routes and flow execution
+            return
     except (RuntimeError, AttributeError):
         # No event loop or import failed, skip event notification
         pass

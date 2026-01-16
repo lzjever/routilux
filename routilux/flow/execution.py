@@ -19,8 +19,11 @@ def execute_flow(
     entry_params: Optional[Dict[str, Any]] = None,
     execution_strategy: Optional[str] = None,
     timeout: Optional[float] = None,
+    job_state: Optional["JobState"] = None,
 ) -> "JobState":
     """Execute the flow starting from the specified entry routine.
+
+    This is a synchronous execution that waits for completion.
 
     Args:
         flow: Flow object.
@@ -29,9 +32,10 @@ def execute_flow(
         execution_strategy: Optional execution strategy override.
         timeout: Optional timeout for execution completion in seconds.
             If None, uses flow.execution_timeout (default: 300.0 seconds).
+        job_state: Optional existing JobState to use. If None, creates a new one.
 
     Returns:
-        JobState object.
+        JobState object (completed or failed).
 
     Raises:
         ValueError: If entry_routine_id does not exist in the flow.
@@ -43,9 +47,79 @@ def execute_flow(
     execution_timeout = timeout if timeout is not None else flow.execution_timeout
 
     if strategy == "concurrent":
-        return execute_concurrent(flow, entry_routine_id, entry_params, timeout=execution_timeout)
+        return execute_concurrent(flow, entry_routine_id, entry_params, timeout=execution_timeout, job_state=job_state)
     else:
-        return execute_sequential(flow, entry_routine_id, entry_params, timeout=execution_timeout)
+        return execute_sequential(flow, entry_routine_id, entry_params, timeout=execution_timeout, job_state=job_state)
+
+
+def start_flow_execution(
+    flow: "Flow",
+    entry_routine_id: str,
+    entry_params: Optional[Dict[str, Any]] = None,
+    execution_strategy: Optional[str] = None,
+    timeout: Optional[float] = None,
+    job_state: Optional["JobState"] = None,
+) -> "JobState":
+    """Start flow execution asynchronously without waiting for completion.
+
+    This method starts the execution and returns immediately with a JobState.
+    The execution continues in the background. Use JobState.wait_for_completion()
+    if you need to wait for the result.
+
+    Args:
+        flow: Flow object.
+        entry_routine_id: Identifier of the routine to start execution from.
+        entry_params: Optional dictionary of parameters to pass to the entry routine's trigger slot.
+        execution_strategy: Optional execution strategy override.
+        timeout: Optional timeout for execution completion in seconds.
+        job_state: Optional existing JobState to use. If None, creates a new one.
+
+    Returns:
+        JobState object (status will be RUNNING initially).
+
+    Raises:
+        ValueError: If entry_routine_id does not exist in the flow.
+    """
+    if entry_routine_id not in flow.routines:
+        raise ValueError(f"Entry routine '{entry_routine_id}' not found in flow")
+
+    from routilux.job_state import JobState
+    from routilux.status import ExecutionStatus
+
+    # Create or use provided job_state
+    if job_state is None:
+        job_state = JobState(flow.flow_id)
+    
+    job_state.status = ExecutionStatus.RUNNING
+    job_state.current_routine_id = entry_routine_id
+
+    # Start execution in background thread
+    import threading
+    
+    def _run_execution():
+        """Run execution in background thread."""
+        try:
+            # Use the synchronous execute, but we won't wait for it
+            # The execution will complete in the background
+            strategy = execution_strategy or flow.execution_strategy
+            execution_timeout = timeout if timeout is not None else flow.execution_timeout
+            
+            if strategy == "concurrent":
+                execute_concurrent(flow, entry_routine_id, entry_params, timeout=execution_timeout, job_state=job_state)
+            else:
+                execute_sequential(flow, entry_routine_id, entry_params, timeout=execution_timeout, job_state=job_state)
+        except Exception as e:
+            import logging
+            logging.exception(f"Error in background execution for job {job_state.job_id}: {e}")
+            job_state.status = ExecutionStatus.FAILED
+            if "error" not in job_state.shared_data:
+                job_state.shared_data["error"] = str(e)
+
+    # Start background thread
+    thread = threading.Thread(target=_run_execution, daemon=True)
+    thread.start()
+
+    return job_state
 
 
 def execute_sequential(
@@ -53,6 +127,7 @@ def execute_sequential(
     entry_routine_id: str,
     entry_params: Optional[Dict[str, Any]] = None,
     timeout: Optional[float] = None,
+    job_state: Optional["JobState"] = None,
 ) -> "JobState":
     """Execute Flow using unified queue-based mechanism.
 
@@ -60,6 +135,8 @@ def execute_sequential(
         flow: Flow object.
         entry_routine_id: Entry routine identifier.
         entry_params: Entry parameters.
+        timeout: Optional timeout for execution completion in seconds.
+        job_state: Optional existing JobState to use. If None, creates a new one.
 
     Returns:
         JobState object.
@@ -70,9 +147,15 @@ def execute_sequential(
     from routilux.job_state import JobState
     from routilux.status import ExecutionStatus
 
-    job_state = JobState(flow.flow_id)
-    job_state.status = ExecutionStatus.RUNNING
-    job_state.current_routine_id = entry_routine_id
+    # Use provided job_state or create new one
+    if job_state is None:
+        job_state = JobState(flow.flow_id)
+        job_state.status = ExecutionStatus.RUNNING
+        job_state.current_routine_id = entry_routine_id
+    else:
+        # Update existing job_state
+        job_state.status = ExecutionStatus.RUNNING
+        job_state.current_routine_id = entry_routine_id
 
     flow.execution_tracker = ExecutionTracker(flow.flow_id)
 
@@ -116,11 +199,8 @@ def execute_sequential(
             else:
                 _current_job_state.set(None)
 
-        from routilux.flow.completion import ensure_event_loop_running
-
-        ensure_event_loop_running(flow)
-
-        # Update routine state for successful execution
+        # Entry routine's trigger handler completed successfully
+        # Update its state regardless of downstream routine failures
         job_state.update_routine_state(
             entry_routine_id,
             {
@@ -128,11 +208,24 @@ def execute_sequential(
             },
         )
 
-        # Set job state to completed
-        job_state.status = ExecutionStatus.COMPLETED
+        from routilux.flow.completion import (
+            ensure_event_loop_running,
+            wait_for_event_loop_completion,
+        )
 
-        # Monitoring hook: Flow end
-        execution_hooks.on_flow_end(flow, job_state, "completed")
+        ensure_event_loop_running(flow)
+
+        # Wait for event loop to complete all tasks
+        # This is critical for timeout tasks that may emit new events
+        wait_for_event_loop_completion(flow, timeout=timeout)
+
+        # Only update job status to completed if it hasn't already failed
+        if job_state.status != ExecutionStatus.FAILED:
+            # Set job state to completed
+            job_state.status = ExecutionStatus.COMPLETED
+
+            # Monitoring hook: Flow end
+            execution_hooks.on_flow_end(flow, job_state, "completed")
 
         return job_state
 
@@ -166,7 +259,7 @@ def execute_sequential(
                     raise ValueError(
                         f"Entry routine '{entry_routine_id}' must have a 'trigger' slot. "
                         f"Define it using: routine.define_slot('trigger', handler=your_handler)"
-                    )
+                    ) from e
                 for attempt in range(remaining_retries):
                     try:
                         trigger_slot.call_handler(entry_params or {}, propagate_exceptions=True)
@@ -231,6 +324,7 @@ def execute_concurrent(
     entry_routine_id: str,
     entry_params: Optional[Dict[str, Any]] = None,
     timeout: Optional[float] = None,
+    job_state: Optional["JobState"] = None,
 ) -> "JobState":
     """Execute Flow concurrently using unified queue-based mechanism.
 
@@ -242,8 +336,9 @@ def execute_concurrent(
         entry_routine_id: Entry routine identifier.
         entry_params: Entry parameters.
         timeout: Optional timeout for execution completion in seconds.
+        job_state: Optional existing JobState to use. If None, creates a new one.
 
     Returns:
         JobState object.
     """
-    return execute_sequential(flow, entry_routine_id, entry_params, timeout=timeout)
+    return execute_sequential(flow, entry_routine_id, entry_params, timeout=timeout, job_state=job_state)

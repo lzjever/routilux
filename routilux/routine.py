@@ -456,7 +456,8 @@ class Routine(Serializable):
             return kwargs["data"]
 
         if len(kwargs) == 1:
-            return list(kwargs.values())[0]
+            # Fix: Use next() for safer single value extraction
+            return next(iter(kwargs.values()))
 
         if len(kwargs) > 0:
             return kwargs
@@ -807,7 +808,7 @@ class Routine(Serializable):
         routine_id = flow._get_routine_id(self)
         if routine_id is None:
             logger.warning(
-                f"Routine {self.__class__.__name__} is not registered in flow {flow.flow_id}. "
+                f"Routine {self.__class__.__name__} is not registered in flow {flow.flow_id if flow else 'Unknown'}. "
                 "Make sure to call flow.add_routine() before execution."
             )
             return None

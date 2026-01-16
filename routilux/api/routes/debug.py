@@ -144,6 +144,13 @@ async def get_variables(job_id: str, routine_id: str = None):
     if not session:
         raise HTTPException(status_code=404, detail=f"No debug session for job '{job_id}'")
 
+    # Fix: Add validation for routine_id when call stack is empty
+    if not routine_id and not session.call_stack:
+        raise HTTPException(
+            status_code=400,
+            detail="routine_id must be specified when not paused at a breakpoint"
+        )
+
     variables = session.get_variables(routine_id)
 
     return {

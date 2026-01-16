@@ -26,16 +26,27 @@ def build_dependency_graph(
     Returns:
         Dependency graph dictionary: {routine_id: {dependent routine_ids}}.
     """
-    graph = {rid: set() for rid in routines.keys()}
+    # Fix: Create a snapshot to avoid modification during iteration
+    routines_snapshot = dict(routines)
+    graph = {rid: set() for rid in routines_snapshot.keys()}
 
     def get_routine_id(routine: "Routine") -> str | None:
         """Find the ID of a Routine object within routines dict."""
-        for rid, r in routines.items():
+        for rid, r in routines_snapshot.items():
             if r is routine:
                 return rid
         return None
 
     for conn in connections:
+        # Critical fix: Check if source_event and target_slot exist before accessing attributes
+        # These can be None during deserialization or if connection is not fully initialized
+        if conn.source_event is None or conn.target_slot is None:
+            continue
+
+        # Additional fix: Check if .routine attribute is not None
+        if conn.source_event.routine is None or conn.target_slot.routine is None:
+            continue
+
         source_rid = get_routine_id(conn.source_event.routine)
         target_rid = get_routine_id(conn.target_slot.routine)
 

@@ -6,6 +6,7 @@ Tracks flow execution state and performance metrics.
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 from typing import Any
 
@@ -65,6 +66,9 @@ class ExecutionTracker(Serializable):
         self.event_flow: list[dict[str, Any]] = []
         self.performance_metrics: dict[str, Any] = {}
 
+        # Critical fix: Add lock for thread-safe access to shared data
+        self._lock: threading.RLock = threading.RLock()
+
         # Register serializable fields
         self.add_serializable_fields(
             ["flow_id", "routine_executions", "event_flow", "performance_metrics"]
@@ -95,16 +99,18 @@ class ExecutionTracker(Serializable):
                 >>> tracker.record_routine_start("processor", {"input": "data"})
                 >>> # Later, call record_routine_end() to complete the record
         """
-        if routine_id not in self.routine_executions:
-            self.routine_executions[routine_id] = []
+        # Critical fix: Use lock to prevent race conditions in concurrent mode
+        with self._lock:
+            if routine_id not in self.routine_executions:
+                self.routine_executions[routine_id] = []
 
-        execution = {
-            "routine_id": routine_id,
-            "start_time": datetime.now().isoformat(),
-            "params": params or {},
-            "status": "running",
-        }
-        self.routine_executions[routine_id].append(execution)
+            execution = {
+                "routine_id": routine_id,
+                "start_time": datetime.now().isoformat(),
+                "params": params or {},
+                "status": "running",
+            }
+            self.routine_executions[routine_id].append(execution)
 
     def record_routine_end(
         self,
@@ -150,27 +156,29 @@ class ExecutionTracker(Serializable):
                 ...     error="Connection timeout"
                 ... )
         """
-        if routine_id not in self.routine_executions:
-            return
+        # Critical fix: Use lock to prevent race conditions
+        with self._lock:
+            if routine_id not in self.routine_executions:
+                return
 
-        if not self.routine_executions[routine_id]:
-            return
+            if not self.routine_executions[routine_id]:
+                return
 
-        execution = self.routine_executions[routine_id][-1]
-        execution["end_time"] = datetime.now().isoformat()
-        execution["status"] = status
+            execution = self.routine_executions[routine_id][-1]
+            execution["end_time"] = datetime.now().isoformat()
+            execution["status"] = status
 
-        if result is not None:
-            execution["result"] = result
+            if result is not None:
+                execution["result"] = result
 
-        if error is not None:
-            execution["error"] = error
+            if error is not None:
+                execution["error"] = error
 
-        # Calculate execution time
-        if "start_time" in execution and "end_time" in execution:
-            start = datetime.fromisoformat(execution["start_time"])
-            end = datetime.fromisoformat(execution["end_time"])
-            execution["execution_time"] = (end - start).total_seconds()
+            # Calculate execution time
+            if "start_time" in execution and "end_time" in execution:
+                start = datetime.fromisoformat(execution["start_time"])
+                end = datetime.fromisoformat(execution["end_time"])
+                execution["execution_time"] = (end - start).total_seconds()
 
     def record_event(
         self,
@@ -210,51 +218,72 @@ class ExecutionTracker(Serializable):
                 ...     data={"result": "processed", "count": 10}
                 ... )
         """
-        event_record = {
-            "timestamp": datetime.now().isoformat(),
-            "source_routine_id": source_routine_id,
-            "event_name": event_name,
-            "target_routine_id": target_routine_id,
-            "data": data or {},
-        }
-        self.event_flow.append(event_record)
+        # Critical fix: Use lock to prevent race conditions
+        with self._lock:
+            event_record = {
+                "timestamp": datetime.now().isoformat(),
+                "source_routine_id": source_routine_id,
+                "event_name": event_name,
+                "target_routine_id": target_routine_id,
+                "data": data or {},
+            }
+            self.event_flow.append(event_record)
 
-    def get_routine_performance(self, routine_id: str) -> dict[str, Any] | None:
+    def get_routine_performance(self, routine_id: str) -> dict[str, Any]:
         """Get performance metrics for a routine.
 
         Args:
             routine_id: Routine identifier.
 
         Returns:
-            Dictionary containing performance metrics, or None if routine not found.
+            Dictionary containing performance metrics with default values if routine not found.
+            Never returns None - always returns a valid metrics dict.
         """
-        if routine_id not in self.routine_executions:
-            return None
+        with self._lock:
+            if routine_id not in self.routine_executions:
+                # Return default metrics instead of None to prevent None access bugs
+                return {
+                    "total_executions": 0,
+                    "completed": 0,
+                    "failed": 0,
+                    "success_rate": 0.0,
+                    "avg_execution_time": 0.0,
+                    "min_execution_time": 0.0,
+                    "max_execution_time": 0.0,
+                }
 
-        executions = self.routine_executions[routine_id]
-        if not executions:
-            return None
+            executions = self.routine_executions[routine_id]
+            if not executions:
+                return {
+                    "total_executions": 0,
+                    "completed": 0,
+                    "failed": 0,
+                    "success_rate": 0.0,
+                    "avg_execution_time": 0.0,
+                    "min_execution_time": 0.0,
+                    "max_execution_time": 0.0,
+                }
 
-        # Calculate statistics
-        total_executions = len(executions)
-        completed = sum(1 for e in executions if e.get("status") == "completed")
-        failed = sum(1 for e in executions if e.get("status") == "failed")
+            # Calculate statistics
+            total_executions = len(executions)
+            completed = sum(1 for e in executions if e.get("status") == "completed")
+            failed = sum(1 for e in executions if e.get("status") == "failed")
 
-        execution_times = [e.get("execution_time", 0) for e in executions if "execution_time" in e]
+            execution_times = [e.get("execution_time", 0) for e in executions if "execution_time" in e]
 
-        avg_time = sum(execution_times) / len(execution_times) if execution_times else 0
-        min_time = min(execution_times) if execution_times else 0
-        max_time = max(execution_times) if execution_times else 0
+            avg_time = sum(execution_times) / len(execution_times) if execution_times else 0
+            min_time = min(execution_times) if execution_times else 0
+            max_time = max(execution_times) if execution_times else 0
 
-        return {
-            "total_executions": total_executions,
-            "completed": completed,
-            "failed": failed,
-            "success_rate": completed / total_executions if total_executions > 0 else 0,
-            "avg_execution_time": avg_time,
-            "min_execution_time": min_time,
-            "max_execution_time": max_time,
-        }
+            return {
+                "total_executions": total_executions,
+                "completed": completed,
+                "failed": failed,
+                "success_rate": completed / total_executions if total_executions > 0 else 0,
+                "avg_execution_time": avg_time,
+                "min_execution_time": min_time,
+                "max_execution_time": max_time,
+            }
 
     def get_flow_performance(self) -> dict[str, Any]:
         """Get performance metrics for the entire flow.
@@ -276,21 +305,23 @@ class ExecutionTracker(Serializable):
                 >>> print(f"Total events: {metrics['total_events']}")
                 >>> print(f"Total time: {metrics['total_execution_time']:.2f}s")
         """
-        total_routines = len(self.routine_executions)
-        total_events = len(self.event_flow)
+        with self._lock:
+            total_routines = len(self.routine_executions)
+            total_events = len(self.event_flow)
 
-        all_execution_times = []
-        for routine_id in self.routine_executions:
-            perf = self.get_routine_performance(routine_id)
-            if perf and perf.get("avg_execution_time"):
-                all_execution_times.append(perf["avg_execution_time"])
+            all_execution_times = []
+            for routine_id in self.routine_executions:
+                perf = self.get_routine_performance(routine_id)
+                # perf is now guaranteed to be non-None dict
+                if perf.get("avg_execution_time"):
+                    all_execution_times.append(perf["avg_execution_time"])
 
-        total_time = sum(all_execution_times)
-        avg_time = total_time / len(all_execution_times) if all_execution_times else 0
+            total_time = sum(all_execution_times)
+            avg_time = total_time / len(all_execution_times) if all_execution_times else 0
 
-        return {
-            "total_routines": total_routines,
-            "total_events": total_events,
-            "total_execution_time": total_time,
-            "avg_routine_time": avg_time,
-        }
+            return {
+                "total_routines": total_routines,
+                "total_events": total_events,
+                "total_execution_time": total_time,
+                "avg_routine_time": avg_time,
+            }

@@ -227,10 +227,15 @@ class WorkflowAnalyzer:
         source_routine = connection.source_event.routine
         target_routine = connection.target_slot.routine
 
+        # Critical fix: Check if routines are None before accessing
+        if not source_routine or not target_routine:
+            return None
+
         source_routine_id = self._get_routine_id(source_routine, flow)
         target_routine_id = self._get_routine_id(target_routine, flow)
 
-        if not source_routine_id or not target_routine_id:
+        # Explicit None check for safety
+        if source_routine_id is None or target_routine_id is None:
             return None
 
         conn_info = {
@@ -262,6 +267,10 @@ class WorkflowAnalyzer:
             source_routine = connection.source_event.routine
             target_routine = connection.target_slot.routine
 
+            # Critical fix: Check if routines are None before accessing
+            if not source_routine or not target_routine:
+                continue
+
             source_routine_id = self._get_routine_id(source_routine, flow)
             target_routine_id = self._get_routine_id(target_routine, flow)
 
@@ -284,7 +293,7 @@ class WorkflowAnalyzer:
 
         for routine_id, routine in flow.routines.items():
             if hasattr(routine, "_slots"):
-                for slot_name, slot in routine._slots.items():
+                for slot_name in routine._slots.keys():
                     if slot_name == "trigger":
                         entry_points.append(routine_id)
                         break
@@ -507,9 +516,8 @@ class WorkflowAnalyzer:
             if file_path.exists():
                 with open(file_path, encoding="utf-8") as f:
                     return json.load(f)
-        except (OSError, json.JSONDecodeError) as e:
+        except (OSError, json.JSONDecodeError):
             # Silently fail - will use basic info
-            e
             pass
 
         return None
@@ -738,8 +746,6 @@ class WorkflowAnalyzer:
 
         # Determine connection style based on event/slot names and types
         event_lower = source_event.lower()
-        slot_lower = target_slot.lower()
-        slot_lower = slot_lower
 
         # Determine connection type and styling based on semantic meaning
         # Check if this is a result aggregation connection (worker result -> aggregator)

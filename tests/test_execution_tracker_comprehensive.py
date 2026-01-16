@@ -139,7 +139,11 @@ class TestExecutionTrackerPerformance:
 
         perf = tracker.get_routine_performance("nonexistent")
 
-        assert perf is None
+        # get_routine_performance returns default metrics instead of None to prevent None access bugs
+        assert perf is not None
+        assert perf["total_executions"] == 0
+        assert perf["completed"] == 0
+        assert perf["failed"] == 0
 
     def test_get_flow_performance(self):
         """测试获取 flow 性能指标"""

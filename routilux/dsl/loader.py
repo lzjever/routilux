@@ -44,18 +44,33 @@ def load_flow_from_spec(spec: Dict[str, Any]) -> "Flow":
     # Create flow
     flow = Flow(flow_id=parsed.get("flow_id"))
 
+    # Fix: Validate that routines key exists
+    routines = parsed.get("routines")
+    if not routines or not isinstance(routines, dict):
+        raise ValueError(
+            "Specification must contain a 'routines' dictionary with routine definitions"
+        )
+
     # Add routines
-    for routine_id, routine_info in parsed["routines"].items():
+    for routine_id, routine_info in routines.items():
+        # Critical fix: Validate 'class' key exists to prevent KeyError
+        if "class" not in routine_info:
+            raise KeyError(
+                f"Missing required 'class' key in routine specification for '{routine_id}'. "
+                f"Each routine must specify a 'class' field with the routine class or import path."
+            )
         routine_class = routine_info["class"]
         routine = routine_class()
 
         # Apply config
-        if routine_info["config"]:
-            routine.set_config(**routine_info["config"])
+        config = routine_info.get("config")
+        if config:
+            routine.set_config(**config)
 
         # Apply error handler
-        if routine_info["error_handler"]:
-            handler_spec = routine_info["error_handler"]
+        error_handler_spec = routine_info.get("error_handler")
+        if error_handler_spec:
+            handler_spec = error_handler_spec
             if isinstance(handler_spec, dict):
                 strategy_str = handler_spec.get("strategy", "stop")
                 strategy = (
@@ -77,7 +92,19 @@ def load_flow_from_spec(spec: Dict[str, Any]) -> "Flow":
         flow.add_routine(routine, routine_id)
 
     # Add connections
-    for conn in parsed["connections"]:
+    # Critical fix: Validate connections key exists and is list
+    connections = parsed.get("connections")
+    if not isinstance(connections, list):
+        raise ValueError("'connections' must be a list in flow specification")
+
+    for conn in connections:
+        # Critical fix: Validate connection has required keys
+        if not isinstance(conn, dict):
+            raise ValueError(f"Each connection must be a dictionary, got {type(conn)}")
+
+        if "from" not in conn or "to" not in conn:
+            raise ValueError(f"Connection must specify 'from' and 'to' keys")
+
         from_path = conn["from"].split(".")
         to_path = conn["to"].split(".")
 

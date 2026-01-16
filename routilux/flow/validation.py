@@ -71,6 +71,9 @@ def find_unconnected_events(flow: "Flow") -> List[Tuple[str, str]]:
     # Build set of connected events
     connected_events: Set[Tuple[str, str]] = set()
     for connection in flow.connections:
+        # Critical fix: Check if connection and source_event exist before accessing
+        if connection.source_event is None or connection.source_event.routine is None:
+            continue  # Skip incomplete connections
         source_routine_id = flow._get_routine_id(connection.source_event.routine)
         if source_routine_id:
             connected_events.add((source_routine_id, connection.source_event.name))
@@ -98,6 +101,9 @@ def find_unconnected_slots(flow: "Flow") -> List[Tuple[str, str]]:
     # Build set of connected slots
     connected_slots: Set[Tuple[str, str]] = set()
     for connection in flow.connections:
+        # Critical fix: Check if connection and target_slot exist before accessing
+        if connection.target_slot is None or connection.target_slot.routine is None:
+            continue  # Skip incomplete connections
         target_routine_id = flow._get_routine_id(connection.target_slot.routine)
         if target_routine_id:
             connected_slots.add((target_routine_id, connection.target_slot.name))
@@ -144,6 +150,14 @@ def validate_flow(flow: "Flow") -> List[str]:
 
     # Validate connections reference valid routines/events/slots
     for connection in flow.connections:
+        # Critical fix: Check if connection and its attributes exist before accessing
+        if connection.source_event is None or connection.source_event.routine is None:
+            issues.append("Connection has missing source event or source routine")
+            continue
+        if connection.target_slot is None or connection.target_slot.routine is None:
+            issues.append("Connection has missing target slot or target routine")
+            continue
+
         source_routine_id = flow._get_routine_id(connection.source_event.routine)
         target_routine_id = flow._get_routine_id(connection.target_slot.routine)
 

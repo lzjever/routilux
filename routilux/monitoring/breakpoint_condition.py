@@ -108,7 +108,7 @@ def evaluate_condition(
         return bool(result)
 
     except SyntaxError as e:
-        raise ValueError(f"Invalid condition syntax: {e}")
+        raise ValueError(f"Invalid condition syntax: {e}") from e
     except ValueError as e:
         # Re-raise security violations
         if "Unsafe" in str(e) or "Import" in str(e):

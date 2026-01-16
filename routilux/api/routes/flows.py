@@ -33,8 +33,12 @@ def _flow_to_response(flow: Flow) -> FlowResponse:
 
     connections = []
     for i, conn in enumerate(flow.connections):
-        source_routine_id = flow._get_routine_id(conn.source_event.routine)
-        target_routine_id = flow._get_routine_id(conn.target_slot.routine)
+        # Critical fix: Check if source_event and target_slot exist before accessing attributes
+        if conn.source_event is None or conn.target_slot is None:
+            continue  # Skip incomplete connections
+
+        source_routine_id = flow._get_routine_id(conn.source_event.routine) if conn.source_event.routine else None
+        target_routine_id = flow._get_routine_id(conn.target_slot.routine) if conn.target_slot.routine else None
         connections.append(
             ConnectionInfo(
                 connection_id=f"conn_{i}",
@@ -99,7 +103,7 @@ async def create_flow(request: FlowCreateRequest):
 
         return _flow_to_response(flow)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to create flow: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to create flow: {str(e)}") from e
 
 
 @router.delete("/flows/{flow_id}", status_code=204)
@@ -150,6 +154,12 @@ async def export_flow_dsl(flow_id: str, format: str = Query("yaml", pattern="^(y
 
     # Add connections
     for conn in flow.connections:
+        # Critical fix: Check for None before accessing connection attributes
+        if conn.source_event is None or conn.source_event.routine is None:
+            continue  # Skip incomplete connections
+        if conn.target_slot is None or conn.target_slot.routine is None:
+            continue  # Skip incomplete connections
+
         source_routine_id = flow._get_routine_id(conn.source_event.routine)
         target_routine_id = flow._get_routine_id(conn.target_slot.routine)
         conn_spec = {
@@ -214,8 +224,12 @@ async def list_flow_connections(flow_id: str):
 
     connections = []
     for i, conn in enumerate(flow.connections):
-        source_routine_id = flow._get_routine_id(conn.source_event.routine)
-        target_routine_id = flow._get_routine_id(conn.target_slot.routine)
+        # Critical fix: Check if source_event and target_slot exist before accessing attributes
+        if conn.source_event is None or conn.target_slot is None:
+            continue  # Skip incomplete connections
+
+        source_routine_id = flow._get_routine_id(conn.source_event.routine) if conn.source_event.routine else None
+        target_routine_id = flow._get_routine_id(conn.target_slot.routine) if conn.target_slot.routine else None
         connections.append(
             ConnectionInfo(
                 connection_id=f"conn_{i}",
@@ -239,16 +253,25 @@ async def add_routine_to_flow(
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{flow_id}' not found")
 
+    # Fix: Validate class_path format before using
+    if "." not in class_path or class_path.startswith(".") or class_path.endswith("."):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid class_path format: '{class_path}'. Expected format: 'module.path.ClassName'"
+        )
+
     # Load routine class
     try:
         from importlib import import_module
 
         module_path, class_name = class_path.rsplit(".", 1)
+        if not module_path or not class_name:
+            raise ValueError("Both module_path and class_name must be non-empty")
         module = import_module(module_path)
         routine_class = getattr(module, class_name)
         routine = routine_class()
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to load routine class: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to load routine class: {str(e)}") from e
 
     # Apply config
     if config:
@@ -280,7 +303,7 @@ async def add_connection_to_flow(
         flow_store.add(flow)  # Update stored flow
         return {"status": "connected"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to add connection: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to add connection: {str(e)}") from e
 
 
 @router.delete("/flows/{flow_id}/routines/{routine_id}", status_code=204)
@@ -293,12 +316,16 @@ async def remove_routine_from_flow(flow_id: str, routine_id: str):
     if routine_id not in flow.routines:
         raise HTTPException(status_code=404, detail=f"Routine '{routine_id}' not found in flow")
 
-    # Remove routine and all its connections
-    flow.routines[routine_id]
-
+    # Fix: Remove dead code - line 306 did nothing (flow.routines[routine_id] accessed but didn't use result)
     # Remove connections involving this routine
     connections_to_remove = []
     for conn in flow.connections:
+        # Critical fix: Check for None before accessing connection attributes
+        if conn.source_event is None or conn.source_event.routine is None:
+            continue  # Skip incomplete connections
+        if conn.target_slot is None or conn.target_slot.routine is None:
+            continue  # Skip incomplete connections
+
         source_routine_id = flow._get_routine_id(conn.source_event.routine)
         target_routine_id = flow._get_routine_id(conn.target_slot.routine)
         if source_routine_id == routine_id or target_routine_id == routine_id:

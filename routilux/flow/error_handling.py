@@ -4,6 +4,7 @@ Error handling logic for Flow execution.
 Handles task errors and error handler resolution.
 """
 
+import logging
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
@@ -49,6 +50,19 @@ def handle_task_error(
         error: The exception that occurred.
         flow: Flow object.
     """
+    # Critical fix: Check if task.slot is None to prevent AttributeError
+    if task.slot is None:
+        error_msg = f"Cannot handle task error: task.slot is None. Error: {error}"
+        logging.getLogger(__name__).error(error_msg)
+        # Still update job state if available
+        if task.job_state:
+            from routilux.status import ExecutionStatus
+
+            task.job_state.status = ExecutionStatus.FAILED
+            task.job_state.record_execution("unknown", "error", {"error": error_msg})
+        _stop_execution(task.job_state, flow)
+        return
+
     routine = task.slot.routine
 
     # Find routine_id in flow (this is the correct routine_id, not routine._id)
@@ -88,7 +102,9 @@ def handle_task_error(
                         max_retries=max_retries,
                         job_state=task.job_state,  # Preserve JobState in retry task
                     )
-                    flow._enqueue_task(retry_task)
+                    # Route to JobExecutor if available, otherwise use flow._enqueue_task()
+                    if not _enqueue_to_executor(retry_task, task.job_state):
+                        flow._enqueue_task(retry_task)
                     return
             # Max retries reached or non-retryable exception, fall through to default
             # Record error in execution history before marking as failed
@@ -120,4 +136,51 @@ def handle_task_error(
                 routine_id, {"status": "failed", "error": str(error)}
             )
 
-    flow._running = False
+    _stop_execution(task.job_state, flow)
+
+
+def _enqueue_to_executor(task: "SlotActivationTask", job_state) -> bool:
+    """Enqueue task to JobExecutor if available.
+
+    Args:
+        task: SlotActivationTask to enqueue.
+        job_state: JobState for finding the executor.
+
+    Returns:
+        True if enqueued to executor, False otherwise.
+    """
+    if job_state is None:
+        return False
+
+    from routilux.job_manager import get_job_manager
+
+    job_manager = get_job_manager()
+    executor = job_manager.get_job(job_state.job_id)
+
+    if executor is not None:
+        executor.enqueue_task(task)
+        return True
+
+    return False
+
+
+def _stop_execution(job_state, flow: "Flow") -> None:
+    """Stop execution - either JobExecutor or Flow.
+
+    Args:
+        job_state: JobState for finding the executor.
+        flow: Flow object (fallback).
+    """
+    if job_state is not None:
+        from routilux.job_manager import get_job_manager
+
+        job_manager = get_job_manager()
+        executor = job_manager.get_job(job_state.job_id)
+
+        if executor is not None:
+            executor._running = False
+            return
+
+    # Fallback: stop flow (legacy mode)
+    if hasattr(flow, "_running"):
+        flow._running = False

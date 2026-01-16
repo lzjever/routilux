@@ -33,6 +33,7 @@ routilux/
 │   │   ├── execution.py   # Sequential/concurrent execution
 │   │   ├── event_loop.py  # Event loop and task queue
 │   │   ├── state_management.py  # Pause/resume/cancel
+│   │   ├── completion.py  # Event loop completion utilities
 │   │   ├── task.py        # TaskPriority, SlotActivationTask
 │   │   ├── builder.py     # FlowBuilder for fluent API
 │   │   ├── dependency.py  # Dependency graph building
@@ -45,14 +46,17 @@ routilux/
 │   ├── error_handler.py   # Error handling strategies
 │   ├── job_state.py       # Execution state tracking
 │   ├── execution_tracker.py # Performance metrics
+│   ├── status.py          # ExecutionStatus and RoutineStatus enums
+│   ├── output_handler.py  # OutputHandler utilities (Queue, Callback, Null)
 │   ├── analysis/          # Workflow analysis tools
 │   ├── api/               # FastAPI server (monitoring/debugging)
 │   ├── dsl/               # YAML/JSON DSL loader
 │   ├── monitoring/        # Debug/breakpoint system
 │   └── testing/           # Testing utilities
 ├── tests/                 # Core test suite (45+ test files)
-├── examples/              # Usage examples (12 demos)
+├── examples/              # Usage examples (14 demos)
 ├── docs/                  # Sphinx documentation
+├── scripts/               # Utility scripts (release notes, setup)
 └── pyproject.toml         # Project configuration
 ```
 
@@ -71,6 +75,10 @@ make install               # Install package after setup-venv
 
 **Note**: This project uses [uv](https://github.com/astral-sh/uv) for fast dependency management. All Makefile commands automatically use `uv` if available, otherwise fall back to `pip`.
 
+**Dependency groups vs extras**:
+- **Dependency groups** (`dev`, `docs`): Development dependencies not published to PyPI. Use with `uv sync --group docs`
+- **Optional dependencies** (`api`, `dev`): Published to PyPI, installable via `pip install routilux[api]`
+
 ### Testing
 
 ```bash
@@ -85,8 +93,10 @@ pytest tests/ -v -m integration  # Run integration tests only
 pytest tests/ -k "test_concurrent"  # Run tests matching pattern
 ```
 
-**Test markers**: `unit`, `integration`, `slow`, `persistence`, `resume`
+**Test markers**: `unit`, `integration`, `slow`, `persistence`, `resume`, `asyncio`, `api`, `websocket`, `debug`
 - Integration tests are excluded by default
+- Default timeout: 120 seconds
+- Coverage requirement: 60% minimum
 - Tests use pytest framework - see `tests/README.md` for details
 
 ### Code Quality
@@ -96,6 +106,9 @@ make lint                  # Run ruff linting
 make format                # Format code with ruff
 make format-check          # Check formatting without modifying
 make check                 # Run all checks (lint + format-check + test)
+make type-check            # Run mypy type checking
+make pre-commit-install    # Install pre-commit hooks
+make pre-commit-run        # Run pre-commit hooks manually
 ```
 
 **Ruff configuration**:
@@ -124,6 +137,7 @@ cd docs && make html       # Direct sphinx build
 ```bash
 make clean                 # Remove build artifacts
 make clean-docs            # Clean documentation build
+make clean-all             # Clean all build artifacts and cache files
 ```
 
 ## Critical Architectural Constraints
@@ -332,10 +346,14 @@ uvicorn routilux.api.main:app --host 0.0.0.0 --port 8000
 **Core monitoring system** (in `routilux/monitoring/`):
 - `monitor_collector.py` - Event/data collection from running flows
 - `breakpoint_manager.py` - Breakpoint condition evaluation
+- `breakpoint_condition.py` - Condition evaluation for breakpoints
 - `debug_session.py` - Interactive debugging state management
 - `hooks.py` - Execution hooks for pre/post slot processing
 - `event_manager.py` - Event streaming and management
-- `websocket_manager.py` - WebSocket connection management
+- `storage.py` - Debug session persistence
+- Plus: `MonitoringRegistry`, `ExecutionMetrics`, `RoutineMetrics`, `ErrorRecord`
+
+**Auto-enable monitoring**: Set environment variable `ROUTILUX_ENABLE_MONITORING=true`
 
 **See `examples/run_debugger_server.py` for a complete debugging setup.**
 
@@ -362,10 +380,11 @@ analysis_result = analyze_workflow(flow)
 ```
 
 **Analysis components** (in `routilux/analysis/`):
-- `WorkflowAnalyzer` - Analyzes flow structure, dependencies, and patterns
-- `WorkflowD2Formatter` - Exports to D2 diagram format
-- `RoutineAnalyzer` - Analyzes individual routine structure
-- `RoutineMarkdownFormatter` - Documents routines as markdown
+- `analyzers/workflow.py` - `WorkflowAnalyzer` for flow structure, dependencies, and patterns
+- `analyzers/routine.py` - `RoutineAnalyzer` for individual routine structure
+- `exporters/workflow_d2.py` - `WorkflowD2Formatter` exports to D2 diagram format
+- `exporters/routine_markdown.py` - `RoutineMarkdownFormatter` documents routines as markdown
+- `exporters/base.py` - `BaseFormatter` for custom exporters
 
 ### Testing Utilities
 
@@ -394,8 +413,33 @@ assert events[0].name == "output"
 3. **Accessing flow.job_state**: This field was removed in v0.9.0
 4. **Sharing state between executions**: Each execute() is independent, use aggregation patterns
 5. **Non-serializable data**: All data must be JSON-serializable for persistence
-6. **Retry strategy with broad exceptions**: RETRY only works for specific exception types
+6. **Retry strategy with broad exceptions**: RETRY only works for specific exception types listed in `retryable_exceptions`
 7. **Slot merge in concurrent mode**: Slot merging is not atomic in concurrent mode
+
+## Execution Context Pattern
+
+The recommended way to access execution context is through the `ExecutionContext` NamedTuple:
+
+```python
+from routilux.routine import ExecutionContext
+
+# In your routine handler
+ctx: ExecutionContext = self.get_execution_context()
+# ctx.flow -> Flow instance
+# ctx.job_state -> JobState instance
+# ctx.routine_id -> str (routine identifier)
+
+# Thread-safe access via ContextVar
+# Routilux uses contextvars for concurrent execution safety
+```
+
+## Status Values
+
+**ExecutionStatus** (JobState): `PENDING`, `RUNNING`, `PAUSED`, `COMPLETED`, `FAILED`, `CANCELLED`
+
+**RoutineStatus** (individual routines): `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `ERROR_CONTINUED`, `SKIPPED`
+
+Note: `ERROR_CONTINUED` is set when CONTINUE error strategy is used and an error occurs.
 
 ## Dependencies
 
@@ -411,6 +455,7 @@ assert events[0].name == "output"
 ### Python Version Support
 - **Supported**: Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Tested on**: All versions via CI/CD
+- **Version range**: `>=3.8,<3.15` (excludes 3.15+)
 
 ## Related Projects
 
@@ -429,17 +474,31 @@ All part of the Agentsmith open-source ecosystem.
 - Documentation: `/home/percy/works/mygithub/routilux/docs/`
 - Playground: `/home/percy/works/mygithub/routilux/playground/` (experimental features)
 
+## CI/CD
+
+The project uses GitHub Actions with workflows in `.github/workflows/`:
+
+- **ci.yml**: Runs tests on Python 3.8-3.14, linting, format checking, and coverage upload
+- **release.yml**: Handles PyPI releases with version verification and artifact generation
+
+Coverage is uploaded to Codecov from Python 3.14 tests only.
+
 ## Examples Directory
 
-The `examples/` directory contains 12+ demos covering:
+The `examples/` directory contains 14 demos covering:
 - `basic_example.py` - Simple workflow
+- `complex_routine_demo.py` - Complex routine patterns
 - `data_processing.py` - Multi-stage pipeline
 - `concurrent_flow_demo.py` - Parallel execution
 - `error_handling_example.py` - Error strategies
-- `state_management_example.py` - State tracking
+- `job_state_management.py` - Job state operations
 - `llm_agent_complex_demo.py` - Complex agent orchestration
+- `retry_with_router_demo.py` - Retry with routing patterns
+- `state_management_example.py` - State tracking
 - `aggregator_demo.py` - Fan-in/fan-out patterns
 - `debugger_test_app.py` - Debugging system usage
 - `run_debugger_server.py` - Start monitoring server
+- `register_test_flows.py` - Test flow registration
+- `overseer_demo_app.py` - Overseer API demo
 
 Run examples with: `python examples/<name>.py`

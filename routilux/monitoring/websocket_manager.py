@@ -159,6 +159,8 @@ class WebSocketManager:
             job_id: Job identifier.
             websocket: WebSocket connection.
         """
+        task_to_cancel = None
+
         async with self._lock:
             if job_id in self._connections:
                 # Find and remove the connection
@@ -169,16 +171,36 @@ class WebSocketManager:
                         break
 
                 if to_remove:
-                    await to_remove.send_connection_status("disconnected")
+                    # Fix: Wrap in try-finally to ensure WebSocket is closed
+                    try:
+                        await to_remove.send_connection_status("disconnected")
+                    except Exception:
+                        # Ignore send errors, connection might be dead
+                        pass
+                    finally:
+                        # Ensure WebSocket is closed
+                        try:
+                            await to_remove.websocket.close()
+                        except Exception:
+                            # Already closed or invalid
+                            pass
                     self._connections[job_id].discard(to_remove)
 
                 # Clean up if no more connections
                 if not self._connections[job_id]:
                     del self._connections[job_id]
-                    # Cancel heartbeat task
+                    # Fix: Cancel and properly await heartbeat task
                     if job_id in self._heartbeat_tasks:
-                        self._heartbeat_tasks[job_id].cancel()
-                        del self._heartbeat_tasks[job_id]
+                        task_to_cancel = self._heartbeat_tasks.pop(job_id)
+
+        # Fix: Await cancelled task outside of lock to prevent deadlock
+        if task_to_cancel is not None:
+            task_to_cancel.cancel()
+            try:
+                await task_to_cancel
+            except asyncio.CancelledError:
+                # Expected - task was cancelled
+                pass
 
     async def broadcast(self, job_id: str, event_type: str, message: Dict) -> None:
         """Broadcast message to all subscribed connections for a job.

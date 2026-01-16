@@ -31,6 +31,10 @@ from routilux.routine import ExecutionContext, Routine
 from routilux.slot import Slot
 from routilux.status import ExecutionStatus, RoutineStatus
 
+# Import job management
+from routilux.job_executor import JobExecutor
+from routilux.job_manager import GlobalJobManager, get_job_manager, reset_job_manager
+
 # Import testing utilities
 from routilux.testing import RoutineTester
 
@@ -48,6 +52,11 @@ __all__ = [
     "ExecutionTracker",
     "ErrorHandler",
     "ErrorStrategy",
+    # Job management
+    "GlobalJobManager",
+    "JobExecutor",
+    "get_job_manager",
+    "reset_job_manager",
     # Status enums
     "ExecutionStatus",
     "RoutineStatus",

@@ -2,6 +2,7 @@
 Job management API routes.
 """
 
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -11,6 +12,9 @@ from routilux.api.models.job import JobListResponse, JobResponse, JobStartReques
 from routilux.job_state import JobState
 from routilux.monitoring.registry import MonitoringRegistry
 from routilux.monitoring.storage import flow_store, job_store
+from routilux.status import ExecutionStatus
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -32,7 +36,11 @@ def _job_to_response(job_state: JobState) -> JobResponse:
 
 @router.post("/jobs", response_model=JobResponse, status_code=201)
 async def start_job(request: JobStartRequest):
-    """Start a new job from a flow."""
+    """Start a new job from a flow.
+    
+    This endpoint immediately returns a job_id and executes the flow asynchronously
+    in the background. Use the job status endpoint to check execution progress.
+    """
     # Get flow
     flow = flow_store.get(request.flow_id)
     if not flow:
@@ -41,20 +49,32 @@ async def start_job(request: JobStartRequest):
     # Enable monitoring if not already enabled
     MonitoringRegistry.enable()
 
-    # Execute flow
+    # Create job state immediately (before execution)
+    job_state = JobState(flow.flow_id)
+    
+    # Store job immediately so it can be queried
+    job_store.add(job_state)
+    
+    # Start flow execution asynchronously using the new start() method
+    # This returns immediately without blocking
     try:
-        job_state = flow.execute(
+        started_job_state = flow.start(
             entry_routine_id=request.entry_routine_id,
             entry_params=request.entry_params,
             timeout=request.timeout,
+            job_state=job_state,  # Use our pre-created job_state
         )
-
-        # Store job
-        job_store.add(job_state)
-
-        return _job_to_response(job_state)
+        
+        # Update stored job with the started state
+        job_store.add(started_job_state)
+        
+        return _job_to_response(started_job_state)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to start job: {str(e)}")
+        # If start() fails, mark job as failed
+        job_state.status = ExecutionStatus.FAILED
+        job_state.shared_data["error"] = str(e)
+        job_store.add(job_state)
+        raise HTTPException(status_code=400, detail=f"Failed to start job: {str(e)}") from e
 
 
 @router.get(
@@ -134,7 +154,7 @@ async def pause_job(job_id: str):
         flow.pause(job_state, reason="Paused via API")
         return {"status": "paused", "job_id": job_id}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to pause job: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to pause job: {str(e)}") from e
 
 
 @router.post("/jobs/{job_id}/resume", status_code=200)
@@ -153,7 +173,7 @@ async def resume_job(job_id: str):
         job_store.add(job_state)  # Update stored job
         return {"status": "resumed", "job_id": job_id}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to resume job: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to resume job: {str(e)}") from e
 
 
 @router.post("/jobs/{job_id}/cancel", status_code=200)
@@ -171,7 +191,7 @@ async def cancel_job(job_id: str):
         flow.cancel(job_state, reason="Cancelled via API")
         return {"status": "cancelled", "job_id": job_id}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to cancel job: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to cancel job: {str(e)}") from e
 
 
 @router.get("/jobs/{job_id}/status")

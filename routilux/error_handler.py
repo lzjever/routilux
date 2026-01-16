@@ -169,11 +169,15 @@ class ErrorHandler(Serializable):
                 ... )
         """
         super().__init__()
-        # Support both string and enum
+        # Critical fix: Validate strategy type to prevent type confusion bugs
         if isinstance(strategy, str):
             self.strategy: ErrorStrategy = ErrorStrategy(strategy)
-        else:
+        elif isinstance(strategy, ErrorStrategy):
             self.strategy: ErrorStrategy = strategy
+        else:
+            raise TypeError(
+                f"strategy must be str or ErrorStrategy, got {type(strategy).__name__}"
+            )
         self.max_retries: int = max_retries
         self.retry_delay: float = retry_delay
         self.retry_backoff: float = retry_backoff

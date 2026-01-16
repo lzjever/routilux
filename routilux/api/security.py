@@ -167,7 +167,7 @@ def safe_evaluate(
     try:
         tree = ast.parse(expression, mode="eval")
     except SyntaxError as e:
-        raise ValueError(f"Invalid syntax: {e}")
+        raise ValueError(f"Invalid syntax: {e}") from e
 
     # Check AST safety
     check_ast_safety(tree)
@@ -187,11 +187,11 @@ def safe_evaluate(
 
     except TimeoutError:
         signal.alarm(0)
-        raise TimeoutError("Expression evaluation timed out")
+        raise TimeoutError("Expression evaluation timed out") from None
     except SecurityError:
         raise
     except Exception as e:
-        raise Exception(f"Evaluation error: {str(e)}")
+        raise Exception(f"Evaluation error: {str(e)}") from e
     finally:
         # Restore old signal handler
         if old_handler is not None:

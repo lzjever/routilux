@@ -2,6 +2,7 @@
 Monitoring API routes.
 """
 
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -52,13 +53,16 @@ async def get_job_metrics(job_id: str):
         for rid, rm in metrics.routine_metrics.items()
     }
 
+    # Convert ErrorRecord objects to dictionaries
     errors = [
         {
             "error_id": err.error_id,
+            "job_id": err.job_id,
             "routine_id": err.routine_id,
             "timestamp": err.timestamp.isoformat(),
             "error_type": err.error_type,
             "error_message": err.error_message,
+            "traceback": err.traceback,
         }
         for err in metrics.errors
     ]
@@ -66,7 +70,7 @@ async def get_job_metrics(job_id: str):
     return ExecutionMetricsResponse(
         job_id=metrics.job_id,
         flow_id=metrics.flow_id,
-        start_time=metrics.start_time,
+        start_time=metrics.start_time if metrics.start_time else datetime.now(),
         end_time=metrics.end_time,
         duration=metrics.duration,
         routine_metrics=routine_metrics,

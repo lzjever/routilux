@@ -139,7 +139,7 @@ from routilux.api.middleware.rate_limit import setup_rate_limiting  # noqa: E402
 setup_rate_limiting(app)
 
 # Register exception handlers
-from fastapi import status  # noqa: E402
+from starlette.exceptions import HTTPException  # noqa: E402
 from fastapi.exceptions import RequestValidationError  # noqa: E402
 
 from routilux.api.middleware.error_handler import (  # noqa: E402
@@ -149,7 +149,7 @@ from routilux.api.middleware.error_handler import (  # noqa: E402
 )
 
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
-app.add_exception_handler(status.HTTPException, http_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
 # Include routers

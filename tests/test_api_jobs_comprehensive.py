@@ -20,9 +20,15 @@ try:
     from routilux.status import ExecutionStatus
 
     API_AVAILABLE = True
-except (ImportError, RuntimeError):
+except (ImportError, RuntimeError) as e:
     API_AVAILABLE = False
-    pytestmark = pytest.mark.skip("API dependencies not available (httpx required)")
+    pytest.skip(
+        f"API dependencies not available: {e}. Install with: pip install routilux[api]",
+        allow_module_level=True,
+    )
+
+# Import Mock for testing (always available in Python 3.3+)
+from unittest.mock import Mock
 
 
 @pytest.fixture
@@ -74,21 +80,27 @@ class TestAPIJobExecutionInterface:
         # Verify response structure
         assert response.status_code == 201
         data = response.json()
-        
+
         # Required fields per JobResponse interface
         assert "job_id" in data, "Response must contain job_id"
         assert "flow_id" in data, "Response must contain flow_id"
         assert "status" in data, "Response must contain status"
         assert "created_at" in data, "Response must contain created_at"
-        
+
         # Verify types
         assert isinstance(data["job_id"], str)
         assert isinstance(data["flow_id"], str)
         assert isinstance(data["status"], str)
-        
+
         # Verify status is valid
-        assert data["status"] in ["pending", "running", "completed", "failed", "paused", "cancelled"], \
-            f"Invalid status: {data['status']}"
+        assert data["status"] in [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "paused",
+            "cancelled",
+        ], f"Invalid status: {data['status']}"
 
     def test_api_start_job_creates_job_in_runtime(self, api_client, test_flow):
         """Test: Starting job via API should register job in Runtime."""
@@ -107,6 +119,7 @@ class TestAPIJobExecutionInterface:
         # Verify job is in Runtime's active jobs
         # Get Runtime instance (from module-level attribute)
         from routilux.api.routes.jobs import start_job
+
         if hasattr(start_job, "_runtime"):
             runtime = start_job._runtime
             runtime_job = runtime.get_job(job_id)
@@ -132,6 +145,7 @@ class TestAPIJobExecutionInterface:
 
         # Verify entry_params are stored in job_state
         from routilux.api.routes.jobs import start_job
+
         if hasattr(start_job, "_runtime"):
             runtime = start_job._runtime
             runtime_job = runtime.get_job(job_id)
@@ -150,8 +164,9 @@ class TestAPIJobExecutionInterface:
         )
 
         # Should return error (404 or 400)
-        assert response.status_code in [400, 404], \
+        assert response.status_code in [400, 404], (
             f"Expected 400 or 404 for invalid flow_id, got {response.status_code}"
+        )
 
     def test_api_start_job_with_invalid_entry_routine(self, api_client, test_flow):
         """Test: API should return error for invalid entry_routine_id."""
@@ -164,16 +179,17 @@ class TestAPIJobExecutionInterface:
         )
 
         # Should return error (400 or 404)
-        assert response.status_code in [400, 404], \
+        assert response.status_code in [400, 404], (
             f"Expected 400 or 404 for invalid entry_routine_id, got {response.status_code}"
+        )
 
     def test_api_start_job_handles_runtime_errors(self, api_client, test_flow):
         """Test: API should handle Runtime.exec() errors gracefully."""
         # Mock Runtime.exec to raise exception
         from routilux.api.routes.jobs import start_job
-        
+
         original_runtime = getattr(start_job, "_runtime", None)
-        
+
         # Create a mock runtime that raises error
         mock_runtime = Mock(spec=Runtime)
         mock_runtime.exec = Mock(side_effect=RuntimeError("Runtime execution error"))
@@ -189,9 +205,8 @@ class TestAPIJobExecutionInterface:
             )
 
             # Should return error status
-            assert response.status_code == 400, \
-                "API should return 400 when Runtime.exec() fails"
-            
+            assert response.status_code == 400, "API should return 400 when Runtime.exec() fails"
+
             # Job should be marked as failed
             data = response.json()
             # Response might be error detail, not job response
@@ -221,7 +236,7 @@ class TestAPIJobStateManagement:
         # Get job
         get_response = api_client.get(f"/api/jobs/{job_id}")
         assert get_response.status_code == 200
-        
+
         data = get_response.json()
         assert "job_id" in data
         assert data["job_id"] == job_id
@@ -247,7 +262,7 @@ class TestAPIJobStateManagement:
         # Get job state
         state_response = api_client.get(f"/api/jobs/{job_id}/state")
         assert state_response.status_code == 200
-        
+
         state_data = state_response.json()
         # Should be a dictionary (serialized JobState)
         assert isinstance(state_data, dict)
@@ -273,13 +288,13 @@ class TestAPIJobStateManagement:
         # List jobs
         list_response = api_client.get("/api/jobs?limit=2&offset=0")
         assert list_response.status_code == 200
-        
+
         data = list_response.json()
         assert "jobs" in data
         assert "total" in data
         assert "limit" in data
         assert "offset" in data
-        
+
         # Verify pagination fields
         assert isinstance(data["jobs"], list)
         assert isinstance(data["total"], int)
@@ -301,12 +316,11 @@ class TestAPIJobStateManagement:
         # List with status filter
         list_response = api_client.get("/api/jobs?status=running")
         assert list_response.status_code == 200
-        
+
         data = list_response.json()
         # All returned jobs should have status="running"
         for job in data["jobs"]:
-            assert job["status"] == "running", \
-                f"Filtered job has wrong status: {job['status']}"
+            assert job["status"] == "running", f"Filtered job has wrong status: {job['status']}"
 
     def test_api_list_jobs_filters_by_flow_id(self, api_client, test_flow):
         """Test: GET /api/jobs?flow_id=... should filter correctly."""
@@ -323,12 +337,13 @@ class TestAPIJobStateManagement:
         # List with flow_id filter
         list_response = api_client.get(f"/api/jobs?flow_id={test_flow.flow_id}")
         assert list_response.status_code == 200
-        
+
         data = list_response.json()
         # All returned jobs should have matching flow_id
         for job in data["jobs"]:
-            assert job["flow_id"] == test_flow.flow_id, \
+            assert job["flow_id"] == test_flow.flow_id, (
                 f"Filtered job has wrong flow_id: {job['flow_id']}"
+            )
 
 
 class TestAPIJobExecutionFlow:
@@ -362,12 +377,13 @@ class TestAPIJobExecutionFlow:
 
         # 4. Wait for completion and verify final status
         time.sleep(1.0)  # Wait for execution
-        
+
         final_status_response = api_client.get(f"/api/jobs/{job_id}/status")
         assert final_status_response.status_code == 200
         final_status = final_status_response.json()["status"]
-        assert final_status in ["completed", "failed", "running"], \
+        assert final_status in ["completed", "failed", "running"], (
             f"Unexpected final status: {final_status}"
+        )
 
     def test_api_multiple_concurrent_jobs(self, api_client, test_flow):
         """Test: API should handle multiple concurrent job starts."""
@@ -386,8 +402,9 @@ class TestAPIJobExecutionFlow:
         # All should succeed
         job_ids = []
         for response in responses:
-            assert response.status_code == 201, \
+            assert response.status_code == 201, (
                 f"Concurrent job start failed with status {response.status_code}"
+            )
             job_ids.append(response.json()["job_id"])
 
         # All job IDs should be unique
@@ -413,16 +430,18 @@ class TestAPIJobExecutionFlow:
 
         # Check initial status
         initial_status = api_client.get(f"/api/jobs/{job_id}/status").json()["status"]
-        assert initial_status in ["pending", "running"], \
+        assert initial_status in ["pending", "running"], (
             f"Initial status should be pending or running, got {initial_status}"
+        )
 
         # Wait and check again
         time.sleep(1.0)
         final_status = api_client.get(f"/api/jobs/{job_id}/status").json()["status"]
-        
+
         # Status should have changed or be in final state
-        assert final_status in ["completed", "failed", "running"], \
+        assert final_status in ["completed", "failed", "running"], (
             f"Final status should be completed/failed/running, got {final_status}"
+        )
 
 
 class TestAPIJobErrorHandling:
@@ -488,9 +507,9 @@ class TestAPIJobErrorHandling:
         # Get state
         state_response = api_client.get(f"/api/jobs/{job_id}/state")
         assert state_response.status_code == 200
-        
+
         state_data = state_response.json()
-        
+
         # Verify all critical fields are present
         required_fields = ["job_id", "flow_id", "status", "created_at"]
         for field in required_fields:

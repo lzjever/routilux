@@ -16,7 +16,7 @@ class JobStartRequest(BaseModel):
     entry_params: Optional[Dict[str, Any]] = None
     timeout: Optional[float] = None
 
-    @field_validator('timeout')
+    @field_validator("timeout")
     @classmethod
     def validate_timeout(cls, v: Optional[float]) -> Optional[float]:
         """Validate timeout parameter.
@@ -45,9 +45,9 @@ class JobResponse(BaseModel):
     job_id: str
     flow_id: str
     status: str
-    created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    created_at: int
+    started_at: Optional[int] = None
+    completed_at: Optional[int] = None
     error: Optional[str] = None
 
 

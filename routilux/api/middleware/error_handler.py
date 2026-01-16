@@ -25,8 +25,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             error_code="VALIDATION_ERROR",
             message="Request validation failed",
             details={"errors": exc.errors()},
-            timestamp=datetime.now(),
-        ).dict(),
+            timestamp=int(datetime.now().timestamp()),
+        ).model_dump(),
     )
 
 
@@ -49,8 +49,8 @@ async def http_exception_handler(request: Request, exc):
             error_code=error_code.upper(),
             message=message,
             details=details,
-            timestamp=datetime.now(),
-        ).dict(),
+            timestamp=int(datetime.now().timestamp()),
+        ).model_dump(),
     )
 
 
@@ -65,6 +65,6 @@ async def general_exception_handler(request: Request, exc: Exception):
             error_code="INTERNAL_SERVER_ERROR",
             message="An internal server error occurred",
             details=None,
-            timestamp=datetime.now(),
-        ).dict(),
+            timestamp=int(datetime.now().timestamp()),
+        ).model_dump(),
     )

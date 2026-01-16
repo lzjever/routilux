@@ -44,7 +44,7 @@ def _job_to_response(job_state: JobState) -> JobResponse:
         status=job_state.status.value
         if hasattr(job_state.status, "value")
         else str(job_state.status),
-        created_at=getattr(job_state, "created_at", datetime.now()),
+        created_at=int(datetime.now().timestamp()),
         started_at=getattr(job_state, "started_at", None),
         completed_at=getattr(job_state, "completed_at", None),
         error=error,

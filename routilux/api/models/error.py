@@ -15,5 +15,5 @@ class ErrorResponse(BaseModel):
     error_code: str
     message: str
     details: Optional[Dict[str, Any]] = None
-    timestamp: datetime = datetime.now()
+    timestamp: int = int(datetime.now().timestamp())
     request_id: Optional[str] = None

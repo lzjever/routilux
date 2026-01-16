@@ -298,30 +298,20 @@ class Routine(Serializable):
 
         event = self._events[event_name]
 
-        # Get runtime and job_state from context if not provided
-        # Priority: context variable > instance attribute > raise error
+        # Get runtime from instance attribute if not provided
+        # Runtime sets this attribute before executing the routine
         if runtime is None:
-            # First check context variable (set by Runtime.execute_routine)
-            from routilux.runtime import _current_runtime
-            runtime_ctx = _current_runtime.get(None)
-            if runtime_ctx is not None:
-                runtime = runtime_ctx
-            else:
-                # Fallback to instance attribute (for backward compatibility)
-                runtime = getattr(self, "_current_runtime", None)
+            runtime = getattr(self, "_current_runtime", None)
+            if runtime is None:
+                raise RuntimeError(
+                    "Runtime is required for emit(). "
+                    "Provide runtime parameter or ensure routine is executing within Runtime context."
+                )
 
-        if runtime is None:
-            raise RuntimeError(
-                "Runtime is required for emit(). "
-                "Provide runtime parameter or ensure routine is executing within Runtime context."
-            )
-
-        if job_state is None:
-            job_state = _current_job_state.get(None)
         if job_state is None:
             raise RuntimeError(
                 "JobState is required for emit(). "
-                "Provide job_state parameter or ensure routine is executing within Runtime context."
+                "Provide job_state parameter."
             )
 
         # Emit event through Runtime
@@ -786,6 +776,15 @@ class Routine(Serializable):
         """
         return self._slots
 
+    @property
+    def events(self) -> dict[str, Event]:
+        """Get all events for this routine.
+
+        Returns:
+            Dictionary of event_name -> Event object.
+        """
+        return self._events
+
     def get_state(self, job_state: JobState, key: str = None, default: Any = None) -> Any:
         """Get routine-specific state from job_state.
 
@@ -818,6 +817,107 @@ class Routine(Serializable):
         if key is None:
             return state
         return state.get(key, default)
+
+    def get_activation_policy_info(self) -> dict[str, Any]:
+        """Get activation policy type and configuration information.
+
+        Returns:
+            Dictionary with policy information:
+            - type: Policy type name (e.g., "immediate", "batch_size", "time_interval")
+            - config: Policy configuration parameters
+            - description: Policy description
+
+        Examples:
+            >>> policy_info = routine.get_activation_policy_info()
+            >>> print(policy_info["type"])  # "immediate", "batch_size", etc.
+        """
+        if self._activation_policy is None:
+            return {
+                "type": "none",
+                "config": {},
+                "description": "No activation policy set",
+            }
+
+        # Try to get policy metadata from function attributes
+        policy_type = getattr(self._activation_policy, "_policy_type", None)
+        policy_config = getattr(self._activation_policy, "_policy_config", None)
+        policy_description = getattr(self._activation_policy, "_policy_description", None)
+
+        if policy_type:
+            # Policy has metadata attached
+            return {
+                "type": policy_type,
+                "config": policy_config or {},
+                "description": policy_description or f"Activation policy: {policy_type}",
+            }
+
+        # Fallback: try to infer from function name
+        policy_name = getattr(self._activation_policy, "__name__", "unknown").lower()
+
+        if "immediate" in policy_name:
+            return {
+                "type": "immediate",
+                "config": {},
+                "description": "Activate immediately when any slot receives data",
+            }
+        elif "batch_size" in policy_name:
+            # Try to extract min_batch_size from closure
+            closure_vars = getattr(self._activation_policy, "__closure__", None)
+            if closure_vars:
+                for cell in closure_vars:
+                    if hasattr(cell, "cell_contents"):
+                        val = cell.cell_contents
+                        if isinstance(val, int) and val > 0:
+                            return {
+                                "type": "batch_size",
+                                "config": {"min_batch_size": val},
+                                "description": f"Activate when all slots have at least {val} items",
+                            }
+            return {
+                "type": "batch_size",
+                "config": {},
+                "description": "Activate when all slots have minimum batch size",
+            }
+        elif "time_interval" in policy_name:
+            # Try to extract min_interval_seconds from closure
+            closure_vars = getattr(self._activation_policy, "__closure__", None)
+            if closure_vars:
+                for cell in closure_vars:
+                    if hasattr(cell, "cell_contents"):
+                        val = cell.cell_contents
+                        if isinstance(val, (int, float)) and val > 0:
+                            return {
+                                "type": "time_interval",
+                                "config": {"min_interval_seconds": val},
+                                "description": f"Activate at most once every {val} seconds",
+                            }
+            return {
+                "type": "time_interval",
+                "config": {},
+                "description": "Activate at most once per time interval",
+            }
+        elif "all_slots_ready" in policy_name:
+            return {
+                "type": "all_slots_ready",
+                "config": {},
+                "description": "Activate when all slots have at least 1 data point",
+            }
+        else:
+            # Custom policy
+            return {
+                "type": "custom",
+                "config": {},
+                "description": f"Custom activation policy: {policy_name}",
+            }
+
+    def get_all_config(self) -> dict[str, Any]:
+        """Get all configuration values from _config dictionary.
+
+        Returns:
+            Copy of the _config dictionary.
+        """
+        with self._config_lock:
+            return self._config.copy()
 
     def set_state(self, job_state: JobState, key: str, value: Any) -> None:
         """Set routine-specific state in job_state.

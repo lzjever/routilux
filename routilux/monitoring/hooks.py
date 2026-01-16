@@ -152,6 +152,39 @@ class ExecutionHooks:
             # publish routine_start events via JobEventManager
             collector.record_routine_start(routine_id, job_state.job_id)
 
+        # Publish routine status change event
+        _publish_event_via_manager(
+            job_state.job_id,
+            {
+                "type": "routine_status_change",
+                "job_id": job_state.job_id,
+                "routine_id": routine_id,
+                "status": "running",
+                "is_active": True,
+            },
+        )
+
+        # Publish queue status updates for all slots
+        queue_updates = {}
+        for slot_name, slot in routine.slots.items():
+            try:
+                status = slot.get_queue_status()
+                queue_updates[slot_name] = status
+            except Exception:
+                # Ignore errors in queue status retrieval
+                pass
+
+        if queue_updates:
+            _publish_event_via_manager(
+                job_state.job_id,
+                {
+                    "type": "routine_queue_update",
+                    "job_id": job_state.job_id,
+                    "routine_id": routine_id,
+                    "queues": queue_updates,
+                },
+            )
+
     def on_routine_end(
         self,
         routine: "Routine",
@@ -179,6 +212,39 @@ class ExecutionHooks:
 
         if collector:
             collector.record_routine_end(routine_id, job_state.job_id, status, error)
+
+        # Publish routine status change event
+        _publish_event_via_manager(
+            job_state.job_id,
+            {
+                "type": "routine_status_change",
+                "job_id": job_state.job_id,
+                "routine_id": routine_id,
+                "status": status,
+                "is_active": False,
+            },
+        )
+
+        # Publish queue status updates for all slots
+        queue_updates = {}
+        for slot_name, slot in routine.slots.items():
+            try:
+                status = slot.get_queue_status()
+                queue_updates[slot_name] = status
+            except Exception:
+                # Ignore errors in queue status retrieval
+                pass
+
+        if queue_updates:
+            _publish_event_via_manager(
+                job_state.job_id,
+                {
+                    "type": "routine_queue_update",
+                    "job_id": job_state.job_id,
+                    "routine_id": routine_id,
+                    "queues": queue_updates,
+                },
+            )
 
     def on_slot_call(
         self,
@@ -353,6 +419,23 @@ class ExecutionHooks:
             # Convert data to dict if needed for record_slot_call
             data_dict = data if isinstance(data, dict) else {"data": data}
             collector.record_slot_call(slot.name, routine_id, job_state.job_id, data_dict)
+
+        # Publish queue status update
+        try:
+            status = slot.get_queue_status()
+            _publish_event_via_manager(
+                job_state.job_id,
+                {
+                    "type": "slot_queue_update",
+                    "job_id": job_state.job_id,
+                    "routine_id": routine_id,
+                    "slot_name": slot.name,
+                    "queue_status": status,
+                },
+            )
+        except Exception:
+            # Ignore errors in queue status retrieval
+            pass
 
         # Check breakpoint
         breakpoint_mgr = registry.breakpoint_manager

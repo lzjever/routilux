@@ -3,7 +3,7 @@ Monitoring API routes.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -12,8 +12,13 @@ from routilux.api.models.monitor import (
     ExecutionEventResponse,
     ExecutionMetricsResponse,
     ExecutionTraceResponse,
-    RoutineMetricsResponse,
+    JobMonitoringData,
+    RoutineExecutionStatus,
+    RoutineInfo,
+    RoutineMonitoringData,
+    SlotQueueStatus,
 )
+from routilux.monitoring.monitor_service import get_monitor_service
 from routilux.monitoring.registry import MonitoringRegistry
 from routilux.monitoring.storage import flow_store, job_store
 
@@ -181,3 +186,73 @@ async def get_flow_metrics(flow_id: str):
         "failed_jobs": failed_jobs,
         "job_metrics": job_metrics,
     }
+
+
+@router.get(
+    "/jobs/{job_id}/routines/{routine_id}/queue-status",
+    response_model=List[SlotQueueStatus],
+    dependencies=[RequireAuth],
+)
+async def get_routine_queue_status(job_id: str, routine_id: str):
+    """Get queue status for all slots in a specific routine."""
+    service = get_monitor_service()
+    try:
+        return service.get_routine_queue_status(job_id, routine_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get(
+    "/jobs/{job_id}/queues/status",
+    response_model=Dict[str, List[SlotQueueStatus]],
+    dependencies=[RequireAuth],
+)
+async def get_job_queues_status(job_id: str):
+    """Get queue status for all routines in a job."""
+    service = get_monitor_service()
+    try:
+        return service.get_all_queues_status(job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get(
+    "/flows/{flow_id}/routines/{routine_id}/info",
+    response_model=RoutineInfo,
+    dependencies=[RequireAuth],
+)
+async def get_routine_info(flow_id: str, routine_id: str):
+    """Get routine metadata information (policy, config, slots, events)."""
+    service = get_monitor_service()
+    try:
+        return service.get_routine_info(flow_id, routine_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get(
+    "/jobs/{job_id}/routines/status",
+    response_model=Dict[str, RoutineExecutionStatus],
+    dependencies=[RequireAuth],
+)
+async def get_routines_status(job_id: str):
+    """Get execution status for all routines in a job."""
+    service = get_monitor_service()
+    try:
+        return service.get_all_routines_status(job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get(
+    "/jobs/{job_id}/monitoring",
+    response_model=JobMonitoringData,
+    dependencies=[RequireAuth],
+)
+async def get_job_monitoring_data(job_id: str):
+    """Get complete monitoring data for a job (status + queues + metadata)."""
+    service = get_monitor_service()
+    try:
+        return service.get_job_monitoring_data(job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

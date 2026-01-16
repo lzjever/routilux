@@ -332,10 +332,7 @@ class Flow(Serializable):
 
             from routilux.connection import Connection
 
-            connection = Connection(source_event_obj, target_slot_obj)
-            # HIGH fix: Apply param_mapping if provided (matches API used by builder.py:102)
-            if param_mapping:
-                connection.param_mapping = param_mapping
+            connection = Connection(source_event_obj, target_slot_obj, param_mapping)
             self.connections.append(connection)
 
             key = (source_event_obj, target_slot_obj)

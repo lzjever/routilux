@@ -28,6 +28,7 @@ import time
 from datetime import datetime
 
 from routilux import Flow, Routine
+from routilux.activation_policies import immediate_policy
 from routilux.monitoring.registry import MonitoringRegistry
 
 # ===== Comprehensive Routines =====
@@ -39,23 +40,26 @@ class DataSource(Routine):
     def __init__(self, name="DataSource"):
         super().__init__()
         self.set_config(name=name)
-        self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
+        self.trigger_slot = self.define_slot("trigger")
         self.output_event = self.define_event("output", ["data", "index", "timestamp", "metadata"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self._handle_trigger)
 
-    def _handle_trigger(self, data=None, **kwargs):
-        ctx = self.get_execution_context()
+    def _handle_trigger(self, *slot_data_lists, policy_message, job_state):
+        # Extract data from trigger slot (slot_data_lists[0] is a list of data dicts)
+        trigger_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = trigger_data[0] if trigger_data else {}
+        data = data_dict.get("data") if isinstance(data_dict, dict) else None
+        
         name = self.get_config("name", "DataSource")
 
         # Get counter from JobState
-        if ctx:
-            routine_state = ctx.job_state.get_routine_state(ctx.routine_id) or {}
-            counter = routine_state.get("counter", 0) + 1
-            ctx.job_state.update_routine_state(ctx.routine_id, {"counter": counter})
-        else:
-            counter = 1
+        routine_state = job_state.get_routine_state(self._id) or {}
+        counter = routine_state.get("counter", 0) + 1
+        job_state.update_routine_state(self._id, {"counter": counter})
 
-        output_data = data or kwargs.get("data", f"test_data_{counter}")
-        index = kwargs.get("index", counter)
+        output_data = data or f"test_data_{counter}"
+        index = data_dict.get("index", counter) if isinstance(data_dict, dict) else counter
         timestamp = datetime.now().isoformat()
         metadata = {
             "source": name,
@@ -63,7 +67,7 @@ class DataSource(Routine):
         }
 
         print(f"[{name}] Emitting: {output_data} (#{index}) at {timestamp}")
-        self.emit("output", data=output_data, index=index, timestamp=timestamp, metadata=metadata)
+        self.emit("output", job_state=job_state, data=output_data, index=index, timestamp=timestamp, metadata=metadata)
 
 
 class DataValidator(Routine):
@@ -72,12 +76,19 @@ class DataValidator(Routine):
     def __init__(self, name="Validator"):
         super().__init__()
         self.set_config(name=name)
-        self.input_slot = self.define_slot("input", handler=self.validate)
+        self.input_slot = self.define_slot("input")
         self.valid_event = self.define_event("valid", ["data", "index", "validation_details"])
         self.invalid_event = self.define_event("invalid", ["error", "index", "original_data"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.validate)
 
-    def validate(self, data, index=0, **kwargs):
-        ctx = self.get_execution_context()
+    def validate(self, *slot_data_lists, policy_message, job_state):
+        # Extract data from input slot (slot_data_lists[0] is a list of data dicts)
+        input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = input_data[0] if input_data else {}
+        data = data_dict.get("data") if isinstance(data_dict, dict) else None
+        index = data_dict.get("index", 0) if isinstance(data_dict, dict) else 0
+        
         name = self.get_config("name", "Validator")
 
         print(f"[{name}] Validating: {data}")
@@ -87,14 +98,13 @@ class DataValidator(Routine):
         is_valid = self._validate_data(data)
 
         # Update counts in JobState
-        if ctx:
-            routine_state = ctx.job_state.get_routine_state(ctx.routine_id) or {}
-            if is_valid:
-                valid_count = routine_state.get("valid_count", 0) + 1
-                ctx.job_state.update_routine_state(ctx.routine_id, {"valid_count": valid_count})
-            else:
-                invalid_count = routine_state.get("invalid_count", 0) + 1
-                ctx.job_state.update_routine_state(ctx.routine_id, {"invalid_count": invalid_count})
+        routine_state = job_state.get_routine_state(self._id) or {}
+        if is_valid:
+            valid_count = routine_state.get("valid_count", 0) + 1
+            job_state.update_routine_state(self._id, {"valid_count": valid_count})
+        else:
+            invalid_count = routine_state.get("invalid_count", 0) + 1
+            job_state.update_routine_state(self._id, {"invalid_count": invalid_count})
 
         validation_details = {
             "timestamp": datetime.now().isoformat(),
@@ -103,21 +113,15 @@ class DataValidator(Routine):
         }
 
         if is_valid:
-            if ctx:
-                routine_state = ctx.job_state.get_routine_state(ctx.routine_id) or {}
-                valid_count = routine_state.get("valid_count", 0)
-            else:
-                valid_count = 0
+            routine_state = job_state.get_routine_state(self._id) or {}
+            valid_count = routine_state.get("valid_count", 0)
             print(f"[{name}] ✓ Valid (total valid: {valid_count})")
-            self.emit("valid", data=data, index=index, validation_details=validation_details)
+            self.emit("valid", job_state=job_state, data=data, index=index, validation_details=validation_details)
         else:
-            if ctx:
-                routine_state = ctx.job_state.get_routine_state(ctx.routine_id) or {}
-                invalid_count = routine_state.get("invalid_count", 0)
-            else:
-                invalid_count = 0
+            routine_state = job_state.get_routine_state(self._id) or {}
+            invalid_count = routine_state.get("invalid_count", 0)
             print(f"[{name}] ✗ Invalid (total invalid: {invalid_count})")
-            self.emit("invalid", error="Validation failed", index=index, original_data=data)
+            self.emit("invalid", job_state=job_state, error="Validation failed", index=index, original_data=data)
 
     def _validate_data(self, data):
         """Custom validation logic"""
@@ -134,11 +138,18 @@ class DataTransformer(Routine):
     def __init__(self, name="Transformer", transformation="uppercase"):
         super().__init__()
         self.set_config(name=name, transformation=transformation)
-        self.input_slot = self.define_slot("input", handler=self.transform)
+        self.input_slot = self.define_slot("input")
         self.output_event = self.define_event("output", ["result", "index", "transformation_type"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.transform)
 
-    def transform(self, data, index=0, **kwargs):
-        ctx = self.get_execution_context()
+    def transform(self, *slot_data_lists, policy_message, job_state):
+        # Extract data from input slot
+        input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = input_data[0] if input_data else {}
+        data = data_dict.get("data") if isinstance(data_dict, dict) else None
+        index = data_dict.get("index", 0) if isinstance(data_dict, dict) else 0
+        
         name = self.get_config("name", "Transformer")
         transformation = self.get_config("transformation", "uppercase")
 
@@ -158,13 +169,12 @@ class DataTransformer(Routine):
             result = str(data)
 
         # Update processed count in JobState
-        if ctx:
-            routine_state = ctx.job_state.get_routine_state(ctx.routine_id) or {}
-            processed_count = routine_state.get("processed_count", 0) + 1
-            ctx.job_state.update_routine_state(ctx.routine_id, {"processed_count": processed_count})
+        routine_state = job_state.get_routine_state(self._id) or {}
+        processed_count = routine_state.get("processed_count", 0) + 1
+        job_state.update_routine_state(self._id, {"processed_count": processed_count})
 
         print(f"[{name}] → Result: {result}")
-        self.emit("output", result=result, index=index, transformation_type=transformation)
+        self.emit("output", job_state=job_state, result=result, index=index, transformation_type=transformation)
 
 
 class DataMultiplier(Routine):
@@ -173,17 +183,25 @@ class DataMultiplier(Routine):
     def __init__(self, name="Multiplier"):
         super().__init__()
         self.set_config(name=name)
-        self.input_slot = self.define_slot("input", handler=self.multiply)
+        self.input_slot = self.define_slot("input")
         self.output_event = self.define_event("output", ["result", "index", "multiplier"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.multiply)
 
-    def multiply(self, data, index=0, multiplier=2, **kwargs):
+    def multiply(self, *slot_data_lists, policy_message, job_state):
+        input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = input_data[0] if input_data else {}
+        data = data_dict.get("data") if isinstance(data_dict, dict) else None
+        index = data_dict.get("index", 0) if isinstance(data_dict, dict) else 0
+        multiplier = data_dict.get("multiplier", 2) if isinstance(data_dict, dict) else 2
+        
         name = self.get_config("name", "Multiplier")
         print(f"[{name}] Multiplying: {data} (x{multiplier})")
         time.sleep(0.2)
 
         result = f"{data} " * multiplier
         print(f"[{name}] → Result: {result.strip()}")
-        self.emit("output", result=result.strip(), index=index, multiplier=multiplier)
+        self.emit("output", job_state=job_state, result=result.strip(), index=index, multiplier=multiplier)
 
 
 class DataAggregator(Routine):
@@ -192,25 +210,30 @@ class DataAggregator(Routine):
     def __init__(self, name="Aggregator"):
         super().__init__()
         self.set_config(name=name)
-        self.input_slot = self.define_slot("input", handler=self.aggregate, merge_strategy="append")
+        self.input_slot = self.define_slot("input")
         self.output_event = self.define_event("output", ["results", "count", "sources"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.aggregate)
 
-    def aggregate(self, **kwargs):
+    def aggregate(self, *slot_data_lists, policy_message, job_state):
         name = self.get_config("name", "Aggregator")
         print(f"[{name}] Aggregating data...")
         time.sleep(0.3)
 
-        # Collect all data
+        # Collect all data from slot (slot_data_lists[0] is a list of data dicts)
         results = []
         sources = []
-        for key, value in kwargs.items():
-            if key not in ["flow", "job_state"]:
-                results.append(f"{value}")
-                sources.append(key)
+        if slot_data_lists and slot_data_lists[0]:
+            for data_dict in slot_data_lists[0]:
+                if isinstance(data_dict, dict):
+                    # Extract all values from the data dict
+                    for key, value in data_dict.items():
+                        results.append(str(value))
+                        sources.append(key)
 
-        result = " | ".join(results)
+        result = " | ".join(results) if results else ""
         print(f"[{name}] → Aggregated {len(results)} items: {result}")
-        self.emit("output", results=result, count=len(results), sources=sources)
+        self.emit("output", job_state=job_state, results=result, count=len(results), sources=sources)
 
 
 class DataSink(Routine):
@@ -219,25 +242,30 @@ class DataSink(Routine):
     def __init__(self, name="Sink"):
         super().__init__()
         self.set_config(name=name)
-        self.input_slot = self.define_slot("input", handler=self.receive)
+        self.input_slot = self.define_slot("input")
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.receive)
 
-    def receive(self, **kwargs):
-        ctx = self.get_execution_context()
+    def receive(self, *slot_data_lists, policy_message, job_state):
         name = self.get_config("name", "Sink")
 
+        # Collect all received data (slot_data_lists[0] is a list of data dicts)
+        received_data = {}
+        if slot_data_lists and slot_data_lists[0]:
+            for data_dict in slot_data_lists[0]:
+                if isinstance(data_dict, dict):
+                    received_data.update(data_dict)
+
         # Update received count in JobState
-        if ctx:
-            routine_state = ctx.job_state.get_routine_state(ctx.routine_id) or {}
-            received_count = routine_state.get("received_count", 0) + 1
-            ctx.job_state.update_routine_state(
-                ctx.routine_id, {"received_count": received_count, "final_result": kwargs}
-            )
-            print(f"[{name}] Receiving data (#{received_count})")
-        else:
-            print(f"[{name}] Receiving data")
+        routine_state = job_state.get_routine_state(self._id) or {}
+        received_count = routine_state.get("received_count", 0) + 1
+        job_state.update_routine_state(
+            self._id, {"received_count": received_count, "final_result": received_data}
+        )
+        print(f"[{name}] Receiving data (#{received_count})")
 
         time.sleep(0.1)
-        print(f"[{name}] ✓ Final result: {kwargs}")
+        print(f"[{name}] ✓ Final result: {received_data}")
 
 
 class ErrorGenerator(Routine):
@@ -246,11 +274,18 @@ class ErrorGenerator(Routine):
     def __init__(self, name="ErrorGenerator"):
         super().__init__()
         self.set_config(name=name)
-        self.input_slot = self.define_slot("input", handler=self.process)
+        self.input_slot = self.define_slot("input")
         self.output_event = self.define_event("output", ["result"])
         self.error_event = self.define_event("error", ["error_type", "error_message"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.process)
 
-    def process(self, data, error_type="none", **kwargs):
+    def process(self, *slot_data_lists, policy_message, job_state):
+        input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = input_data[0] if input_data else {}
+        data = data_dict.get("data") if isinstance(data_dict, dict) else None
+        error_type = data_dict.get("error_type", "none") if isinstance(data_dict, dict) else "none"
+        
         name = self.get_config("name", "ErrorGenerator")
         print(f"[{name}] Processing: {data} (error_type={error_type})")
         time.sleep(0.2)
@@ -264,7 +299,7 @@ class ErrorGenerator(Routine):
         elif error_type == "custom":
             raise Exception("Custom error for debugging!")
         else:
-            self.emit("output", result=f"Success: {data}")
+            self.emit("output", job_state=job_state, result=f"Success: {data}")
 
 
 class SlowProcessor(Routine):
@@ -273,10 +308,16 @@ class SlowProcessor(Routine):
     def __init__(self, name="SlowProcessor"):
         super().__init__()
         self.set_config(name=name)
-        self.input_slot = self.define_slot("input", handler=self.process)
+        self.input_slot = self.define_slot("input")
         self.output_event = self.define_event("output", ["result", "processing_time"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.process)
 
-    def process(self, data, index=0, **kwargs):
+    def process(self, *slot_data_lists, policy_message, job_state):
+        input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = input_data[0] if input_data else {}
+        data = data_dict.get("data") if isinstance(data_dict, dict) else None
+        
         name = self.get_config("name", "SlowProcessor")
         print(f"[{name}] Starting slow processing: {data}")
         start_time = time.time()
@@ -285,7 +326,7 @@ class SlowProcessor(Routine):
 
         result = f"Slowly processed: {data}"
         print(f"[{name}] → Done in {processing_time:.2f}s")
-        self.emit("output", result=result, processing_time=processing_time)
+        self.emit("output", job_state=job_state, result=result, processing_time=processing_time)
 
 
 class FastProcessor(Routine):
@@ -294,24 +335,26 @@ class FastProcessor(Routine):
     def __init__(self, name="FastProcessor"):
         super().__init__()
         self.set_config(name=name)
-        self.input_slot = self.define_slot("input", handler=self.process)
+        self.input_slot = self.define_slot("input")
         self.output_event = self.define_event("output", ["result", "count"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.process)
 
-    def process(self, data, index=0, **kwargs):
-        ctx = self.get_execution_context()
-        self.get_config("name", "FastProcessor")
+    def process(self, *slot_data_lists, policy_message, job_state):
+        input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = input_data[0] if input_data else {}
+        data = data_dict.get("data") if isinstance(data_dict, dict) else None
+        
+        name = self.get_config("name", "FastProcessor")
 
         # Update processed count in JobState
-        if ctx:
-            routine_state = ctx.job_state.get_routine_state(ctx.routine_id) or {}
-            processed_count = routine_state.get("processed_count", 0) + 1
-            ctx.job_state.update_routine_state(ctx.routine_id, {"processed_count": processed_count})
-        else:
-            processed_count = 1
+        routine_state = job_state.get_routine_state(self._id) or {}
+        processed_count = routine_state.get("processed_count", 0) + 1
+        job_state.update_routine_state(self._id, {"processed_count": processed_count})
 
         # Very fast processing
         time.sleep(0.01)
-        self.emit("output", result=f"Fast: {data}", count=processed_count)
+        self.emit("output", job_state=job_state, result=f"Fast: {data}", count=processed_count)
 
 
 class ConditionalProcessor(Routine):
@@ -320,29 +363,36 @@ class ConditionalProcessor(Routine):
     def __init__(self, name="ConditionalProcessor"):
         super().__init__()
         self.set_config(name=name)
-        self.input_slot = self.define_slot("input", handler=self.process)
+        self.input_slot = self.define_slot("input")
         self.output_event = self.define_event("output", ["result", "condition"])
         self.branch_a_event = self.define_event("branch_a", ["result"])
         self.branch_b_event = self.define_event("branch_b", ["result"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.process)
 
-    def process(self, data, condition="default", **kwargs):
+    def process(self, *slot_data_lists, policy_message, job_state):
+        input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = input_data[0] if input_data else {}
+        data = data_dict.get("data") if isinstance(data_dict, dict) else None
+        condition = data_dict.get("condition", "default") if isinstance(data_dict, dict) else "default"
+        
         name = self.get_config("name", "ConditionalProcessor")
         print(f"[{name}] Processing with condition: {condition}")
 
         if condition == "branch_a":
             result = f"Branch A processed: {data}"
             print(f"[{name}] → Taking Branch A")
-            self.emit("branch_a", result=result)
-            self.emit("output", result=result, condition="branch_a")
+            self.emit("branch_a", job_state=job_state, result=result)
+            self.emit("output", job_state=job_state, result=result, condition="branch_a")
         elif condition == "branch_b":
             result = f"Branch B processed: {data}"
             print(f"[{name}] → Taking Branch B")
-            self.emit("branch_b", result=result)
-            self.emit("output", result=result, condition="branch_b")
+            self.emit("branch_b", job_state=job_state, result=result)
+            self.emit("output", job_state=job_state, result=result, condition="branch_b")
         else:
             result = f"Default processed: {data}"
             print(f"[{name}] → Default path")
-            self.emit("output", result=result, condition="default")
+            self.emit("output", job_state=job_state, result=result, condition="default")
 
 
 class Counter(Routine):
@@ -351,27 +401,29 @@ class Counter(Routine):
     def __init__(self, name="Counter"):
         super().__init__()
         self.set_config(name=name)
-        self.input_slot = self.define_slot("input", handler=self.increment)
+        self.input_slot = self.define_slot("input")
         self.output_event = self.define_event("output", ["count", "message"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.increment)
 
-    def increment(self, steps=1, **kwargs):
-        ctx = self.get_execution_context()
+    def increment(self, *slot_data_lists, policy_message, job_state):
+        input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = input_data[0] if input_data else {}
+        steps = data_dict.get("steps", 1) if isinstance(data_dict, dict) else 1
+        
         name = self.get_config("name", "Counter")
 
         print(f"[{name}] Incrementing by {steps}")
         time.sleep(0.1)
 
         # Update count in JobState
-        if ctx:
-            routine_state = ctx.job_state.get_routine_state(ctx.routine_id) or {}
-            count = routine_state.get("count", 0) + steps
-            ctx.job_state.update_routine_state(ctx.routine_id, {"count": count})
-        else:
-            count = steps
+        routine_state = job_state.get_routine_state(self._id) or {}
+        count = routine_state.get("count", 0) + steps
+        job_state.update_routine_state(self._id, {"count": count})
 
         message = f"Count is now {count}"
         print(f"[{name}] → {message}")
-        self.emit("output", count=count, message=message)
+        self.emit("output", job_state=job_state, count=count, message=message)
 
 
 class LongRunningProcessor(Routine):
@@ -380,12 +432,17 @@ class LongRunningProcessor(Routine):
     def __init__(self, name="LongRunningProcessor", duration=60):
         super().__init__()
         self.set_config(name=name, duration=duration)
-        self.input_slot = self.define_slot("input", handler=self.process)
+        self.input_slot = self.define_slot("input")
         self.progress_event = self.define_event("progress", ["progress", "elapsed", "message"])
         self.output_event = self.define_event("output", ["result", "total_time", "iterations"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.process)
 
-    def process(self, data, **kwargs):
-        ctx = self.get_execution_context()
+    def process(self, *slot_data_lists, policy_message, job_state):
+        input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = input_data[0] if input_data else {}
+        data = data_dict.get("data") if isinstance(data_dict, dict) else None
+        
         name = self.get_config("name", "LongRunningProcessor")
         duration = self.get_config("duration", 60)
 
@@ -395,7 +452,6 @@ class LongRunningProcessor(Routine):
 
         # Process in chunks with progress updates
         chunk_duration = 5.0  # Report progress every 5 seconds
-        int(duration / chunk_duration)
 
         while time.time() - start_time < duration:
             iteration += 1
@@ -405,17 +461,17 @@ class LongRunningProcessor(Routine):
             # Emit progress event
             self.emit(
                 "progress",
+                job_state=job_state,
                 progress=progress,
                 elapsed=elapsed,
                 message=f"Processing iteration {iteration}...",
             )
 
             # Update state in JobState
-            if ctx:
-                ctx.job_state.update_routine_state(
-                    ctx.routine_id,
-                    {"iteration": iteration, "elapsed": elapsed, "progress": progress},
-                )
+            job_state.update_routine_state(
+                self._id,
+                {"iteration": iteration, "elapsed": elapsed, "progress": progress},
+            )
 
             print(f"[{name}] Progress: {progress:.1f}% ({elapsed:.1f}s / {duration}s)")
             time.sleep(chunk_duration)
@@ -424,7 +480,7 @@ class LongRunningProcessor(Routine):
         result = f"Long-running process completed: {data}"
         print(f"[{name}] → Done in {total_time:.2f}s ({iteration} iterations)")
 
-        self.emit("output", result=result, total_time=total_time, iterations=iteration)
+        self.emit("output", job_state=job_state, result=result, total_time=total_time, iterations=iteration)
 
 
 class LoopController(Routine):
@@ -433,25 +489,28 @@ class LoopController(Routine):
     def __init__(self, name="LoopController", max_iterations=5):
         super().__init__()
         self.set_config(name=name, max_iterations=max_iterations)
-        self.input_slot = self.define_slot("input", handler=self.control_loop)
+        self.input_slot = self.define_slot("input")
         self.continue_loop_event = self.define_event(
             "continue_loop", ["iteration", "data", "reason"]
         )
         self.exit_loop_event = self.define_event(
             "exit_loop", ["final_data", "iterations", "reason"]
         )
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.control_loop)
 
-    def control_loop(self, data=None, iteration=None, **kwargs):
-        ctx = self.get_execution_context()
+    def control_loop(self, *slot_data_lists, policy_message, job_state):
+        input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = input_data[0] if input_data else {}
+        data = data_dict.get("data") if isinstance(data_dict, dict) else None
+        iteration = data_dict.get("iteration") if isinstance(data_dict, dict) else None
+        
         name = self.get_config("name", "LoopController")
         max_iterations = self.get_config("max_iterations", 5)
 
         # Get current iteration from JobState or parameter
-        if ctx:
-            routine_state = ctx.job_state.get_routine_state(ctx.routine_id) or {}
-            current_iteration = iteration or routine_state.get("iteration", 0)
-        else:
-            current_iteration = iteration or 0
+        routine_state = job_state.get_routine_state(self._id) or {}
+        current_iteration = iteration or routine_state.get("iteration", 0)
 
         print(f"[{name}] Loop control: iteration {current_iteration}/{max_iterations}")
 
@@ -464,20 +523,18 @@ class LoopController(Routine):
 
         if should_continue and needs_retry:
             next_iteration = current_iteration + 1
-            if ctx:
-                ctx.job_state.update_routine_state(ctx.routine_id, {"iteration": next_iteration})
+            job_state.update_routine_state(self._id, {"iteration": next_iteration})
 
             print(f"[{name}] → Continuing loop (iteration {next_iteration})")
-            self.emit("continue_loop", iteration=next_iteration, data=data, reason="needs_retry")
+            self.emit("continue_loop", job_state=job_state, iteration=next_iteration, data=data, reason="needs_retry")
         else:
             reason = "max_iterations_reached" if not should_continue else "validation_passed"
-            if ctx:
-                ctx.job_state.update_routine_state(
-                    ctx.routine_id, {"iteration": current_iteration, "completed": True}
-                )
+            job_state.update_routine_state(
+                self._id, {"iteration": current_iteration, "completed": True}
+            )
 
             print(f"[{name}] → Exiting loop (reason: {reason})")
-            self.emit("exit_loop", final_data=data, iterations=current_iteration + 1, reason=reason)
+            self.emit("exit_loop", job_state=job_state, final_data=data, iterations=current_iteration + 1, reason=reason)
 
 
 class LoopProcessor(Routine):
@@ -486,11 +543,17 @@ class LoopProcessor(Routine):
     def __init__(self, name="LoopProcessor"):
         super().__init__()
         self.set_config(name=name)
-        self.input_slot = self.define_slot("input", handler=self.process)
+        self.input_slot = self.define_slot("input")
         self.output_event = self.define_event("output", ["result", "iteration", "status"])
+        self.set_activation_policy(immediate_policy())
+        self.set_logic(self.process)
 
-    def process(self, data, iteration=0, **kwargs):
-        self.get_execution_context()
+    def process(self, *slot_data_lists, policy_message, job_state):
+        input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
+        data_dict = input_data[0] if input_data else {}
+        data = data_dict.get("data") if isinstance(data_dict, dict) else None
+        iteration = data_dict.get("iteration", 0) if isinstance(data_dict, dict) else 0
+        
         name = self.get_config("name", "LoopProcessor")
 
         print(f"[{name}] Processing (iteration {iteration}): {data}")
@@ -511,7 +574,7 @@ class LoopProcessor(Routine):
             status = "retry_needed"
 
         print(f"[{name}] → {result}")
-        self.emit("output", result=result, iteration=iteration, status=status)
+        self.emit("output", job_state=job_state, result=result, iteration=iteration, status=status)
 
 
 # ===== Flows =====

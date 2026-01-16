@@ -35,7 +35,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         serializable_errors.append(serializable_error)
     
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content=ErrorResponse(
             error="validation_error",
             error_code="VALIDATION_ERROR",
@@ -79,15 +79,20 @@ async def http_exception_handler(request: Request, exc):
             message = msg_val
         details = exc.detail.get("details")
 
+    # Include both custom format and FastAPI's default 'detail' field for compatibility
+    error_response = ErrorResponse(
+        error=error_code,
+        error_code=error_code.upper(),
+        message=message,
+        details=details,
+        timestamp=int(datetime.now().timestamp()),
+    ).model_dump()
+    # Add 'detail' field for backward compatibility with FastAPI's default format
+    error_response["detail"] = message
+    
     return JSONResponse(
         status_code=exc.status_code,
-        content=ErrorResponse(
-            error=error_code,
-            error_code=error_code.upper(),
-            message=message,
-            details=details,
-            timestamp=int(datetime.now().timestamp()),
-        ).model_dump(),
+        content=error_response,
     )
 
 

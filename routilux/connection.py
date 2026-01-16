@@ -46,6 +46,7 @@ class Connection(Serializable):
         self,
         source_event: Event | None = None,
         target_slot: Slot | None = None,
+        param_mapping: dict[str, str] | None = None,
     ):
         """Initialize a Connection between an event and a slot.
 
@@ -60,6 +61,8 @@ class Connection(Serializable):
             target_slot: Target Slot object that will receive data.
                 Must be a Slot instance created via Routine.define_slot().
                 If None, connection is created but not active until both are set.
+            param_mapping: Optional mapping from source parameter names to target
+                parameter names. Allows renaming/mapping parameters during data transfer.
 
         Side Effects:
             - Automatically calls source_event.connect(target_slot) if both are provided
@@ -76,6 +79,7 @@ class Connection(Serializable):
         super().__init__()
         self.source_event: Event | None = source_event
         self.target_slot: Slot | None = target_slot
+        self.param_mapping: dict[str, str] | None = param_mapping
 
         # Establish connection if both event and slot are provided
         if source_event is not None and target_slot is not None:
@@ -98,6 +102,10 @@ class Connection(Serializable):
         if self.target_slot:
             data["_target_slot_name"] = self.target_slot.name
 
+        # Save param_mapping if it exists
+        if self.param_mapping is not None:
+            data["param_mapping"] = self.param_mapping
+
         # Note: routine_id is NOT serialized here - it's Flow's responsibility
         # Flow will add routine_id when serializing connections
 
@@ -118,6 +126,9 @@ class Connection(Serializable):
         source_event_name = data.pop("_source_event_name", None)
         target_routine_id = data.pop("_target_routine_id", None)
         target_slot_name = data.pop("_target_slot_name", None)
+
+        # Restore param_mapping if it exists
+        self.param_mapping = data.pop("param_mapping", None)
 
         super().deserialize(data, strict=strict, registry=registry)
 

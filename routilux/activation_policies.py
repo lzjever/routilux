@@ -75,6 +75,10 @@ def time_interval_policy(min_interval_seconds: float):
         }
         return True, data_slice, policy_message
 
+    # Attach metadata for monitoring
+    policy._policy_type = "time_interval"
+    policy._policy_config = {"min_interval_seconds": min_interval_seconds}
+    policy._policy_description = f"Activate at most once every {min_interval_seconds} seconds"
     return policy
 
 
@@ -129,6 +133,10 @@ def batch_size_policy(min_batch_size: int):
         }
         return True, data_slice, policy_message
 
+    # Attach metadata for monitoring
+    policy._policy_type = "batch_size"
+    policy._policy_config = {"min_batch_size": min_batch_size}
+    policy._policy_description = f"Activate when all slots have at least {min_batch_size} items"
     return policy
 
 
@@ -173,6 +181,10 @@ def all_slots_ready_policy():
         policy_message = {"reason": "all_slots_ready"}
         return True, data_slice, policy_message
 
+    # Attach metadata for monitoring
+    policy._policy_type = "all_slots_ready"
+    policy._policy_config = {}
+    policy._policy_description = "Activate when all slots have at least 1 data point"
     return policy
 
 
@@ -222,6 +234,10 @@ def custom_policy(check_function: Callable[[dict[str, Slot], JobState], bool]):
         policy_message = {"reason": "custom_policy_met"}
         return True, data_slice, policy_message
 
+    # Attach metadata for monitoring
+    policy._policy_type = "custom"
+    policy._policy_config = {}
+    policy._policy_description = "Custom activation policy"
     return policy
 
 
@@ -263,4 +279,8 @@ def immediate_policy():
         policy_message = {"reason": "immediate"}
         return True, data_slice, policy_message
 
+    # Attach metadata for monitoring
+    policy._policy_type = "immediate"
+    policy._policy_config = {}
+    policy._policy_description = "Activate immediately when any slot receives data"
     return policy

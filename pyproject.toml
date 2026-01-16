@@ -1,0 +1,148 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "routilux"
+dynamic = ["version"]
+description = "Event-driven workflow orchestration framework with flexible connection, state management, and workflow orchestration capabilities"
+readme = "README.md"
+requires-python = ">=3.8,<3.15"
+license = "Apache-2.0"
+authors = [
+    {name = "Routilux Team"}
+]
+keywords = ["workflow", "orchestration", "event-driven", "state-management", "flow"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "serilux>=0.3.1",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi",
+    "uvicorn",
+    "slowapi",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "sphinx>=5.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "ruff>=0.1.0",
+    "mypy>=0.991",
+]
+
+docs = [
+    "sphinx>=5.0.0,<9.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "furo>=2024.1.0",
+    "sphinx-autodoc-typehints>=1.19.0",
+    "sphinx-copybutton>=0.5.0",
+    "sphinx-design>=0.5.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+    "mypy>=0.991",
+    "build>=0.10.0",
+    "httpx",
+    "fastapi",
+    "uvicorn",
+    "slowapi",
+]
+docs = [
+    "sphinx>=5.0.0,<9.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "furo>=2024.1.0",
+    "sphinx-autodoc-typehints>=1.19.0",
+    "sphinx-copybutton>=0.5.0",
+    "sphinx-design>=0.5.0",
+]
+httpx = [
+    "httpx",
+    "fastapi",
+    "uvicorn"
+]
+
+[project.urls]
+Homepage = "https://github.com/lzjever/routilux"
+Documentation = "https://routilux.readthedocs.io"
+Repository = "https://github.com/lzjever/routilux"
+Issues = "https://github.com/lzjever/routilux/issues"
+
+[tool.setuptools.packages.find]
+exclude = [
+    "tests*",
+    "examples*", 
+    "docs*",
+    "*.tests*",
+    "routilux.builtin_routines.control_flow.tests*",
+    "routilux.builtin_routines.data_processing.tests*",
+    "routilux.builtin_routines.text_processing.tests*",
+    "routilux.builtin_routines.utils.tests*",
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "routilux.__version__"}
+
+[tool.setuptools.package-data]
+routilux = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.mypy]
+python_version = "3.7"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["routilux"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+# Minimum coverage threshold (optional, can be enabled later)
+# fail_under = 80

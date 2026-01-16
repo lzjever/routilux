@@ -13,7 +13,7 @@ import time
 import warnings
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict, Set
 
 if TYPE_CHECKING:
     from routilux.event import Event
@@ -78,6 +78,9 @@ class Runtime:
         self._shutdown = False
         # Critical fix: Track if thread pool is shutdown to prevent double-shutdown
         self._is_shutdown = False
+        # Track active routines for monitoring: job_id -> set[routine_id]
+        self._active_routines: Dict[str, Set[str]] = {}
+        self._active_routines_lock = threading.RLock()
 
     def __del__(self) -> None:
         """Cleanup thread pool when Runtime is garbage collected.
@@ -518,6 +521,12 @@ class Runtime:
 
         job_state.current_routine_id = routine_id
 
+        # Mark routine as active for monitoring
+        with self._active_routines_lock:
+            if job_state.job_id not in self._active_routines:
+                self._active_routines[job_state.job_id] = set()
+            self._active_routines[job_state.job_id].add(routine_id)
+
         # Prepare data for logic
         if data_slice is None:
             # Consume all new data from all slots
@@ -632,6 +641,14 @@ class Runtime:
                     },
                 )
         finally:
+            # Mark routine as inactive for monitoring
+            with self._active_routines_lock:
+                if job_state.job_id in self._active_routines:
+                    self._active_routines[job_state.job_id].discard(routine_id)
+                    # Clean up empty job entry
+                    if not self._active_routines[job_state.job_id]:
+                        del self._active_routines[job_state.job_id]
+            
             # Call routine end hook
             execution_hooks.on_routine_end(routine, routine_id, job_state, status=status, error=error)
 
@@ -651,15 +668,31 @@ class Runtime:
             return flow._get_routine_id(routine)
         return None
 
+    def get_active_routines(self, job_id: str) -> Set[str]:
+        """Get set of routine IDs that are currently executing for a job.
+
+        Args:
+            job_id: Job identifier.
+
+        Returns:
+            Set of routine IDs that are currently active (executing).
+            Returns empty set if job_id not found or no active routines.
+        """
+        with self._active_routines_lock:
+            return self._active_routines.get(job_id, set()).copy()
+
     def wait_until_all_jobs_finished(self, timeout: float | None = None) -> bool:
         """Wait until all active jobs complete.
 
         Args:
-            timeout: Optional timeout in seconds. If None, waits indefinitely.
+            timeout: Optional timeout in seconds. If None, uses default of 3600 seconds (1 hour)
+                to prevent indefinite waiting.
 
         Returns:
             True if all jobs finished, False if timeout occurred.
         """
+        # Fix: Add default maximum timeout to prevent indefinite waiting
+        max_timeout = timeout if timeout is not None else 3600.0
         start_time = time.time()
         while True:
             with self._job_lock:
@@ -671,10 +704,9 @@ class Runtime:
                 if active_count == 0:
                     return True
 
-            if timeout is not None:
-                elapsed = time.time() - start_time
-                if elapsed >= timeout:
-                    return False
+            elapsed = time.time() - start_time
+            if elapsed >= max_timeout:
+                return False
 
             time.sleep(0.1)  # Check every 100ms
 
@@ -768,3 +800,24 @@ class Runtime:
         # Critical fix: Set flag before shutdown to prevent race conditions
         self._is_shutdown = True
         self.thread_pool.shutdown(wait=wait)
+
+
+# Global Runtime instance for API access
+_runtime_instance: Runtime | None = None
+_runtime_instance_lock = threading.RLock()
+
+
+def get_runtime_instance() -> Runtime:
+    """Get global Runtime instance for API access.
+
+    This function provides a singleton Runtime instance that can be used
+    by API endpoints to access runtime state (e.g., active routines).
+
+    Returns:
+        Global Runtime instance.
+    """
+    global _runtime_instance
+    with _runtime_instance_lock:
+        if _runtime_instance is None:
+            _runtime_instance = Runtime(thread_pool_size=10)
+        return _runtime_instance

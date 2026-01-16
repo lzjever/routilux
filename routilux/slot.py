@@ -375,6 +375,59 @@ class Slot(Serializable):
                 "oldest_unconsumed": oldest_unconsumed.isoformat() if oldest_unconsumed else None,
             }
 
+    def get_queue_status(self) -> dict[str, Any]:
+        """Get queue status information for monitoring.
+
+        Returns comprehensive queue status including pressure level and usage metrics.
+
+        Returns:
+            Dictionary with queue status information:
+            - unconsumed_count: Number of unconsumed data points
+            - total_count: Total number of data points in queue
+            - max_length: Maximum queue length
+            - watermark_threshold: Watermark threshold for auto-shrink
+            - usage_percentage: Queue usage percentage (0.0-1.0)
+            - pressure_level: Pressure level (low, medium, high, critical)
+            - is_full: Whether queue is full
+            - is_near_full: Whether queue is near full (above watermark)
+
+        Examples:
+            >>> status = slot.get_queue_status()
+            >>> print(status["pressure_level"])  # "low", "medium", "high", or "critical"
+            >>> print(status["usage_percentage"])  # 0.0 to 1.0
+        """
+        with self._lock:
+            unconsumed = self.get_unconsumed_count()
+            total = len(self._queue)
+            usage = total / self.max_queue_length if self.max_queue_length > 0 else 0.0
+
+            # Calculate pressure level
+            if usage >= 1.0:
+                pressure = "critical"
+                is_full = True
+            elif usage >= self.watermark:
+                pressure = "high"
+                is_full = False
+            elif usage >= 0.6:
+                pressure = "medium"
+                is_full = False
+            else:
+                pressure = "low"
+                is_full = False
+
+            is_near_full = usage >= self.watermark
+
+            return {
+                "unconsumed_count": unconsumed,
+                "total_count": total,
+                "max_length": self.max_queue_length,
+                "watermark_threshold": self.watermark_threshold,
+                "usage_percentage": usage,
+                "pressure_level": pressure,
+                "is_full": is_full,
+                "is_near_full": is_near_full,
+            }
+
     def _clear_consumed_data(self) -> None:
         """Clear all consumed data to free space.
 

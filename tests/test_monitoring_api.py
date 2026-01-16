@@ -7,8 +7,9 @@ Tests are written against the API interfaces, challenging the business logic.
 
 import pytest
 
-# Check if FastAPI is available
+# Check if FastAPI and httpx are available
 try:
+    import httpx  # noqa: F401
     from fastapi.testclient import TestClient
 
     from routilux.api.main import app
@@ -17,7 +18,8 @@ try:
 except ImportError:
     FASTAPI_AVAILABLE = False
     pytest.skip(
-        "FastAPI not available. Install with: pip install routilux[api]", allow_module_level=True
+        "FastAPI or httpx not available. Install with: pip install routilux[api] or uv sync --group dev",
+        allow_module_level=True
     )
 
 from routilux import Flow, Routine

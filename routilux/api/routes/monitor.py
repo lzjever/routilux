@@ -15,6 +15,7 @@ from routilux.api.models.monitor import (
     JobMonitoringData,
     RoutineExecutionStatus,
     RoutineInfo,
+    RoutineMetricsResponse,
     RoutineMonitoringData,
     SlotQueueStatus,
 )

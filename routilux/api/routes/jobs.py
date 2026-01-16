@@ -78,8 +78,8 @@ async def start_job(request: JobStartRequest):
     # Ensure flow is registered in FlowRegistry (required for Runtime)
     flow_registry = FlowRegistry.get_instance()
     if not flow_registry.get(flow.flow_id) and not flow_registry.get_by_name(flow.flow_id):
-        # Register by both ID and name for flexibility
-        flow_registry.register(flow.flow_id, flow)
+        # Register flow (register() takes only the flow as argument)
+        flow_registry.register(flow)
         if hasattr(flow, "name") and flow.name:
             flow_registry.register_by_name(flow.name, flow)
 

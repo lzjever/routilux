@@ -1,19 +1,18 @@
 User Guide
 ==========
 
-This section provides detailed guidance on using routilux.
+This section provides detailed guidance on using Routilux with the new Runtime-based
+architecture and activation policy system.
 
 .. toctree::
    :maxdepth: 2
 
    routines
+   activation_policies
    flows
    connections
-   aggregation_pattern
    state_management
    error_handling
    job_state
-   serialization
-   identifiers
-   monitoring_debugging
-
+   runtime
+   monitoring

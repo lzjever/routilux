@@ -94,9 +94,7 @@ class GlobalJobManager:
             RuntimeError: If manager is shut down.
             ValueError: If entry_routine_id not found in flow.
         """
-        if self._shutdown:
-            raise RuntimeError("GlobalJobManager is shut down")
-
+        # Critical fix: Validate before creating executor to avoid TOCTOU race condition
         if entry_routine_id not in flow.routines:
             raise ValueError(f"Entry routine '{entry_routine_id}' not found in flow")
 
@@ -106,6 +104,20 @@ class GlobalJobManager:
         # Create or use provided JobState
         if job_state is None:
             job_state = JobStateClass(flow.flow_id)
+
+        # Auto-register job with global registry if monitoring is enabled
+        # This allows the API to discover jobs started outside the API
+        try:
+            from routilux.monitoring.registry import MonitoringRegistry
+            from routilux.monitoring.job_registry import JobRegistry
+
+            if MonitoringRegistry.is_enabled():
+                registry = JobRegistry.get_instance()
+                registry.register(job_state)
+        except ImportError:
+            # Monitoring module not available, skip registration
+            # This ensures core functionality works without API dependencies
+            pass
 
         # Use flow's timeout if not specified
         effective_timeout = timeout if timeout is not None else flow.execution_timeout
@@ -118,7 +130,8 @@ class GlobalJobManager:
             timeout=effective_timeout,
         )
 
-        # Register job
+        # Critical fix: Extend lock scope to prevent TOCTOU race condition
+        # between shutdown check and job registration
         with self._lock:
             if self._shutdown:
                 raise RuntimeError("GlobalJobManager is shut down")

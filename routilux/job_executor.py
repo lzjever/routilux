@@ -130,6 +130,8 @@ class JobExecutor:
         # Update job state
         self.job_state.status = ExecutionStatus.RUNNING
         self.job_state.current_routine_id = entry_routine_id
+        # Set started_at timestamp
+        self.job_state.started_at = datetime.now()
         self._start_time = time.time()
 
         # Record execution start
@@ -327,9 +329,12 @@ class JobExecutor:
         from routilux.monitoring.hooks import execution_hooks
         from routilux.status import ExecutionStatus
 
-        # Only mark as completed if not already failed
-        if self.job_state.status != ExecutionStatus.FAILED:
+        # Critical fix: Only mark as completed if not already in a terminal state
+        # Terminal states are: FAILED, CANCELLED, COMPLETED
+        if self.job_state.status not in (ExecutionStatus.FAILED, ExecutionStatus.CANCELLED, ExecutionStatus.COMPLETED):
             self.job_state.status = ExecutionStatus.COMPLETED
+            # Set completed_at timestamp
+            self.job_state.completed_at = datetime.now()
 
             # Record execution end
             if self.execution_tracker:
@@ -346,6 +351,9 @@ class JobExecutor:
         from routilux.status import ExecutionStatus
 
         self.job_state.status = ExecutionStatus.FAILED
+        # Set completed_at timestamp
+        self.job_state.completed_at = datetime.now()
+        self.job_state.error = f"Job timed out after {self.timeout}s"
         self.job_state.shared_data["error"] = f"Job timed out after {self.timeout}s"
 
         # Record execution end
@@ -369,8 +377,11 @@ class JobExecutor:
         from routilux.status import ExecutionStatus
 
         self.job_state.status = ExecutionStatus.FAILED
+        # Set completed_at timestamp
+        self.job_state.completed_at = datetime.now()
         if "error" not in self.job_state.shared_data:
             self.job_state.shared_data["error"] = str(error)
+        self.job_state.error = str(error)
 
         # Record execution end
         if self.execution_tracker:

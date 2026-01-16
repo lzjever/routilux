@@ -10,8 +10,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from routilux.flow import Flow
+    from routilux.job_state import JobState
     from routilux.routine import Routine
+    from routilux.runtime import Runtime
     from routilux.slot import Slot
 
 from serilux import Serializable, register_serializable
@@ -109,13 +110,11 @@ class Event(Serializable):
         else:
             return f"Event[{self.name}]"
 
-    def connect(self, slot: Slot, param_mapping: dict[str, str] | None = None) -> None:
+    def connect(self, slot: Slot) -> None:
         """Connect to a slot.
 
         Args:
             slot: Slot object to connect to.
-            param_mapping: Parameter mapping dictionary (managed by Connection,
-                this method only establishes the connection).
         """
         if slot not in self.connected_slots:
             self.connected_slots.append(slot)
@@ -135,144 +134,36 @@ class Event(Serializable):
             if self in slot.connected_events:
                 slot.connected_events.remove(self)
 
-    def emit(self, flow: Flow | None = None, **kwargs) -> None:
-        """Emit the event and send data to all connected slots.
+    def emit(self, runtime: Runtime, job_state: JobState, **kwargs) -> None:
+        """Emit the event and route data through Runtime to connected slots.
 
-        This method transmits data to all slots connected to this event using
-        a queue-based mechanism. Tasks are enqueued and executed asynchronously,
-        allowing emit() to return immediately without waiting for downstream
-        execution.
-
-        Execution Mode:
-            - All execution uses a unified queue-based mechanism
-            - Sequential mode: max_workers=1, tasks execute one at a time
-            - Concurrent mode: max_workers>1, tasks execute in parallel
-            - emit() is always non-blocking and returns immediately
-
-        Parameter Mapping:
-            If a Connection has param_mapping defined (via Flow.connect()),
-            parameter names are transformed before being sent to the slot.
-            Unmapped parameters are passed with their original names.
-
-        Flow Context Auto-Detection:
-            If flow parameter is None, this method automatically attempts to
-            get the flow from the routine's context (routine._current_flow).
-            This allows simpler usage: event.emit(data="value") instead of
-            event.emit(flow=my_flow, data="value").
-
-            The flow context is automatically set by Flow.execute() and Flow.resume().
+        This method packs data with metadata and routes it through Runtime,
+        which handles slot enqueueing and routine activation.
 
         Args:
-            flow: Optional Flow object. If None, automatically attempts to get
-                from routine._current_flow (set by Flow.execute()).
-                Required for:
-                - Finding Connection objects to apply parameter mappings
-                - Recording execution history in JobState
-                - Queue-based task execution
-                If no flow is available, falls back to direct slot.receive() call (legacy mode).
+            runtime: Runtime object for event routing.
+            job_state: JobState for this execution.
             ``**kwargs``: Data to transmit. These keyword arguments form the
-                data dictionary sent to connected slots. All values must be
-                serializable if the flow uses persistence.
-                Example: emit(result="success", count=42)
+                data dictionary sent to connected slots.
 
         Examples:
-            Basic emission (automatic flow detection):
-                >>> event = routine.define_event("output", ["result"])
-                >>> # Inside a routine handler called by Flow.execute():
-                >>> event.emit(result="data", status="ok")
-                >>> # Automatically uses routine._current_flow
-
-            Explicit flow parameter:
-                >>> event.emit(flow=my_flow, result="data", status="ok")
-                >>> # Explicitly specify flow (useful for testing or edge cases)
-
-            Without flow (legacy mode):
-                >>> event.emit(result="data")  # Direct call, no queue
-                >>> # Only works if no flow context available
+            Basic emission:
+                >>> event.emit(runtime=runtime, job_state=job_state, result="data", status="ok")
         """
-        # Auto-detect flow from routine context if not provided
-        if flow is None and self.routine:
-            flow = getattr(self.routine, "_current_flow", None)
+        # Pack data with metadata
+        # Use routine class name or _id as emitted_from
+        emitted_from = "unknown"
+        if self.routine:
+            emitted_from = self.routine.__class__.__name__ or getattr(self.routine, "_id", "unknown")
 
-        # If no flow context, use legacy direct call
-        if flow is None:
-            for slot in self.connected_slots:
-                slot.receive(kwargs)
-            return
+        event_data = {
+            "data": kwargs,
+            "metadata": {
+                "emitted_at": datetime.now(),
+                "emitted_from": emitted_from,
+                "event_name": self.name,
+            },
+        }
 
-        # Queue-based execution: create tasks and enqueue
-        from routilux.flow.task import SlotActivationTask, TaskPriority
-
-        # Get JobState from kwargs or context variable
-        job_state = kwargs.pop("job_state", None)
-        if job_state is None:
-            from routilux.routine import _current_job_state
-
-            job_state = _current_job_state.get(None)
-
-        # Monitoring hook: Event emit (before propagation)
-        if job_state and self.routine:
-            from routilux.monitoring.hooks import execution_hooks
-
-            # Critical fix: Check if self.routine is not None before passing to _get_routine_id
-            routine_id = flow._get_routine_id(self.routine) if flow and self.routine else None
-            if routine_id:
-                # Check if should pause (breakpoint check)
-                if not execution_hooks.on_event_emit(self, routine_id, job_state, kwargs):
-                    # Execution paused by breakpoint - wait for resume
-                    from routilux.monitoring.registry import MonitoringRegistry
-
-                    if MonitoringRegistry.is_enabled():
-                        registry = MonitoringRegistry.get_instance()
-                        debug_store = registry.debug_session_store
-                        if debug_store:
-                            session = debug_store.get(job_state.job_id)
-                            if session and session.status == "paused":
-                                # Wait for resume (with timeout to prevent indefinite hangs)
-                                import time
-
-                                max_wait = 60  # Maximum 60 seconds wait for resume (reduced from 1 hour)
-                                start_wait = time.time()
-                                while session.status == "paused":
-                                    if time.time() - start_wait > max_wait:
-                                        raise TimeoutError(
-                                            f"Breakpoint wait timed out after {max_wait}s. "
-                                            f"Event: {self.name}, Job: {job_state.job_id}"
-                                        )
-                                    # Check if job was cancelled or failed while waiting
-                                    job_status = str(job_state.status)
-                                    if job_status in ["cancelled", "failed"]:
-                                        raise RuntimeError(
-                                            f"Job {job_state.job_id} was {job_status} while waiting for breakpoint resume"
-                                        )
-                                    time.sleep(0.1)
-
-        # Try to route to JobExecutor if we have job_state
-        executor = None
-        if job_state is not None:
-            from routilux.job_manager import get_job_manager
-
-            job_manager = get_job_manager()
-            executor = job_manager.get_job(job_state.job_id)
-
-        for slot in self.connected_slots:
-            connection = flow._find_connection(self, slot)
-
-            # Create task
-            task = SlotActivationTask(
-                slot=slot,
-                data=kwargs.copy(),
-                connection=connection,
-                priority=TaskPriority.NORMAL,
-                created_at=datetime.now(),
-                job_state=job_state,  # Pass JobState to task
-            )
-
-            # Route to JobExecutor if available, otherwise use flow._enqueue_task()
-            if executor is not None:
-                executor.enqueue_task(task)
-            else:
-                # Legacy mode: use flow's queue
-                flow._enqueue_task(task)
-
-        # Return immediately, no waiting
+        # Route through Runtime
+        runtime.handle_event_emit(self, event_data, job_state)

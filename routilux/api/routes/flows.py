@@ -13,6 +13,8 @@ from routilux.api.models.flow import (
     FlowResponse,
     RoutineInfo,
 )
+from routilux.api.middleware.auth import RequireAuth
+from routilux.api.validators import validate_dsl_size, validate_routine_id_conflict
 from routilux.flow import Flow
 from routilux.monitoring.storage import flow_store
 
@@ -78,11 +80,13 @@ async def get_flow(flow_id: str):
     return _flow_to_response(flow)
 
 
-@router.post("/flows", response_model=FlowResponse, status_code=201)
+@router.post("/flows", response_model=FlowResponse, status_code=201, dependencies=[RequireAuth])
 async def create_flow(request: FlowCreateRequest):
     """Create a new flow."""
     try:
         if request.dsl:
+            # Validate DSL size
+            validate_dsl_size(request.dsl)
             # Create from YAML
             flow = Flow.from_yaml(request.dsl)
         elif request.dsl_dict:
@@ -106,7 +110,7 @@ async def create_flow(request: FlowCreateRequest):
         raise HTTPException(status_code=400, detail=f"Failed to create flow: {str(e)}") from e
 
 
-@router.delete("/flows/{flow_id}", status_code=204)
+@router.delete("/flows/{flow_id}", status_code=204, dependencies=[RequireAuth])
 async def delete_flow(flow_id: str):
     """Delete a flow."""
     flow = flow_store.get(flow_id)
@@ -181,7 +185,7 @@ async def export_flow_dsl(flow_id: str, format: str = Query("yaml", pattern="^(y
         return {"format": "json", "dsl": json.dumps(dsl_dict, indent=2)}
 
 
-@router.post("/flows/{flow_id}/validate")
+@router.post("/flows/{flow_id}/validate", dependencies=[RequireAuth])
 async def validate_flow(flow_id: str):
     """Validate flow structure."""
     flow = flow_store.get(flow_id)
@@ -244,14 +248,15 @@ async def list_flow_connections(flow_id: str):
     return connections
 
 
-@router.post("/flows/{flow_id}/routines")
+@router.post("/flows/{flow_id}/routines", dependencies=[RequireAuth])
 async def add_routine_to_flow(
     flow_id: str, routine_id: str, class_path: str, config: Optional[Dict[str, Any]] = None
 ):
     """Add a routine to an existing flow."""
-    flow = flow_store.get(flow_id)
-    if not flow:
-        raise HTTPException(status_code=404, detail=f"Flow '{flow_id}' not found")
+    from routilux.api.validators import validate_flow_exists, validate_routine_id_conflict
+    
+    flow = validate_flow_exists(flow_id)
+    validate_routine_id_conflict(flow, routine_id)
 
     # Fix: Validate class_path format before using
     if "." not in class_path or class_path.startswith(".") or class_path.endswith("."):
@@ -284,7 +289,7 @@ async def add_routine_to_flow(
     return {"routine_id": routine_id, "status": "added"}
 
 
-@router.post("/flows/{flow_id}/connections")
+@router.post("/flows/{flow_id}/connections", dependencies=[RequireAuth])
 async def add_connection_to_flow(
     flow_id: str,
     source_routine: str,
@@ -306,7 +311,7 @@ async def add_connection_to_flow(
         raise HTTPException(status_code=400, detail=f"Failed to add connection: {str(e)}") from e
 
 
-@router.delete("/flows/{flow_id}/routines/{routine_id}", status_code=204)
+@router.delete("/flows/{flow_id}/routines/{routine_id}", status_code=204, dependencies=[RequireAuth])
 async def remove_routine_from_flow(flow_id: str, routine_id: str):
     """Remove a routine from a flow."""
     flow = flow_store.get(flow_id)
@@ -342,7 +347,7 @@ async def remove_routine_from_flow(flow_id: str, routine_id: str):
     flow_store.add(flow)  # Update stored flow
 
 
-@router.delete("/flows/{flow_id}/connections/{connection_index}", status_code=204)
+@router.delete("/flows/{flow_id}/connections/{connection_index}", status_code=204, dependencies=[RequireAuth])
 async def remove_connection_from_flow(flow_id: str, connection_index: int):
     """Remove a connection from a flow."""
     flow = flow_store.get(flow_id)

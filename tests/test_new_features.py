@@ -594,93 +594,10 @@ class TestFlowBuilder:
 
 
 # ============================================================================
-# Test 7: Parameter Mapping Optimization
+# Test 7: Parameter Mapping - REMOVED (feature removed in redesign)
 # ============================================================================
-
-
-class TestParameterMappingOptimization:
-    """Test auto-detection of identity parameter mapping"""
-
-    def test_auto_detects_identity_mapping(self):
-        """Test that connect() auto-detects when parameters match."""
-        flow = Flow()
-
-        class SourceRoutine(Routine):
-            def __init__(self):
-                super().__init__()
-                self.trigger_slot = self.define_slot("trigger", handler=self._handle)
-                self.output_event = self.define_event("output", ["data", "count"])
-
-            def _handle(self, **kwargs):
-                self.emit("output", data="test", count=5)
-
-        class TargetRoutine(Routine):
-            def __init__(self):
-                super().__init__()
-                self.input_slot = self.define_slot("input", handler=self._handle)
-                self.received_data = None
-                self.received_count = None
-
-            def _handle(self, data=None, count=None, **kwargs):
-                self.received_data = data
-                self.received_count = count
-
-        source = SourceRoutine()
-        target = TargetRoutine()
-
-        source_id = flow.add_routine(source, "source")
-        target_id = flow.add_routine(target, "target")
-
-        # Connect without param_mapping - should auto-detect
-        flow.connect(source_id, "output", target_id, "input")
-
-        # Execute
-        job_state = flow.execute(source_id)
-        JobState.wait_for_completion(flow, job_state, timeout=2.0)
-
-        # Verify data was passed correctly
-        assert target.received_data == "test"
-        assert target.received_count == 5
-
-    def test_explicit_param_mapping_still_works(self):
-        """Test that explicit param_mapping still works."""
-        flow = Flow()
-
-        class SourceRoutine(Routine):
-            def __init__(self):
-                super().__init__()
-                self.trigger_slot = self.define_slot("trigger", handler=self._handle)
-                self.output_event = self.define_event("output", ["source_data"])
-
-            def _handle(self, **kwargs):
-                self.emit("output", source_data="test")
-
-        class TargetRoutine(Routine):
-            def __init__(self):
-                super().__init__()
-                self.input_slot = self.define_slot("input", handler=self._handle)
-                self.received = None
-
-            def _handle(self, target_data=None, **kwargs):
-                self.received = target_data
-
-        source = SourceRoutine()
-        target = TargetRoutine()
-
-        source_id = flow.add_routine(source, "source")
-        target_id = flow.add_routine(target, "target")
-
-        # Connect with explicit mapping
-        flow.connect(
-            source_id, "output", target_id, "input", param_mapping={"source_data": "target_data"}
-        )
-
-        # Execute
-        job_state = flow.execute(source_id)
-        JobState.wait_for_completion(flow, job_state, timeout=2.0)
-
-        # Verify mapping worked
-        assert target.received == "test"
+# Parameter mapping has been removed as part of the redesign.
+# The framework is now data-structure agnostic.
 
 
 # ============================================================================
@@ -1427,43 +1344,7 @@ class TestEdgeCases:
         assert routine.get_config("list_val") == [1, 2, 3]
         assert routine.get_config("simple") == "test"
 
-    def test_parameter_mapping_with_partial_match(self):
-        """Test parameter mapping when only some parameters match."""
-        flow = Flow()
-
-        class SourceRoutine(Routine):
-            def __init__(self):
-                super().__init__()
-                self.trigger_slot = self.define_slot("trigger", handler=self._handle)
-                self.output_event = self.define_event("output", ["param1", "param2", "param3"])
-
-            def _handle(self, **kwargs):
-                self.emit("output", param1="value1", param2="value2", param3="value3")
-
-        class TargetRoutine(Routine):
-            def __init__(self):
-                super().__init__()
-                self.input_slot = self.define_slot("input", handler=self._handle)
-                self.received = {}
-
-            def _handle(self, param1=None, param2=None, **kwargs):
-                self.received = {"param1": param1, "param2": param2}
-
-        source = SourceRoutine()
-        target = TargetRoutine()
-
-        source_id = flow.add_routine(source, "source")
-        target_id = flow.add_routine(target, "target")
-
-        # Connect without mapping - should auto-detect partial match
-        flow.connect(source_id, "output", target_id, "input")
-
-        job_state = flow.execute(source_id)
-        JobState.wait_for_completion(flow, job_state, timeout=2.0)
-
-        # Should receive matching parameters
-        assert target.received["param1"] == "value1"
-        assert target.received["param2"] == "value2"
+    # Parameter mapping test removed - feature removed in redesign
 
     def test_validation_with_multiple_issues(self):
         """Test that validation reports all issues, not just the first one."""

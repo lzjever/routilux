@@ -170,8 +170,6 @@ async def job_monitor_websocket(websocket: WebSocket, job_id: str):
         subscriber_id = await event_manager.subscribe(job_id)
         logger.info(f"WebSocket subscribed to job {job_id} as {subscriber_id}")
 
-        # Enable monitoring
-        MonitoringRegistry.enable()
         registry = MonitoringRegistry.get_instance()
         collector = registry.monitor_collector
 
@@ -268,8 +266,6 @@ async def job_debug_websocket(websocket: WebSocket, job_id: str):
         subscriber_id = await event_manager.subscribe(job_id)
         logger.info(f"Debug WebSocket subscribed to job {job_id} as {subscriber_id}")
 
-        # Enable monitoring
-        MonitoringRegistry.enable()
         registry = MonitoringRegistry.get_instance()
         debug_store = registry.debug_session_store
 
@@ -355,9 +351,6 @@ async def flow_monitor_websocket(websocket: WebSocket, flow_id: str):
         # Accept WebSocket connection
         await websocket.accept()
         logger.info(f"Flow WebSocket connection accepted for flow {flow_id}")
-
-        # Enable monitoring
-        MonitoringRegistry.enable()
 
         # Get all jobs for this flow
         try:

@@ -7,6 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
+from routilux.api.middleware.auth import RequireAuth
 from routilux.api.models.monitor import (
     ExecutionEventResponse,
     ExecutionMetricsResponse,
@@ -19,7 +20,7 @@ from routilux.monitoring.storage import flow_store, job_store
 router = APIRouter()
 
 
-@router.get("/jobs/{job_id}/metrics", response_model=ExecutionMetricsResponse)
+@router.get("/jobs/{job_id}/metrics", response_model=ExecutionMetricsResponse, dependencies=[RequireAuth])
 async def get_job_metrics(job_id: str):
     """Get execution metrics for a job."""
     # Verify job exists
@@ -27,7 +28,6 @@ async def get_job_metrics(job_id: str):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     collector = registry.monitor_collector
 
@@ -81,7 +81,7 @@ async def get_job_metrics(job_id: str):
     )
 
 
-@router.get("/jobs/{job_id}/trace", response_model=ExecutionTraceResponse)
+@router.get("/jobs/{job_id}/trace", response_model=ExecutionTraceResponse, dependencies=[RequireAuth])
 async def get_job_trace(job_id: str, limit: Optional[int] = Query(None, ge=1, le=10000)):
     """Get execution trace for a job."""
     # Verify job exists
@@ -89,7 +89,6 @@ async def get_job_trace(job_id: str, limit: Optional[int] = Query(None, ge=1, le
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     collector = registry.monitor_collector
 
@@ -118,7 +117,7 @@ async def get_job_trace(job_id: str, limit: Optional[int] = Query(None, ge=1, le
     )
 
 
-@router.get("/jobs/{job_id}/logs")
+@router.get("/jobs/{job_id}/logs", dependencies=[RequireAuth])
 async def get_job_logs(job_id: str):
     """Get execution logs for a job."""
     # Verify job exists
@@ -136,7 +135,7 @@ async def get_job_logs(job_id: str):
     }
 
 
-@router.get("/flows/{flow_id}/metrics")
+@router.get("/flows/{flow_id}/metrics", dependencies=[RequireAuth])
 async def get_flow_metrics(flow_id: str):
     """Get aggregated metrics for all jobs of a flow."""
     # Verify flow exists
@@ -144,7 +143,6 @@ async def get_flow_metrics(flow_id: str):
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{flow_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     collector = registry.monitor_collector
 

@@ -6,7 +6,7 @@ Improved Routine mechanism supporting slots (input slots) and events (output eve
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Dict, NamedTuple, Optional, TypeVar
 
 T = TypeVar("T")
 from contextvars import ContextVar  # noqa: E402
@@ -138,44 +138,35 @@ class Routine(Serializable):
         # Priority: routine-level error handler > flow-level error handler > default (STOP)
         self._error_handler: ErrorHandler | None = None
 
+        # Activation policy and logic (new design)
+        self._activation_policy: Callable | None = None
+        self._logic: Callable | None = None
+
         # Register serializable fields
         # _slots and _events are included - base class automatically serializes/deserializes them
-        self.add_serializable_fields(["_id", "_config", "_error_handler", "_slots", "_events"])
+        # Note: _activation_policy and _logic are callables, handled by serilux
+        self.add_serializable_fields(["_id", "_config", "_error_handler", "_slots", "_events", "_activation_policy", "_logic"])
 
     def __repr__(self) -> str:
         """Return string representation of the Routine."""
         return f"{self.__class__.__name__}[{self._id}]"
 
     def define_slot(
-        self, name: str, handler: Callable | None = None, merge_strategy: str = "override"
+        self, name: str, max_queue_length: int = 1000, watermark: float = 0.8
     ) -> Slot:
         """Define an input slot for receiving data from other routines.
 
         This method creates a new slot that can be connected to events from
-        other routines. When data is received, it's merged with existing data
-        according to the merge_strategy, then passed to the handler.
+        other routines. Data is enqueued in the slot's queue when events are emitted.
 
         Args:
             name: Slot name. Must be unique within this routine. Used to
                 identify the slot when connecting events.
-            handler: Handler function called when slot receives data. The function
-                signature can be flexible - see Slot.__init__ documentation for
-                details on how data is passed to the handler. If None, no handler
-                is called when data is received.
-            merge_strategy: Strategy for merging new data with existing data.
-                Possible values:
-
-                - "override" (default): New data completely replaces old data.
-                  Each receive() passes only the new data to the handler.
-                  Use this when you only need the latest data.
-                - "append": New values are appended to lists. The handler receives
-                  accumulated data each time. Use this for aggregation scenarios
-                  where you need to collect multiple data points.
-                - Callable: A function(old_data: Dict, new_data: Dict) -> Dict
-                  that implements custom merge logic. Use this for complex
-                  requirements like deep merging or domain-specific operations.
-
-                See Slot class documentation for detailed examples and behavior.
+            max_queue_length: Maximum number of data points in the queue.
+                Default: 1000
+            watermark: Watermark threshold (0.0 to 1.0). When queue reaches
+                this percentage of max_queue_length, consumed data is cleared.
+                Default: 0.8 (80%)
 
         Returns:
             Slot object that can be connected to events from other routines.
@@ -184,32 +175,12 @@ class Routine(Serializable):
             ValueError: If slot name already exists in this routine.
 
         Examples:
-            Simple slot with override strategy (default):
+            Basic slot definition:
+                >>> routine = MyRoutine()
+                >>> slot = routine.define_slot("input")
 
-            >>> routine = MyRoutine()
-            >>> slot = routine.define_slot("input", handler=process_data)
-            >>> # slot uses "override" strategy by default
-
-            Aggregation slot with append strategy:
-
-            >>> slot = routine.define_slot(
-            ...     "input",
-            ...     handler=aggregate_data,
-            ...     merge_strategy="append"
-            ... )
-            >>> # Values will be accumulated in lists
-
-            Custom merge strategy:
-
-            >>> def deep_merge(old, new):
-            ...     result = old.copy()
-            ...     for k, v in new.items():
-            ...         if k in result and isinstance(result[k], dict):
-            ...             result[k] = deep_merge(result[k], v)
-            ...         else:
-            ...             result[k] = v
-            ...     return result
-            >>> slot = routine.define_slot("input", merge_strategy=deep_merge)
+            Custom queue size:
+                >>> slot = routine.define_slot("input", max_queue_length=100, watermark=0.7)
         """
         if name in self._slots:
             raise ValueError(f"Slot '{name}' already exists in {self}")
@@ -217,7 +188,7 @@ class Routine(Serializable):
         # Lazy import to avoid circular dependency
         from routilux.slot import Slot
 
-        slot = Slot(name, self, handler, merge_strategy)
+        slot = Slot(name, self, max_queue_length=max_queue_length, watermark=watermark)
         self._slots[name] = slot
         return slot
 
@@ -279,106 +250,53 @@ class Routine(Serializable):
         self._events[name] = event
         return event
 
-    def emit(self, event_name: str, flow: Flow | None = None, **kwargs) -> None:
+    def emit(self, event_name: str, runtime=None, job_state=None, **kwargs) -> None:
         """Emit an event and send data to all connected slots.
 
-        This method triggers the specified event and transmits the provided
-        data to all slots connected to this event. The data transmission
-        respects parameter mappings defined in Flow.connect().
-
-        Data Flow:
-            1. Event is emitted with ``**kwargs`` data
-            2. For each connected slot:
-               a. Parameter mapping is applied (if defined in Flow.connect())
-               b. Data is merged with slot's existing data (according to merge_strategy)
-               c. Slot's handler is called with the merged data
-            3. In concurrent mode, handlers may execute in parallel threads
-
-        Flow Context:
-            If flow is not provided, the method attempts to get it from the
-            routine's context (_current_flow). This works automatically when
-            the routine is executed within a Flow context. For standalone
-            usage or testing, you may need to provide the flow explicitly.
+        This method triggers the specified event and routes it through Runtime
+        to connected slots. The Runtime handles event routing and slot enqueueing.
 
         Args:
             event_name: Name of the event to emit. Must be defined using
                 define_event() before calling this method.
-            flow: Optional Flow object. Used for:
-                - Finding Connection objects for parameter mapping
-                - Recording execution history
-                - Tracking event emissions
-                If None, attempts to get from routine context.
-                Provide explicitly for standalone usage or testing.
-            ``**kwargs``: Data to transmit via the event. These keyword arguments
-                become the data dictionary sent to connected slots.
-                Example: emit("output", result="success", count=42)
-                sends {"result": "success", "count": 42} to connected slots.
+            runtime: Optional Runtime object. If None, attempts to get from context.
+            job_state: Optional JobState object. If None, attempts to get from context.
+            ``**kwargs``: Data to transmit via the event.
 
         Raises:
             ValueError: If event_name does not exist in this routine.
-                Define the event first using define_event().
+            RuntimeError: If runtime or job_state cannot be determined.
 
         Examples:
             Basic emission:
                 >>> routine.define_event("output", ["result"])
-                >>> routine.emit("output", result="data", status="ok")
-                >>> # Sends {"result": "data", "status": "ok"} to connected slots
-
-            Emission with flow context:
-                >>> routine.emit("output", flow=my_flow, data="value")
-                >>> # Explicitly provides flow for parameter mapping
-
-            Multiple parameters:
-                >>> routine.emit("result",
-                ...              success=True,
-                ...              data={"key": "value"},
-                ...              timestamp=time.time(),
-                ...              metadata={"source": "processor"})
-                >>> # All parameters are sent to connected slots
+                >>> routine.emit("output", runtime=runtime, job_state=job_state, result="data")
         """
         if event_name not in self._events:
             raise ValueError(f"Event '{event_name}' does not exist in {self}")
 
         event = self._events[event_name]
 
-        # If flow not provided, try to get from context
-        if flow is None and hasattr(self, "_current_flow"):
-            flow = getattr(self, "_current_flow", None)
+        # Get runtime and job_state from context if not provided
+        if runtime is None:
+            # Try to get from context (stored by Runtime)
+            runtime = getattr(self, "_current_runtime", None)
+        if runtime is None:
+            raise RuntimeError(
+                "Runtime is required for emit(). "
+                "Provide runtime parameter or ensure routine is executing within Runtime context."
+            )
 
-        # Get job_state from context variable if not in kwargs
-        # Note: event.emit() will pop job_state from kwargs, so we need to preserve it
-        job_state = kwargs.get("job_state")
         if job_state is None:
             job_state = _current_job_state.get(None)
-            if job_state is not None:
-                kwargs["job_state"] = job_state
+        if job_state is None:
+            raise RuntimeError(
+                "JobState is required for emit(). "
+                "Provide job_state parameter or ensure routine is executing within Runtime context."
+            )
 
-        # Emit event (this will create tasks and enqueue them)
-        event.emit(flow=flow, **kwargs)
-
-        # Record execution history if we have flow and job_state
-        # Skip during serialization to avoid recursion
-        if flow is not None and job_state is not None and not getattr(flow, "_serializing", False):
-            routine_id = flow._get_routine_id(self)
-            if routine_id:
-                # Create safe data copy for execution history
-                # Remove job_state and convert Serializable objects to strings to avoid recursion
-                safe_data = self._prepare_execution_data(kwargs)
-                job_state.record_execution(routine_id, event_name, safe_data)
-
-            # Record to execution tracker
-            if flow.execution_tracker is not None:
-                # Get all target routine IDs (there may be multiple connected slots)
-                target_routine_ids = []
-                event_obj = self._events.get(event_name)
-                if event_obj and event_obj.connected_slots:
-                    for slot in event_obj.connected_slots:
-                        if slot.routine:
-                            target_routine_ids.append(slot.routine._id)
-
-                # Use first target routine ID for tracker (or None if no connections)
-                target_routine_id = target_routine_ids[0] if target_routine_ids else None
-                flow.execution_tracker.record_event(self._id, event_name, target_routine_id, kwargs)
+        # Emit event through Runtime
+        event.emit(runtime=runtime, job_state=job_state, **kwargs)
 
     def _prepare_execution_data(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         """Prepare data for execution history recording.
@@ -747,6 +665,169 @@ class Routine(Serializable):
                 is_critical=True,
             )
         )
+
+    def set_activation_policy(self, policy: Callable) -> Routine:
+        """Set activation policy for this routine.
+
+        The activation policy determines when the routine's logic should be executed.
+        It receives (slots, job_state) and returns (should_activate, data_slice, policy_message).
+
+        Args:
+            policy: Activation policy function with signature:
+                (slots: Dict[str, Slot], job_state: JobState) -> Tuple[bool, Dict[str, List[Any]], Any]
+
+        Returns:
+            Self for method chaining.
+
+        Examples:
+            >>> from routilux.activation_policies import time_interval_policy
+            >>> policy = time_interval_policy(5.0)
+            >>> routine.set_activation_policy(policy)
+        """
+        self._activation_policy = policy
+        return self
+
+    def set_logic(self, logic: Callable) -> Routine:
+        """Set logic function for this routine.
+
+        The logic function processes data from slots. It receives slot data lists
+        (1:1 mapping with slots), policy_message, and job_state.
+
+        Args:
+            logic: Logic function with signature:
+                (*slot_data_lists, policy_message: Any, job_state: JobState) -> None
+
+        Returns:
+            Self for method chaining.
+
+        Examples:
+            >>> def my_logic(customer_calls, boss_calls, policy_message, job_state):
+            ...     # Process data
+            ...     result = process(customer_calls, boss_calls)
+            ...     # Emit result
+            ...     routine.emit("output", runtime=runtime, job_state=job_state, result=result)
+            >>> routine.set_logic(my_logic)
+        """
+        self._logic = logic
+        return self
+
+    def _on_slot_update(self, slot: Slot, job_state: JobState) -> None:
+        """Called by Runtime when a slot receives new data.
+
+        This method checks the activation policy and activates the routine
+        if conditions are met.
+
+        Args:
+            slot: Slot that received new data.
+            job_state: JobState for this execution.
+        """
+        # This is called by Runtime, which handles activation checking
+        # We don't need to do anything here - Runtime will call _check_routine_activation
+        pass
+
+    def _get_routine_id(self, job_state: JobState) -> Optional[str]:
+        """Get routine_id for this routine.
+
+        Args:
+            job_state: JobState for this execution.
+
+        Returns:
+            Routine ID if found, None otherwise.
+        """
+        from routilux.flow.flow import Flow
+
+        flow = getattr(self, "_current_flow", None)
+        if flow:
+            return flow._get_routine_id(self)
+        return None
+
+    @property
+    def slots(self) -> dict[str, Slot]:
+        """Get all slots for this routine.
+
+        Returns:
+            Dictionary of slot_name -> Slot object.
+        """
+        return self._slots
+
+    def get_state(self, job_state: JobState, key: str = None, default: Any = None) -> Any:
+        """Get routine-specific state from job_state.
+
+        Convenience method that automatically uses routine_id.
+
+        Args:
+            job_state: JobState object.
+            key: Optional key to get specific value from routine state.
+                 If None, returns entire routine state dict.
+            default: Default value if key doesn't exist.
+
+        Returns:
+            If key is None: entire routine state dict.
+            If key is provided: value for that key.
+
+        Examples:
+            >>> # Get entire routine state
+            >>> state = routine.get_state(job_state)
+            >>> # Get specific key
+            >>> count = routine.get_state(job_state, "processing_count", 0)
+        """
+        routine_id = self._get_routine_id(job_state)
+        if routine_id is None:
+            return default if key is None else default
+
+        state = job_state.get_routine_state(routine_id)
+        if state is None:
+            return default if key is None else default
+
+        if key is None:
+            return state
+        return state.get(key, default)
+
+    def set_state(self, job_state: JobState, key: str, value: Any) -> None:
+        """Set routine-specific state in job_state.
+
+        Convenience method that automatically uses routine_id.
+
+        Args:
+            job_state: JobState object.
+            key: Key to set.
+            value: Value to set.
+
+        Examples:
+            >>> routine.set_state(job_state, "processing_count", 10)
+            >>> routine.set_state(job_state, "last_result", result)
+        """
+        routine_id = self._get_routine_id(job_state)
+        if routine_id is None:
+            return
+
+        current_state = job_state.get_routine_state(routine_id) or {}
+        current_state[key] = value
+        job_state.update_routine_state(routine_id, current_state)
+
+    def update_state(self, job_state: JobState, updates: Dict[str, Any]) -> None:
+        """Update multiple routine-specific state keys at once.
+
+        Convenience method that automatically uses routine_id.
+
+        Args:
+            job_state: JobState object.
+            updates: Dictionary of key-value pairs to update.
+
+        Examples:
+            >>> routine.update_state(job_state, {
+            ...     "processing_count": 10,
+            ...     "last_result": result,
+            ...     "status": "completed"
+            ... })
+        """
+        routine_id = self._get_routine_id(job_state)
+        if routine_id is None:
+            return
+
+        current_state = job_state.get_routine_state(routine_id) or {}
+        current_state.update(updates)
+        job_state.update_routine_state(routine_id, current_state)
 
     def get_execution_context(self) -> ExecutionContext | None:
         """Get execution context (flow, job_state, routine_id).

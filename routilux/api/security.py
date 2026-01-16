@@ -172,27 +172,53 @@ def safe_evaluate(
     # Check AST safety
     check_ast_safety(tree)
 
-    # Set up timeout handler
-    old_handler = None
-    try:
-        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(int(timeout))
+    # Use cross-platform timeout mechanism
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+    import platform
 
-        # Evaluate expression
-        result = eval(compile(tree, "<string>", "eval"), {"__builtins__": SAFE_BUILTINS}, variables)
+    def _evaluate_in_thread(expression_code, safe_builtins, variables):
+        """Evaluate expression in a separate thread."""
+        return eval(expression_code, {"__builtins__": safe_builtins}, variables)
 
-        signal.alarm(0)  # Cancel timeout
+    # Check if we're on Unix (SIGALRM works)
+    is_unix = platform.system() != "Windows"
 
-        return {"value": result, "type": type(result).__name__}
-
-    except TimeoutError:
-        signal.alarm(0)
-        raise TimeoutError("Expression evaluation timed out") from None
-    except SecurityError:
-        raise
-    except Exception as e:
-        raise Exception(f"Evaluation error: {str(e)}") from e
-    finally:
-        # Restore old signal handler
-        if old_handler is not None:
-            signal.signal(signal.SIGALRM, old_handler)
+    if is_unix:
+        # Use signal-based timeout on Unix (more efficient)
+        old_handler = None
+        try:
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(int(timeout))
+            
+            result = eval(compile(tree, "<string>", "eval"), {"__builtins__": SAFE_BUILTINS}, variables)
+            
+            signal.alarm(0)
+            return {"value": result, "type": type(result).__name__}
+        except TimeoutError:
+            signal.alarm(0)
+            raise TimeoutError("Expression evaluation timed out") from None
+        except SecurityError:
+            raise
+        except Exception as e:
+            raise Exception(f"Evaluation error: {str(e)}") from e
+        finally:
+            if old_handler is not None:
+                signal.signal(signal.SIGALRM, old_handler)
+    else:
+        # Use ThreadPoolExecutor on Windows (cross-platform)
+        try:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(
+                    _evaluate_in_thread,
+                    compile(tree, "<string>", "eval"),
+                    SAFE_BUILTINS,
+                    variables
+                )
+                result = future.result(timeout=timeout)
+                return {"value": result, "type": type(result).__name__}
+        except FutureTimeoutError:
+            raise TimeoutError("Expression evaluation timed out") from None
+        except SecurityError:
+            raise
+        except Exception as e:
+            raise Exception(f"Evaluation error: {str(e)}") from e

@@ -4,13 +4,14 @@ Job management API routes.
 
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
+from routilux.api.middleware.auth import RequireAuth
 from routilux.api.models.job import JobListResponse, JobResponse, JobStartRequest
+from routilux.api.validators import validate_flow_exists, validate_routine_exists
 from routilux.job_state import JobState
-from routilux.monitoring.registry import MonitoringRegistry
 from routilux.monitoring.storage import flow_store, job_store
 from routilux.status import ExecutionStatus
 
@@ -21,33 +22,44 @@ router = APIRouter()
 
 def _job_to_response(job_state: JobState) -> JobResponse:
     """Convert JobState to response model."""
+    # Extract error from job_state.error or execution history
+    error = None
+    if hasattr(job_state, "error") and job_state.error:
+        error = job_state.error
+    elif job_state.status in (ExecutionStatus.FAILED, ExecutionStatus.CANCELLED):
+        # Try to extract from execution history
+        for record in reversed(job_state.execution_history):
+            if hasattr(record, "error") and record.error:
+                error = record.error
+                break
+        # Fall back to shared_data
+        if not error:
+            error = job_state.shared_data.get("error")
+    
     return JobResponse(
         job_id=job_state.job_id,
         flow_id=job_state.flow_id,
         status=job_state.status.value
         if hasattr(job_state.status, "value")
         else str(job_state.status),
-        created_at=datetime.now(),  # JobState doesn't track creation time
-        started_at=None,  # Would need to track this
-        completed_at=None,  # Would need to track this
-        error=None,  # Would need to extract from execution history
+        created_at=getattr(job_state, "created_at", datetime.now()),
+        started_at=getattr(job_state, "started_at", None),
+        completed_at=getattr(job_state, "completed_at", None),
+        error=error,
     )
 
 
-@router.post("/jobs", response_model=JobResponse, status_code=201)
+@router.post("/jobs", response_model=JobResponse, status_code=201, dependencies=[RequireAuth])
 async def start_job(request: JobStartRequest):
     """Start a new job from a flow.
     
     This endpoint immediately returns a job_id and executes the flow asynchronously
     in the background. Use the job status endpoint to check execution progress.
     """
-    # Get flow
-    flow = flow_store.get(request.flow_id)
-    if not flow:
-        raise HTTPException(status_code=404, detail=f"Flow '{request.flow_id}' not found")
-
-    # Enable monitoring if not already enabled
-    MonitoringRegistry.enable()
+    # Validate flow exists
+    flow = validate_flow_exists(request.flow_id)
+    # Validate entry routine exists
+    validate_routine_exists(flow, request.entry_routine_id)
 
     # Create job state immediately (before execution)
     job_state = JobState(flow.flow_id)
@@ -82,6 +94,7 @@ async def start_job(request: JobStartRequest):
     response_model=JobListResponse,
     summary="List all jobs",
     description="Retrieve a paginated list of jobs with optional filters",
+    dependencies=[RequireAuth],
 )
 async def list_jobs(
     flow_id: Optional[str] = Query(None, description="Filter by flow ID"),
@@ -130,7 +143,7 @@ async def list_jobs(
     )
 
 
-@router.get("/jobs/{job_id}", response_model=JobResponse)
+@router.get("/jobs/{job_id}", response_model=JobResponse, dependencies=[RequireAuth])
 async def get_job(job_id: str):
     """Get job details."""
     job_state = job_store.get(job_id)
@@ -139,7 +152,7 @@ async def get_job(job_id: str):
     return _job_to_response(job_state)
 
 
-@router.post("/jobs/{job_id}/pause", status_code=200)
+@router.post("/jobs/{job_id}/pause", status_code=200, dependencies=[RequireAuth])
 async def pause_job(job_id: str):
     """Pause job execution."""
     job_state = job_store.get(job_id)
@@ -157,7 +170,7 @@ async def pause_job(job_id: str):
         raise HTTPException(status_code=400, detail=f"Failed to pause job: {str(e)}") from e
 
 
-@router.post("/jobs/{job_id}/resume", status_code=200)
+@router.post("/jobs/{job_id}/resume", status_code=200, dependencies=[RequireAuth])
 async def resume_job(job_id: str):
     """Resume job execution."""
     job_state = job_store.get(job_id)
@@ -176,7 +189,7 @@ async def resume_job(job_id: str):
         raise HTTPException(status_code=400, detail=f"Failed to resume job: {str(e)}") from e
 
 
-@router.post("/jobs/{job_id}/cancel", status_code=200)
+@router.post("/jobs/{job_id}/cancel", status_code=200, dependencies=[RequireAuth])
 async def cancel_job(job_id: str):
     """Cancel job execution."""
     job_state = job_store.get(job_id)
@@ -210,7 +223,7 @@ async def get_job_status(job_id: str):
     }
 
 
-@router.get("/jobs/{job_id}/state")
+@router.get("/jobs/{job_id}/state", dependencies=[RequireAuth])
 async def get_job_state(job_id: str):
     """Get full job state."""
     job_state = job_store.get(job_id)
@@ -219,3 +232,32 @@ async def get_job_state(job_id: str):
 
     # Serialize job state
     return job_state.serialize()
+
+
+@router.post("/jobs/cleanup", dependencies=[RequireAuth])
+async def cleanup_jobs(
+    max_age_hours: int = Query(24, ge=1, le=720, description="Maximum age in hours"),
+    status: Optional[List[str]] = Query(None, description="Status filter"),
+):
+    """Clean up old jobs.
+    
+    Removes jobs older than specified age, optionally filtered by status.
+    
+    Args:
+        max_age_hours: Maximum age in hours (1-720, default: 24).
+        status: Optional list of statuses to clean up.
+        
+    Returns:
+        Number of jobs removed.
+    """
+    max_age_seconds = max_age_hours * 3600
+    removed_count = job_store.cleanup_old_jobs(
+        max_age_seconds=max_age_seconds,
+        status_filter=status,
+    )
+    
+    return {
+        "removed_count": removed_count,
+        "max_age_hours": max_age_hours,
+        "status_filter": status,
+    }

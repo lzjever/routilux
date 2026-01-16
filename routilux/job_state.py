@@ -143,6 +143,10 @@ class JobState(Serializable):
         self.pending_tasks: List[Dict[str, Any]] = []  # Serialized pending tasks
         self.created_at: datetime = datetime.now()
         self.updated_at: datetime = datetime.now()
+        self.started_at: Optional[datetime] = None
+        self.completed_at: Optional[datetime] = None
+        self.error: Optional[str] = None
+        self.error_traceback: Optional[str] = None
 
         # Deferred events to be emitted on resume
         self.deferred_events: List[Dict[str, Any]] = []
@@ -175,6 +179,10 @@ class JobState(Serializable):
                 "execution_history",
                 "created_at",
                 "updated_at",
+                "started_at",
+                "completed_at",
+                "error",
+                "error_traceback",
                 "pause_points",
                 "pending_tasks",
                 "deferred_events",
@@ -353,13 +361,14 @@ class JobState(Serializable):
 
         # Critical fix: Use lock to prevent race conditions in concurrent mode
         with self._execution_history_lock:
-            # Check limit BEFORE appending to prevent memory spike
-            if len(self.execution_history) >= self._max_execution_history:
-                # Critical fix: Use del to modify list in-place instead of creating a new list
-                # This prevents concurrent modification errors if other threads hold references
-                del self.execution_history[:-(self._max_execution_history - 1)]
-
             self.execution_history.append(record)
+            # Check limit AFTER appending and trim if needed
+            # This ensures we always keep the most recent entries
+            if len(self.execution_history) > self._max_execution_history:
+                # Remove oldest entries (from the beginning) to maintain size limit
+                # Using slicing with positive index is clearer and more efficient
+                excess_count = len(self.execution_history) - self._max_execution_history
+                del self.execution_history[:excess_count]
             self.updated_at = datetime.now()
 
     def get_execution_history(self, routine_id: Optional[str] = None) -> List[ExecutionRecord]:
@@ -562,20 +571,24 @@ class JobState(Serializable):
     def add_deferred_event(self, routine_id: str, event_name: str, data: Dict[str, Any]) -> None:
         """Add a deferred event to be emitted on resume.
 
+        Thread-safe - uses lock to protect the append operation.
+
         Args:
             routine_id: ID of the routine that will emit the event.
             event_name: Name of the event to emit.
             data: Data to pass to the event.
         """
-        self.deferred_events.append(
-            {
-                "routine_id": routine_id,
-                "event_name": event_name,
-                "data": data,
-                "timestamp": datetime.now().isoformat(),
-            }
-        )
-        self.updated_at = datetime.now()
+        # Critical fix: Use lock to ensure atomicity of append + updated_at
+        with self._shared_data_lock:
+            self.deferred_events.append(
+                {
+                    "routine_id": routine_id,
+                    "event_name": event_name,
+                    "data": data,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
+            self.updated_at = datetime.now()
 
     def append_to_shared_log(self, entry: Dict[str, Any]) -> None:
         """Append entry to shared log.

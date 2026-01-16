@@ -4,6 +4,7 @@ Breakpoint management API routes.
 
 from fastapi import APIRouter, HTTPException
 
+from routilux.api.middleware.auth import RequireAuth
 from routilux.api.models.breakpoint import (
     BreakpointCreateRequest,
     BreakpointListResponse,
@@ -31,7 +32,7 @@ def _breakpoint_to_response(bp: Breakpoint) -> BreakpointResponse:
     )
 
 
-@router.post("/jobs/{job_id}/breakpoints", response_model=BreakpointResponse, status_code=201)
+@router.post("/jobs/{job_id}/breakpoints", response_model=BreakpointResponse, status_code=201, dependencies=[RequireAuth])
 async def create_breakpoint(job_id: str, request: BreakpointCreateRequest):
     """Create a breakpoint for a job."""
     # Verify job exists
@@ -39,8 +40,6 @@ async def create_breakpoint(job_id: str, request: BreakpointCreateRequest):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    # Enable monitoring
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     breakpoint_mgr = registry.breakpoint_manager
 
@@ -63,7 +62,7 @@ async def create_breakpoint(job_id: str, request: BreakpointCreateRequest):
     return _breakpoint_to_response(breakpoint)
 
 
-@router.get("/jobs/{job_id}/breakpoints", response_model=BreakpointListResponse)
+@router.get("/jobs/{job_id}/breakpoints", response_model=BreakpointListResponse, dependencies=[RequireAuth])
 async def list_breakpoints(job_id: str):
     """List all breakpoints for a job."""
     # Verify job exists
@@ -71,7 +70,6 @@ async def list_breakpoints(job_id: str):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     breakpoint_mgr = registry.breakpoint_manager
 
@@ -86,7 +84,7 @@ async def list_breakpoints(job_id: str):
     )
 
 
-@router.delete("/jobs/{job_id}/breakpoints/{breakpoint_id}", status_code=204)
+@router.delete("/jobs/{job_id}/breakpoints/{breakpoint_id}", status_code=204, dependencies=[RequireAuth])
 async def delete_breakpoint(job_id: str, breakpoint_id: str):
     """Delete a breakpoint."""
     # Verify job exists
@@ -94,7 +92,6 @@ async def delete_breakpoint(job_id: str, breakpoint_id: str):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     breakpoint_mgr = registry.breakpoint_manager
 
@@ -104,7 +101,7 @@ async def delete_breakpoint(job_id: str, breakpoint_id: str):
     breakpoint_mgr.remove_breakpoint(breakpoint_id, job_id)
 
 
-@router.put("/jobs/{job_id}/breakpoints/{breakpoint_id}", response_model=BreakpointResponse)
+@router.put("/jobs/{job_id}/breakpoints/{breakpoint_id}", response_model=BreakpointResponse, dependencies=[RequireAuth])
 async def update_breakpoint(job_id: str, breakpoint_id: str, enabled: bool):
     """Update breakpoint (enable/disable)."""
     # Verify job exists
@@ -112,7 +109,6 @@ async def update_breakpoint(job_id: str, breakpoint_id: str, enabled: bool):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     breakpoint_mgr = registry.breakpoint_manager
 

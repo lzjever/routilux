@@ -178,6 +178,15 @@ class ErrorHandler(Serializable):
             raise TypeError(
                 f"strategy must be str or ErrorStrategy, got {type(strategy).__name__}"
             )
+
+        # Critical fix: Validate retry parameters to prevent infinite loops
+        if max_retries is not None and max_retries < 0:
+            raise ValueError(f"max_retries must be >= 0, got {max_retries}")
+        if retry_delay is not None and retry_delay < 0:
+            raise ValueError(f"retry_delay must be >= 0, got {retry_delay}")
+        if retry_backoff is not None and retry_backoff < 1.0:
+            raise ValueError(f"retry_backoff must be >= 1.0 for exponential backoff, got {retry_backoff}")
+
         self.max_retries: int = max_retries
         self.retry_delay: float = retry_delay
         self.retry_backoff: float = retry_backoff

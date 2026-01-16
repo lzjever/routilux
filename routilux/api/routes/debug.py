@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from routilux.api.middleware.auth import RequireAuth
 from routilux.api.models.debug import ExpressionEvalRequest, ExpressionEvalResponse
 from routilux.api.security import SecurityError, TimeoutError, safe_evaluate
 from routilux.monitoring.registry import MonitoringRegistry
@@ -21,7 +22,7 @@ class VariableSetRequest(BaseModel):
     value: Any
 
 
-@router.get("/jobs/{job_id}/debug/session")
+@router.get("/jobs/{job_id}/debug/session", dependencies=[RequireAuth])
 async def get_debug_session(job_id: str):
     """Get debug session information."""
     # Verify job exists
@@ -29,7 +30,6 @@ async def get_debug_session(job_id: str):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     debug_store = registry.debug_session_store
 
@@ -53,7 +53,7 @@ async def get_debug_session(job_id: str):
     }
 
 
-@router.post("/jobs/{job_id}/debug/resume")
+@router.post("/jobs/{job_id}/debug/resume", dependencies=[RequireAuth])
 async def resume_debug(job_id: str):
     """Resume execution from breakpoint."""
     # Verify job exists
@@ -61,7 +61,6 @@ async def resume_debug(job_id: str):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     debug_store = registry.debug_session_store
 
@@ -77,7 +76,7 @@ async def resume_debug(job_id: str):
     return {"status": "resumed", "job_id": job_id}
 
 
-@router.post("/jobs/{job_id}/debug/step-over")
+@router.post("/jobs/{job_id}/debug/step-over", dependencies=[RequireAuth])
 async def step_over(job_id: str):
     """Step over current line."""
     # Verify job exists
@@ -85,7 +84,6 @@ async def step_over(job_id: str):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     debug_store = registry.debug_session_store
 
@@ -101,7 +99,7 @@ async def step_over(job_id: str):
     return {"status": "stepping", "job_id": job_id, "step_mode": "over"}
 
 
-@router.post("/jobs/{job_id}/debug/step-into")
+@router.post("/jobs/{job_id}/debug/step-into", dependencies=[RequireAuth])
 async def step_into(job_id: str):
     """Step into function."""
     # Verify job exists
@@ -109,7 +107,6 @@ async def step_into(job_id: str):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     debug_store = registry.debug_session_store
 
@@ -125,7 +122,7 @@ async def step_into(job_id: str):
     return {"status": "stepping", "job_id": job_id, "step_mode": "into"}
 
 
-@router.get("/jobs/{job_id}/debug/variables")
+@router.get("/jobs/{job_id}/debug/variables", dependencies=[RequireAuth])
 async def get_variables(job_id: str, routine_id: str = None):
     """Get variables at current breakpoint."""
     # Verify job exists
@@ -133,7 +130,6 @@ async def get_variables(job_id: str, routine_id: str = None):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     debug_store = registry.debug_session_store
 
@@ -160,7 +156,7 @@ async def get_variables(job_id: str, routine_id: str = None):
     }
 
 
-@router.put("/jobs/{job_id}/debug/variables/{name}")
+@router.put("/jobs/{job_id}/debug/variables/{name}", dependencies=[RequireAuth])
 async def set_variable(job_id: str, name: str, request: VariableSetRequest):
     """Set variable value at current breakpoint."""
     # Verify job exists
@@ -168,7 +164,6 @@ async def set_variable(job_id: str, name: str, request: VariableSetRequest):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     debug_store = registry.debug_session_store
 
@@ -193,7 +188,7 @@ async def set_variable(job_id: str, name: str, request: VariableSetRequest):
     }
 
 
-@router.get("/jobs/{job_id}/debug/call-stack")
+@router.get("/jobs/{job_id}/debug/call-stack", dependencies=[RequireAuth])
 async def get_call_stack(job_id: str):
     """Get call stack."""
     # Verify job exists
@@ -201,7 +196,6 @@ async def get_call_stack(job_id: str):
     if not job_state:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     debug_store = registry.debug_session_store
 
@@ -228,7 +222,7 @@ async def get_call_stack(job_id: str):
     }
 
 
-@router.post("/jobs/{job_id}/debug/evaluate", response_model=ExpressionEvalResponse)
+@router.post("/jobs/{job_id}/debug/evaluate", response_model=ExpressionEvalResponse, dependencies=[RequireAuth])
 async def evaluate_expression(job_id: str, request: ExpressionEvalRequest):
     """Evaluate an expression in the context of a paused job.
 
@@ -264,7 +258,6 @@ async def evaluate_expression(job_id: str, request: ExpressionEvalRequest):
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
     # Get debug session
-    MonitoringRegistry.enable()
     registry = MonitoringRegistry.get_instance()
     debug_store = registry.debug_session_store
 

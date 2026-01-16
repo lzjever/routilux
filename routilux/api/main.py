@@ -11,13 +11,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from routilux.api.routes import breakpoints, debug, flows, jobs, monitor, websocket
+from routilux.api.routes import breakpoints, debug, flows, jobs, monitor, websocket, discovery
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
+    # Enable monitoring once at startup
+    from routilux.monitoring.registry import MonitoringRegistry
+    MonitoringRegistry.enable()
+    
     if os.getenv("ROUTILUX_DEBUGGER_MODE") == "true":
         print("🔧 Debugger mode enabled - registering test flows...")
         await register_debugger_flows()
@@ -29,15 +33,27 @@ async def lifespan(app: FastAPI):
     print("🛑 Application shutting down...")
 
 
-async def register_debugger_flows():
-    """Register test flows for debugger"""
+def _setup_examples_path():
+    """Setup examples directory in sys.path for DSL loading support.
+    
+    This allows flows to be created from DSL that references example routines.
+    Should be called once during module initialization.
+    """
     import sys
     from pathlib import Path
-
-    # Add examples directory to path
+    
     examples_dir = str(Path(__file__).parent.parent.parent / "examples")
     if examples_dir not in sys.path:
         sys.path.insert(0, examples_dir)
+
+
+# Setup examples path once at module level
+_setup_examples_path()
+
+
+async def register_debugger_flows():
+    """Register test flows for debugger"""
+    # Examples path already set up at module level
 
     # Import flow creators
     from debugger_test_app import (
@@ -47,12 +63,9 @@ async def register_debugger_flows():
         create_linear_flow,
     )
 
-    from routilux.monitoring.registry import MonitoringRegistry
     from routilux.monitoring.storage import flow_store
 
-    # Enable monitoring
-    MonitoringRegistry.enable()
-
+    # Monitoring already enabled in lifespan()
     # Create and register flows
     linear_flow, _ = create_linear_flow()
     flow_store.add(linear_flow)
@@ -78,22 +91,32 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add examples directory to sys.path for DSL loading support
-# This allows flows to be created from DSL that references example routines
-import sys  # noqa: E402
-from pathlib import Path  # noqa: E402
-
-examples_dir = str(Path(__file__).parent.parent.parent / "examples")
-if examples_dir not in sys.path:
-    sys.path.insert(0, examples_dir)
-
 # CORS middleware for frontend access
-allowed_origins = os.getenv("ROUTILUX_CORS_ORIGINS", "*")
+# Security: Default to localhost-only, require explicit configuration for production
+allowed_origins_env = os.getenv("ROUTILUX_CORS_ORIGINS", "")
 
-if allowed_origins == "*":
+if not allowed_origins_env:
+    # Default: localhost only (development-friendly but secure)
+    allow_origins_list = [
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8000",
+    ]
+elif allowed_origins_env == "*":
+    # Explicit wildcard (user must set this intentionally)
+    import warnings
+    warnings.warn(
+        "CORS is set to allow all origins (*). This is insecure for production. "
+        "Consider restricting to specific origins.",
+        UserWarning
+    )
     allow_origins_list = ["*"]
 else:
-    allow_origins_list = [origin.strip() for origin in allowed_origins.split(",")]
+    # Comma-separated list of allowed origins
+    allow_origins_list = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,
@@ -106,6 +129,23 @@ app.add_middleware(
 # GZip middleware for response compression
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# Setup rate limiting
+from routilux.api.middleware.rate_limit import setup_rate_limiting
+setup_rate_limiting(app)
+
+# Register exception handlers
+from fastapi.exceptions import RequestValidationError
+from fastapi import status
+from routilux.api.middleware.error_handler import (
+    validation_exception_handler,
+    http_exception_handler,
+    general_exception_handler,
+)
+
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(status.HTTPException, http_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
+
 # Include routers
 app.include_router(flows.router, prefix="/api", tags=["flows"])
 app.include_router(jobs.router, prefix="/api", tags=["jobs"])
@@ -113,6 +153,7 @@ app.include_router(breakpoints.router, prefix="/api", tags=["breakpoints"])
 app.include_router(debug.router, prefix="/api", tags=["debug"])
 app.include_router(monitor.router, prefix="/api", tags=["monitor"])
 app.include_router(websocket.router, prefix="/api", tags=["websocket"])
+app.include_router(discovery.router, prefix="/api", tags=["discovery"])
 
 
 @app.get("/")
@@ -127,8 +168,42 @@ def root():
 
 @app.get("/api/health")
 def health():
-    """Health check endpoint."""
-    return {"status": "healthy"}
+    """Health check endpoint.
+    
+    Returns detailed health information including:
+    - Overall status
+    - Monitoring status
+    - Store accessibility
+    - Version information
+    """
+    from routilux.monitoring.registry import MonitoringRegistry
+    from routilux.monitoring.storage import flow_store, job_store
+    
+    # Check monitoring status
+    monitoring_enabled = MonitoringRegistry.is_enabled()
+    
+    # Check store accessibility
+    try:
+        flow_count = len(flow_store.list_all())
+        job_count = len(job_store.list_all())
+        stores_accessible = True
+    except Exception:
+        flow_count = None
+        job_count = None
+        stores_accessible = False
+    
+    return {
+        "status": "healthy",
+        "monitoring": {
+            "enabled": monitoring_enabled,
+        },
+        "stores": {
+            "accessible": stores_accessible,
+            "flow_count": flow_count,
+            "job_count": job_count,
+        },
+        "version": "0.10.0",
+    }
 
 
 if __name__ == "__main__":
@@ -136,13 +211,15 @@ if __name__ == "__main__":
 
     import uvicorn
 
-    # Default configuration
-    # Disable reload in test environment
+    # Read configuration from environment variables
+    # Support both PORT (common convention) and ROUTILUX_API_PORT (specific)
+    host = os.getenv("ROUTILUX_API_HOST", "0.0.0.0")
+    port = int(os.getenv("ROUTILUX_API_PORT", os.getenv("PORT", "20555")))
     reload = os.getenv("ROUTILUX_API_RELOAD", "true").lower() == "true"
 
     uvicorn.run(
         "routilux.api.main:app",
-        host="0.0.0.0",
-        port=20555,
-        reload=reload,  # Enable auto-reload in development
+        host=host,
+        port=port,
+        reload=reload,
     )

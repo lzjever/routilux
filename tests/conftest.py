@@ -1,42 +1,28 @@
 """
-pytest 配置和 fixtures
+Pytest configuration and fixtures for routilux tests.
 """
 
-import os
-import sys
-from pathlib import Path
+import pytest
 
-# Add project root to Python path so tests can import routilux
-project_root = Path(__file__).parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
-import pytest  # noqa: E402
+from routilux.monitoring.flow_registry import FlowRegistry
 
 
-@pytest.fixture
-def temp_file(tmp_path):
-    """提供临时文件路径"""
-    return str(tmp_path / "test_file.json")
+@pytest.fixture(autouse=True)
+def clear_flow_registry():
+    """Clear flow registry before each test to avoid conflicts."""
+    registry = FlowRegistry.get_instance()
+    registry.clear()
+    yield
+    # Cleanup after test
+    registry.clear()
 
 
-@pytest.fixture
-def temp_dir(tmp_path):
-    """提供临时目录路径"""
-    return str(tmp_path)
-
-
-@pytest.fixture
-def cleanup_files():
-    """清理函数，用于删除测试文件"""
-    files_to_cleanup = []
-
-    def _add_file(filepath):
-        files_to_cleanup.append(filepath)
-
-    yield _add_file
-
-    # 清理
-    for filepath in files_to_cleanup:
-        if os.path.exists(filepath):
-            os.remove(filepath)
+# Add timeout marker to all tests by default
+def pytest_collection_modifyitems(config, items):
+    """Add timeout marker to all tests if not already present."""
+    for item in items:
+        # Add timeout if not already set
+        # Use shorter timeout for faster feedback on hanging tests
+        if not any(marker.name == "timeout" for marker in item.iter_markers()):
+            # Default 30 seconds, but can be overridden per test
+            item.add_marker(pytest.mark.timeout(30))

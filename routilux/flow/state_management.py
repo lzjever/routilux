@@ -452,6 +452,8 @@ def cancel_flow(flow: "Flow", job_state: "JobState", reason: str = "") -> None:
     # Stop event loop
     flow._running = False
     with flow._execution_lock:
+        # Critical fix: Cancel all futures first, then clear the set
+        # Clearing inside the loop would skip remaining futures
         for future in flow._active_tasks.copy():
             future.cancel()
-            flow._active_tasks.clear()
+        flow._active_tasks.clear()

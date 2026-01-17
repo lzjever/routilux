@@ -13,7 +13,7 @@ from routilux.factory.factory import ObjectFactory
 router = APIRouter()
 
 
-@router.get("/objects", response_model=ObjectListResponse)
+@router.get("/objects", response_model=ObjectListResponse, dependencies=[RequireAuth])
 async def list_objects(category: Optional[str] = Query(None, description="Filter by category")):
     """List all available objects in the factory.
 
@@ -28,7 +28,7 @@ async def list_objects(category: Optional[str] = Query(None, description="Filter
     return ObjectListResponse(objects=objects, total=len(objects))
 
 
-@router.get("/objects/{name}", response_model=ObjectMetadataResponse)
+@router.get("/objects/{name}", response_model=ObjectMetadataResponse, dependencies=[RequireAuth])
 async def get_object_metadata(name: str):
     """Get metadata for a specific object.
 

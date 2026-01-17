@@ -16,11 +16,19 @@ class APIConfig:
     """API configuration.
 
     Loads configuration from environment variables with sensible defaults.
+
+    Auth control (all-or-nothing, 要么都保护要么都放开):
+        ROUTILUX_API_KEY_ENABLED controls whether all APIs require X-API-Key:
+        - true:  All REST endpoints and WebSockets require a valid X-API-Key
+                 (header for REST; api_key query for WebSocket). 401/403 or
+                 close(1008) when missing/invalid.
+        - false: All endpoints are public; X-API-Key is ignored if sent.
+        No mixed mode: the server either protects everything or nothing.
     """
 
     def __init__(self):
         """Load configuration from environment."""
-        # API Key authentication
+        # API Key authentication: when True, ALL endpoints require X-API-Key
         self.api_key_enabled: bool = (
             os.getenv("ROUTILUX_API_KEY_ENABLED", "false").lower() == "true"
         )

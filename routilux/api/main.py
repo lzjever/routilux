@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from routilux.api.middleware.auth import RequireAuth
 from routilux.api.routes import breakpoints, debug, discovery, flows, jobs, monitor, objects, websocket
 
 
@@ -163,7 +164,7 @@ app.include_router(discovery.router, prefix="/api", tags=["discovery"])
 app.include_router(objects.router, prefix="/api", tags=["objects"])
 
 
-@app.get("/")
+@app.get("/", dependencies=[RequireAuth])
 def root():
     """Root endpoint."""
     return {
@@ -173,7 +174,7 @@ def root():
     }
 
 
-@app.get("/api/health")
+@app.get("/api/health", dependencies=[RequireAuth])
 def health():
     """Health check endpoint.
 
@@ -199,8 +200,12 @@ def health():
         job_count = None
         stores_accessible = False
 
+    from routilux.api.config import get_config
+
+    config = get_config()
     return {
         "status": "healthy",
+        "auth_required": config.api_key_enabled,
         "monitoring": {
             "enabled": monitoring_enabled,
         },
@@ -211,6 +216,26 @@ def health():
         },
         "version": "0.10.0",
     }
+
+
+# OpenAPI: document X-API-Key so Swagger UI shows Authorize
+_original_openapi = app.openapi
+
+
+def _openapi_with_x_api_key():
+    schema = _original_openapi()
+    schema.setdefault("components", {})
+    schema["components"].setdefault("securitySchemes", {})
+    schema["components"]["securitySchemes"]["X-API-Key"] = {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key. Required when ROUTILUX_API_KEY_ENABLED=true; ignored when false.",
+    }
+    return schema
+
+
+app.openapi = _openapi_with_x_api_key
 
 
 if __name__ == "__main__":

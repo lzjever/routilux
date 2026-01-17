@@ -64,7 +64,7 @@ def _flow_to_response(flow: Flow) -> FlowResponse:
     )
 
 
-@router.get("/flows", response_model=FlowListResponse)
+@router.get("/flows", response_model=FlowListResponse, dependencies=[RequireAuth])
 async def list_flows():
     """List all flows."""
     flows = flow_store.list_all()
@@ -74,7 +74,7 @@ async def list_flows():
     )
 
 
-@router.get("/flows/{flow_id}", response_model=FlowResponse)
+@router.get("/flows/{flow_id}", response_model=FlowResponse, dependencies=[RequireAuth])
 async def get_flow(flow_id: str):
     """Get flow details."""
     flow = flow_store.get(flow_id)
@@ -116,7 +116,7 @@ async def delete_flow(flow_id: str):
     flow_store.remove(flow_id)
 
 
-@router.get("/flows/{flow_id}/dsl")
+@router.get("/flows/{flow_id}/dsl", dependencies=[RequireAuth])
 async def export_flow_dsl(flow_id: str, format: str = Query("yaml", pattern="^(yaml|json)$")):
     """Export flow as DSL."""
     flow = flow_store.get(flow_id)
@@ -192,7 +192,7 @@ async def validate_flow(flow_id: str):
     }
 
 
-@router.get("/flows/{flow_id}/routines", response_model=Dict[str, RoutineInfo])
+@router.get("/flows/{flow_id}/routines", response_model=Dict[str, RoutineInfo], dependencies=[RequireAuth])
 async def list_flow_routines(flow_id: str):
     """List all routines in a flow."""
     flow = flow_store.get(flow_id)
@@ -212,7 +212,7 @@ async def list_flow_routines(flow_id: str):
     return routines
 
 
-@router.get("/flows/{flow_id}/connections", response_model=List[ConnectionInfo])
+@router.get("/flows/{flow_id}/connections", response_model=List[ConnectionInfo], dependencies=[RequireAuth])
 async def list_flow_connections(flow_id: str):
     """List all connections in a flow."""
     flow = flow_store.get(flow_id)

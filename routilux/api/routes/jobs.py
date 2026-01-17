@@ -274,7 +274,7 @@ async def cancel_job(job_id: str):
         raise HTTPException(status_code=400, detail=f"Failed to cancel job: {str(e)}") from e
 
 
-@router.get("/jobs/{job_id}/status")
+@router.get("/jobs/{job_id}/status", dependencies=[RequireAuth])
 async def get_job_status(job_id: str):
     """Get job status."""
     job_state = job_store.get(job_id)

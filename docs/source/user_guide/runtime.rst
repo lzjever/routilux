@@ -27,22 +27,26 @@ Creating a Runtime:
 
    from routilux import Runtime
 
-   # Create runtime with default settings (10 workers)
-   runtime = Runtime(thread_pool_size=10)
+   # Create runtime with shared thread pool (recommended, default)
+   runtime = Runtime(thread_pool_size=0)  # Uses GlobalJobManager's shared pool
+
+   # Create runtime with independent thread pool
+   runtime = Runtime(thread_pool_size=10)  # Has its own 10-thread pool
 
    # Use context manager for automatic cleanup
-   with Runtime(thread_pool_size=10) as runtime:
+   with Runtime(thread_pool_size=0) as runtime:
        # Execute flows here
        pass
 
-.. warning:: **Thread Pool Size**
+.. note:: **Thread Pool Size**
 
-   Too few workers limit concurrency. Too many waste resources.
-   Default of 10 is good for most use cases. Adjust based on:
-
-   - I/O-bound operations: More workers (10-20)
-   - CPU-bound operations: Fewer workers (CPU count)
-   - Mixed workload: Balance between CPU and I/O
+   **Recommended: thread_pool_size=0** (uses GlobalJobManager's shared pool)
+   
+   When ``thread_pool_size=0``, Runtime uses the GlobalJobManager's shared thread pool
+   (100 threads by default). This is the recommended configuration for most scenarios
+   as it provides better resource utilization and avoids thread pool fragmentation.
+   
+   See :ref:`thread-pool-sizing` for detailed guidance on choosing thread pool size.
 
 Registering Flows
 -----------------
@@ -147,20 +151,34 @@ Cancelling Jobs
 Resource Management
 -----------------
 
-Runtime uses a shared thread pool for efficiency:
+Runtime can use either a shared thread pool or an independent thread pool:
 
 .. code-block:: python
 
-   # All jobs share same thread pool
-   runtime = Runtime(thread_pool_size=10)
+   # Option 1: Use shared thread pool (recommended)
+   # All Runtime instances with thread_pool_size=0 share GlobalJobManager's pool
+   runtime = Runtime(thread_pool_size=0)  # Uses shared pool (100 threads)
+
+   # Option 2: Use independent thread pool
+   # Each Runtime has its own thread pool
+   runtime = Runtime(thread_pool_size=10)  # Has its own 10-thread pool
 
    # Execute multiple jobs concurrently
    job1 = runtime.exec("flow1")
    job2 = runtime.exec("flow2")
    job3 = runtime.exec("flow3")
 
-   # All use same 10 worker threads
+   # All jobs use the same thread pool (shared or independent)
    runtime.wait_until_all_jobs_finished()
+
+.. note:: **Shared vs Independent Thread Pools**
+
+   * **thread_pool_size=0**: Uses GlobalJobManager's shared thread pool (100 threads).
+     All Runtime instances with this setting share the same pool. Recommended for
+     most scenarios.
+   
+   * **thread_pool_size>0**: Creates an independent thread pool for this Runtime.
+     Useful when you need resource isolation between different Runtime instances.
 
 .. warning:: **Runtime Shutdown**
 
@@ -239,6 +257,8 @@ Performance Considerations
 Thread Pool Sizing
 ~~~~~~~~~~~~~~~~~~~~
 
+.. _thread-pool-sizing:
+
 Choose thread pool size based on workload:
 
 .. list-table::
@@ -248,6 +268,10 @@ Choose thread pool size based on workload:
    * - Workload Type
      - Recommended Workers
      - Reason
+
+   * - **Shared pool (recommended)**
+     - **0 (uses GlobalJobManager's pool)**
+     - **All Runtime instances share one pool (100 threads by default)**
 
    * - I/O-bound (API calls, DB queries)
      - 10-20 workers
@@ -264,6 +288,59 @@ Choose thread pool size based on workload:
    * - Memory-constrained
      - 3-5 workers
      - Limit memory usage
+
+.. important:: **thread_pool_size=0 (Recommended)**
+
+   When ``thread_pool_size=0``, Runtime does **not** create its own thread pool.
+   Instead, it uses the **GlobalJobManager's shared thread pool** (100 threads by default).
+
+   **Benefits:**
+   
+   * ✅ **Resource efficiency**: All Runtime instances share one thread pool
+   * ✅ **No thread pool fragmentation**: Avoids creating multiple pools
+   * ✅ **Unified management**: Thread pool managed by GlobalJobManager
+   * ✅ **Recommended for most scenarios**: Default configuration
+
+   **How it works:**
+   
+   .. code-block:: python
+      
+      # Runtime with shared thread pool (recommended)
+      runtime = Runtime(thread_pool_size=0)  # Uses GlobalJobManager's pool
+      
+      # All Runtime instances with thread_pool_size=0 share the same pool
+      runtime1 = Runtime(thread_pool_size=0)
+      runtime2 = Runtime(thread_pool_size=0)
+      # Both use GlobalJobManager.global_thread_pool (100 threads)
+      
+      # Runtime with independent thread pool
+      runtime3 = Runtime(thread_pool_size=20)  # Has its own 20-thread pool
+      runtime4 = Runtime(thread_pool_size=10)  # Has its own 10-thread pool
+
+   **When to use thread_pool_size=0:**
+   
+   * Default configuration (recommended for most cases)
+   * Multiple Runtime instances that can share resources
+   * Simple deployments without resource isolation requirements
+   * Resource-constrained environments
+
+   **When to use thread_pool_size>0:**
+   
+   * Need resource isolation between different Runtime instances
+   * Performance tuning for specific Runtime with dedicated threads
+   * Multi-tenant scenarios requiring isolation
+   * Testing environments with small thread pools
+
+   **Default Runtime:**
+   
+   The default Runtime created by the system uses ``thread_pool_size=0``:
+   
+   .. code-block:: python
+      
+      from routilux.runtime import get_runtime_instance
+      
+      # Default runtime uses shared thread pool
+      runtime = get_runtime_instance()  # thread_pool_size=0
 
 Context Switching
 ~~~~~~~~~~~~~~~~

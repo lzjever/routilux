@@ -268,8 +268,14 @@ Start a job:
 
    {
      "flow_id": "my_flow",
-     "entry_params": {"data": "input"}
+     "runtime_id": "production",
+     "timeout": 3600.0
    }
+
+.. note:: **Runtime Selection**
+
+   The ``runtime_id`` field is optional. If not specified, the default runtime is used.
+   Use ``GET /api/runtimes`` to see available runtimes. See :ref:`runtime-management` for details.
 
 Pause a job:
 
@@ -358,6 +364,50 @@ Evaluate expression:
      "expression": "data.value * 2",
      "variables": {"data": {"value": 42}}
    }
+
+Runtime Management
+~~~~~~~~~~~~~~~~~~~
+
+.. _runtime-management:
+
+List all runtimes:
+
+.. code-block:: http
+
+   GET /api/runtimes
+   X-API-Key: your-secret-key-here
+
+Get runtime details:
+
+.. code-block:: http
+
+   GET /api/runtimes/{runtime_id}
+   X-API-Key: your-secret-key-here
+
+Create a new runtime:
+
+.. code-block:: http
+
+   POST /api/runtimes
+   X-API-Key: your-secret-key-here
+   Content-Type: application/json
+
+   {
+     "runtime_id": "production",
+     "thread_pool_size": 20,
+     "is_default": false
+   }
+
+.. important:: **thread_pool_size Parameter**
+
+   * **thread_pool_size=0** (recommended): Uses GlobalJobManager's shared thread pool
+     (100 threads by default). All Runtime instances with this setting share the same pool.
+     This is the default and recommended configuration for most scenarios.
+
+   * **thread_pool_size>0**: Creates an independent thread pool for this Runtime.
+     Useful when you need resource isolation between different Runtime instances.
+
+   See :doc:`user_guide/runtime` for detailed guidance on thread pool sizing.
 
 Monitoring Endpoints
 ~~~~~~~~~~~~~~~~~~~~

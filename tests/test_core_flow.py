@@ -68,10 +68,10 @@ class TestFlow:
         connection = flow.connect(source_id, "output", target_id, "input")
         
         assert isinstance(connection, Connection)
-        assert connection.source_routine_id == source_id
-        assert connection.source_event == "output"
-        assert connection.target_routine_id == target_id
-        assert connection.target_slot == "input"
+        assert connection.source_event is not None
+        assert connection.source_event.name == "output"
+        assert connection.target_slot is not None
+        assert connection.target_slot.name == "input"
         assert connection in flow.connections
 
     def test_flow_connect_invalid_source(self):
@@ -127,7 +127,8 @@ class TestFlow:
         flow.add_routine(routine, "test")
         
         data = flow.serialize()
-        restored = Flow.deserialize(data)
+        restored = Flow()
+        restored.deserialize(data)
         
         assert restored.flow_id == flow.flow_id
         assert len(restored.routines) == 1

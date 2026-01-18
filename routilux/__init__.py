@@ -38,6 +38,16 @@ from routilux.core.output import (
 # Flow builder (still in flow/ for now)
 from routilux.flow.builder import FlowBuilder
 
+# Activation policies
+from routilux.activation_policies import (
+    all_slots_ready_policy,
+    batch_size_policy,
+    breakpoint_policy,
+    custom_policy,
+    immediate_policy,
+    time_interval_policy,
+)
+
 # Factory
 from routilux.tools.factory import ObjectFactory, ObjectMetadata
 
@@ -102,6 +112,13 @@ __all__ = [
     "ObjectMetadata",
     # Testing utilities
     "RoutineTester",
+    # Activation policies
+    "immediate_policy",
+    "all_slots_ready_policy",
+    "batch_size_policy",
+    "time_interval_policy",
+    "custom_policy",
+    "breakpoint_policy",
 ]
 
 # Add analysis tools if available

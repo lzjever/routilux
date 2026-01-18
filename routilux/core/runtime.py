@@ -98,7 +98,7 @@ class Runtime:
 
     def __del__(self) -> None:
         """Cleanup thread pool when Runtime is garbage collected."""
-        if not self._is_shutdown and getattr(self, "thread_pool", None) is not None:
+        if not getattr(self, "_is_shutdown", False) and getattr(self, "thread_pool", None) is not None:
             try:
                 self.thread_pool.shutdown(wait=False)
             except Exception:
@@ -392,19 +392,27 @@ class Runtime:
     ) -> None:
         """Check if routine should be activated based on its policy.
 
+        This method checks the activation policy and if activation is needed,
+        creates SlotActivationTask(s) for each slot with data and submits them
+        to the WorkerExecutor. This ensures proper context binding and thread
+        execution.
+
         Args:
             routine: Routine to check
             worker_state: WorkerState for this execution
         """
-        from routilux.core.hooks import get_execution_hooks
-
         activation_policy = getattr(routine, "_activation_policy", None)
         if activation_policy is None:
             return
 
+        # Get logic - try _logic attribute first, then check for logic method
         logic = getattr(routine, "_logic", None)
         if logic is None:
-            return
+            # Check if routine has a logic method defined
+            if hasattr(routine, "logic") and callable(getattr(routine, "logic", None)):
+                logic = routine.logic
+            else:
+                return
 
         try:
             # Call activation policy
@@ -419,12 +427,14 @@ class Runtime:
             flow = getattr(routine, "_current_flow", None)
             routine_id = flow._get_routine_id(routine) if flow else None
 
-            # Call routine start hook
-            hooks = get_execution_hooks()
+            # Get job context from current context (should be set by EventRoutingTask)
             from routilux.core.context import get_current_job
+            from routilux.core.hooks import get_execution_hooks
 
             job_context = get_current_job()
 
+            # Call routine start hook
+            hooks = get_execution_hooks()
             if routine_id:
                 should_continue = hooks.on_routine_start(
                     routine_id, worker_state, job_context
@@ -432,7 +442,8 @@ class Runtime:
                 if not should_continue:
                     return
 
-            # Execute logic
+            # Execute logic directly in this thread (we're already in WorkerExecutor's event loop)
+            # This ensures job_context is already bound from EventRoutingTask processing
             try:
                 # Prepare arguments
                 slot_data_lists = []

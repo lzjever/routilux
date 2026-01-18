@@ -3,7 +3,14 @@
 import time
 
 import pytest
-from routilux.core import Flow, JobContext, JobStatus, Runtime, Routine
+from routilux.core import (
+    ExecutionStatus,
+    Flow,
+    JobContext,
+    JobStatus,
+    Runtime,
+    Routine,
+)
 
 
 class TestRuntimeCreation:
@@ -42,52 +49,78 @@ class TestRuntimeExec:
 
     def test_exec_creates_worker(self):
         """Test that exec() creates a worker."""
+        from routilux.core import FlowRegistry, get_flow_registry
+        
         class TestRoutine(Routine):
             def setup(self):
                 self.add_slot("input")
         
         flow = Flow()
+        flow.flow_id = "test_flow"
         routine = TestRoutine()
         routine.setup()
         flow.add_routine(routine, "test")
         
+        # Register flow
+        registry = get_flow_registry()
+        registry.register_by_name("test_flow", flow)
+        
         runtime = Runtime()
-        worker_state = runtime.exec("test_flow", flow)
+        worker_state = runtime.exec("test_flow")
         
         assert worker_state is not None
         assert worker_state.flow_id == flow.flow_id
         assert worker_state.worker_id is not None
-        assert worker_state.status == "running"
+        assert worker_state.status == ExecutionStatus.RUNNING
 
     def test_exec_registers_flow(self):
-        """Test that exec() registers the flow."""
+        """Test that exec() uses registered flow."""
         from routilux.core import get_flow_registry
         
-        flow = Flow()
-        flow.flow_id = "test_flow"
-        
-        runtime = Runtime()
-        runtime.exec("test_flow", flow)
-        
-        registry = get_flow_registry()
-        assert registry.get("test_flow") == flow
-
-    def test_exec_with_existing_worker_id(self):
-        """Test exec() with an existing worker state."""
         class TestRoutine(Routine):
             def setup(self):
                 self.add_slot("input")
         
         flow = Flow()
+        flow.flow_id = "test_flow"
         routine = TestRoutine()
         routine.setup()
         flow.add_routine(routine, "test")
         
+        # Register flow first
+        registry = get_flow_registry()
+        registry.register_by_name("test_flow", flow)
+        
         runtime = Runtime()
-        worker1 = runtime.exec("test_flow", flow)
+        worker_state = runtime.exec("test_flow")
+        
+        # Flow should be accessible
+        assert registry.get_by_name("test_flow") == flow
+        assert worker_state.flow_id == flow.flow_id
+
+    def test_exec_with_existing_worker_id(self):
+        """Test exec() creates new worker each time."""
+        from routilux.core import get_flow_registry
+        
+        class TestRoutine(Routine):
+            def setup(self):
+                self.add_slot("input")
+        
+        flow = Flow()
+        flow.flow_id = "test_flow"
+        routine = TestRoutine()
+        routine.setup()
+        flow.add_routine(routine, "test")
+        
+        # Register flow
+        registry = get_flow_registry()
+        registry.register_by_name("test_flow", flow)
+        
+        runtime = Runtime()
+        worker1 = runtime.exec("test_flow")
         
         # Exec again should create a new worker
-        worker2 = runtime.exec("test_flow", flow)
+        worker2 = runtime.exec("test_flow")
         
         assert worker1.worker_id != worker2.worker_id
 
@@ -97,6 +130,8 @@ class TestRuntimePost:
 
     def test_post_creates_job(self):
         """Test that post() creates a job."""
+        from routilux.core import get_flow_registry
+        
         class TestRoutine(Routine):
             def setup(self):
                 self.add_slot("input")
@@ -105,12 +140,17 @@ class TestRuntimePost:
                 return {"result": "processed"}
         
         flow = Flow()
+        flow.flow_id = "test_flow"
         routine = TestRoutine()
         routine.setup()
         flow.add_routine(routine, "processor")
         
+        # Register flow
+        registry = get_flow_registry()
+        registry.register_by_name("test_flow", flow)
+        
         runtime = Runtime()
-        runtime.exec("test_flow", flow)
+        runtime.exec("test_flow")
         
         worker_state, job = runtime.post(
             "test_flow", "processor", "input",
@@ -126,17 +166,24 @@ class TestRuntimePost:
 
     def test_post_with_metadata(self):
         """Test post() with metadata."""
+        from routilux.core import get_flow_registry
+        
         class TestRoutine(Routine):
             def setup(self):
                 self.add_slot("input")
         
         flow = Flow()
+        flow.flow_id = "test_flow"
         routine = TestRoutine()
         routine.setup()
         flow.add_routine(routine, "processor")
         
+        # Register flow
+        registry = get_flow_registry()
+        registry.register_by_name("test_flow", flow)
+        
         runtime = Runtime()
-        runtime.exec("test_flow", flow)
+        runtime.exec("test_flow")
         
         metadata = {"user_id": "123", "source": "api"}
         worker_state, job = runtime.post(
@@ -149,17 +196,24 @@ class TestRuntimePost:
 
     def test_post_with_custom_job_id(self):
         """Test post() with custom job ID."""
+        from routilux.core import get_flow_registry
+        
         class TestRoutine(Routine):
             def setup(self):
                 self.add_slot("input")
         
         flow = Flow()
+        flow.flow_id = "test_flow"
         routine = TestRoutine()
         routine.setup()
         flow.add_routine(routine, "processor")
         
+        # Register flow
+        registry = get_flow_registry()
+        registry.register_by_name("test_flow", flow)
+        
         runtime = Runtime()
-        runtime.exec("test_flow", flow)
+        runtime.exec("test_flow")
         
         custom_job_id = "custom-job-123"
         worker_state, job = runtime.post(
@@ -179,26 +233,41 @@ class TestRuntimePost:
 
     def test_post_nonexistent_routine(self):
         """Test post() with nonexistent routine."""
+        from routilux.core import get_flow_registry
+        
         flow = Flow()
+        flow.flow_id = "test_flow"
+        
+        # Register flow
+        registry = get_flow_registry()
+        registry.register_by_name("test_flow", flow)
+        
         runtime = Runtime()
-        runtime.exec("test_flow", flow)
+        runtime.exec("test_flow")
         
         with pytest.raises(ValueError):
             runtime.post("test_flow", "nonexistent", "slot", {"data": "test"})
 
     def test_post_nonexistent_slot(self):
         """Test post() with nonexistent slot."""
+        from routilux.core import get_flow_registry
+        
         class TestRoutine(Routine):
             def setup(self):
                 self.add_slot("input")
         
         flow = Flow()
+        flow.flow_id = "test_flow"
         routine = TestRoutine()
         routine.setup()
         flow.add_routine(routine, "processor")
         
+        # Register flow
+        registry = get_flow_registry()
+        registry.register_by_name("test_flow", flow)
+        
         runtime = Runtime()
-        runtime.exec("test_flow", flow)
+        runtime.exec("test_flow")
         
         with pytest.raises(ValueError):
             runtime.post("test_flow", "processor", "nonexistent", {"data": "test"})

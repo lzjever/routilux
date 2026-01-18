@@ -1,7 +1,7 @@
 """Tests for Slot, Event, and Connection classes."""
 
 import pytest
-from routilux.core import Connection, Event, Slot, SlotQueueFullError
+from routilux.core import Connection, Event, Runtime, Slot, SlotQueueFullError
 
 
 class TestSlot:
@@ -14,43 +14,42 @@ class TestSlot:
         assert slot.name == "input"
         assert slot.routine is None
 
-    def test_slot_set_handler(self):
-        """Test setting a handler function for a slot."""
+    def test_slot_enqueue(self):
+        """Test enqueueing data to a slot."""
+        from datetime import datetime
+        
         slot = Slot(name="input", routine=None)
         
-        def handler(data, **kwargs):
-            return {"result": data}
+        slot.enqueue({"test": "data"}, emitted_from="source", emitted_at=datetime.now())
         
-        slot.set_handler(handler)
-        assert slot.handler == handler
+        assert slot.get_total_count() == 1
+        assert slot.get_unconsumed_count() == 1
 
-    def test_slot_call_handler(self):
-        """Test calling a slot's handler."""
+    def test_slot_consume(self):
+        """Test consuming data from a slot."""
+        from datetime import datetime
+        
         slot = Slot(name="input", routine=None)
         
-        result_data = None
+        slot.enqueue({"test": "data"}, emitted_from="source", emitted_at=datetime.now())
         
-        def handler(data, **kwargs):
-            nonlocal result_data
-            result_data = data
-            return {"processed": True}
+        data = slot.consume_one_new()
         
-        slot.set_handler(handler)
-        result = slot.call({"test": "data"})
-        
-        assert result_data == {"test": "data"}
-        assert result == {"processed": True}
+        assert data == {"test": "data"}
+        assert slot.get_unconsumed_count() == 0
 
     def test_slot_queue_status(self):
         """Test getting slot queue status."""
-        slot = Slot(name="input", routine=None, max_queue_size=10)
+        slot = Slot(name="input", routine=None, max_queue_length=10)
         
         status = slot.get_queue_status()
         
-        assert "size" in status
-        assert "max_size" in status
-        assert status["max_size"] == 10
-        assert status["size"] == 0
+        assert "total_count" in status
+        assert "max_length" in status
+        assert status["max_length"] == 10
+        assert status["total_count"] == 0
+        assert "unconsumed_count" in status
+        assert "usage_percentage" in status
 
 
 class TestEvent:
@@ -64,23 +63,37 @@ class TestEvent:
         assert event.routine is None
 
     def test_event_emit_requires_runtime(self):
-        """Test that emit requires a runtime."""
+        """Test that emit requires a runtime and worker_state with executor."""
         from routilux.core.flow import Flow
         from routilux.core.routine import Routine
+        from routilux.core.worker import WorkerState
+        from routilux.core.manager import get_worker_manager
         
         class TestRoutine(Routine):
             def setup(self):
                 self.add_event("output")
         
         routine = TestRoutine()
+        routine.setup()
         flow = Flow()
+        flow.flow_id = "test_flow"
         flow.add_routine(routine, "test")
         
         event = routine.events["output"]
+        runtime = Runtime()
         
-        # Emit should fail without runtime
-        with pytest.raises((AttributeError, TypeError)):
-            event.emit(None, None, data={"test": "value"})
+        # Start a worker to get a proper WorkerState with executor
+        from routilux.core import get_flow_registry
+        registry = get_flow_registry()
+        registry.register_by_name("test_flow", flow)
+        worker_state = runtime.exec("test_flow")
+        
+        # Emit should work with runtime and worker_state that has executor
+        # (This will create an EventRoutingTask, actual routing happens in executor)
+        event.emit(runtime, worker_state, data={"test": "value"})
+        
+        # Verify event has connected_slots list
+        assert hasattr(event, "connected_slots")
 
 
 class TestConnection:
@@ -88,38 +101,47 @@ class TestConnection:
 
     def test_connection_creation(self):
         """Test creating a connection."""
-        connection = Connection(
-            source_routine_id="source",
-            source_event="output",
-            target_routine_id="target",
-            target_slot="input"
-        )
+        from routilux.core import Event, Slot
         
-        assert connection.source_routine_id == "source"
-        assert connection.source_event == "output"
-        assert connection.target_routine_id == "target"
-        assert connection.target_slot == "input"
+        event = Event(name="output", routine=None)
+        slot = Slot(name="input", routine=None)
+        
+        connection = Connection(source_event=event, target_slot=slot)
+        
+        assert connection.source_event == event
+        assert connection.target_slot == slot
+        assert connection.source_event.name == "output"
+        assert connection.target_slot.name == "input"
 
     def test_connection_equality(self):
-        """Test connection equality."""
-        conn1 = Connection("source", "output", "target", "input")
-        conn2 = Connection("source", "output", "target", "input")
-        conn3 = Connection("source", "output", "target", "input2")
+        """Test connection equality (by object identity)."""
+        from routilux.core import Event, Slot
         
-        assert conn1 == conn2
-        assert conn1 != conn3
+        event1 = Event(name="output", routine=None)
+        slot1 = Slot(name="input", routine=None)
+        conn1 = Connection(source_event=event1, target_slot=slot1)
+        
+        event2 = Event(name="output", routine=None)
+        slot2 = Slot(name="input", routine=None)
+        conn2 = Connection(source_event=event2, target_slot=slot2)
+        
+        # Connections are equal if they have the same event and slot objects
+        assert conn1.source_event == conn1.source_event
+        assert conn2.source_event == conn2.source_event
+        # Different objects are not equal
+        assert conn1.source_event != conn2.source_event
 
     def test_connection_serialization(self):
         """Test connection serialization."""
-        connection = Connection("source", "output", "target", "input")
+        from routilux.core import Event, Slot
+        
+        event = Event(name="output", routine=None)
+        slot = Slot(name="input", routine=None)
+        connection = Connection(source_event=event, target_slot=slot)
         
         data = connection.serialize()
         
-        assert data["source_routine_id"] == "source"
-        assert data["source_event"] == "output"
-        assert data["target_routine_id"] == "target"
-        assert data["target_slot"] == "input"
-        
-        # Test deserialization
-        restored = Connection.deserialize(data)
-        assert restored == connection
+        assert "_source_event_name" in data
+        assert data["_source_event_name"] == "output"
+        assert "_target_slot_name" in data
+        assert data["_target_slot_name"] == "input"

@@ -14,7 +14,7 @@ class TestWorkerState:
         
         assert worker_state.flow_id == flow.flow_id
         assert worker_state.worker_id is not None
-        assert worker_state.status == ExecutionStatus.IDLE
+        assert worker_state.status == ExecutionStatus.PENDING
         assert worker_state.routine_states == {}
         assert worker_state.execution_history == []
         assert worker_state.jobs_processed == 0
@@ -25,32 +25,36 @@ class TestWorkerState:
         flow = Flow()
         worker_state = WorkerState(flow_id=flow.flow_id)
         
-        worker_state.update_routine_state("routine1", "active")
+        worker_state.update_routine_state("routine1", {"status": "active", "count": 5})
         
-        assert worker_state.routine_states["routine1"] == "active"
+        state = worker_state.get_routine_state("routine1")
+        assert state is not None
+        assert state["status"] == "active"
+        assert state["count"] == 5
 
     def test_worker_state_record_execution(self):
         """Test recording execution."""
         flow = Flow()
         worker_state = WorkerState(flow_id=flow.flow_id)
         
-        record = worker_state.record_execution(
+        worker_state.record_execution(
             routine_id="routine1",
             event_name="output",
             data={"value": 42}
         )
         
+        assert len(worker_state.execution_history) == 1
+        record = worker_state.execution_history[0]
         assert isinstance(record, ExecutionRecord)
         assert record.routine_id == "routine1"
         assert record.event_name == "output"
         assert record.data == {"value": 42}
-        assert len(worker_state.execution_history) == 1
 
     def test_worker_state_serialization(self):
         """Test WorkerState serialization."""
         flow = Flow()
         worker_state = WorkerState(flow_id=flow.flow_id)
-        worker_state.update_routine_state("routine1", "active")
+        worker_state.update_routine_state("routine1", {"status": "active"})
         worker_state.record_execution("routine1", "output", {"test": "data"})
         
         data = worker_state.serialize()
@@ -64,14 +68,17 @@ class TestWorkerState:
         """Test WorkerState deserialization."""
         flow = Flow()
         worker_state = WorkerState(flow_id=flow.flow_id)
-        worker_state.update_routine_state("routine1", "active")
+        worker_state.update_routine_state("routine1", {"status": "active"})
         
         data = worker_state.serialize()
-        restored = WorkerState.deserialize(data)
+        restored = WorkerState()
+        restored.deserialize(data)
         
         assert restored.flow_id == worker_state.flow_id
         assert restored.worker_id == worker_state.worker_id
-        assert restored.routine_states == worker_state.routine_states
+        restored_state = restored.get_routine_state("routine1")
+        original_state = worker_state.get_routine_state("routine1")
+        assert restored_state == original_state
 
 
 class TestExecutionRecord:
@@ -98,7 +105,7 @@ class TestExecutionRecord:
             data={"value": 42}
         )
         
-        data = record.serialize()
+        data = record.to_dict()
         
         assert data["routine_id"] == "routine1"
         assert data["event_name"] == "output"

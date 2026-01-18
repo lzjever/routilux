@@ -18,13 +18,15 @@ def reset_state():
     # Reset worker manager
     reset_worker_manager()
     
-    # Note: FlowRegistry uses weak references, so flows will be cleaned up
-    # automatically when they go out of scope. No need to manually unregister.
+    # Clear flow registry
+    registry = get_flow_registry()
+    registry.clear()
     
     yield
     
     # Cleanup after test
     reset_worker_manager()
+    registry.clear()
 
 
 @pytest.fixture

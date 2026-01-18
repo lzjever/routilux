@@ -117,10 +117,17 @@ class TestOutputHelpers:
         original_stdout = sys.stdout
         
         try:
-            install_routed_stdout()
+            # Uninstall any existing routed stdout first
             uninstall_routed_stdout()
-            assert sys.stdout is not original_stdout  # Should restore to __stdout__
+            install_routed_stdout()
+            assert isinstance(sys.stdout, RoutedStdout)
+            uninstall_routed_stdout()
+            # After uninstall, should not be RoutedStdout anymore
+            assert not isinstance(sys.stdout, RoutedStdout)
+            # Should restore to original stdout
+            assert sys.stdout is original_stdout
         finally:
+            uninstall_routed_stdout()
             sys.stdout = original_stdout
 
     def test_get_job_output(self):
@@ -128,8 +135,10 @@ class TestOutputHelpers:
         original_stdout = sys.stdout
         
         try:
+            # Uninstall any existing routed stdout first
+            uninstall_routed_stdout()
             install_routed_stdout()
-            job = JobContext(job_id="test-job")
+            job = JobContext(job_id="test-job-unique")
             
             set_current_job(job)
             try:
@@ -137,9 +146,11 @@ class TestOutputHelpers:
             finally:
                 set_current_job(None)
             
-            output = get_job_output("test-job")
+            # Use incremental=False to get full buffer without clearing
+            output = get_job_output("test-job-unique", incremental=False)
             assert "test output" in output
         finally:
+            uninstall_routed_stdout()
             sys.stdout = original_stdout
 
     def test_clear_job_output(self):
@@ -147,8 +158,10 @@ class TestOutputHelpers:
         original_stdout = sys.stdout
         
         try:
+            # Uninstall any existing routed stdout first
+            uninstall_routed_stdout()
             install_routed_stdout()
-            job = JobContext(job_id="test-job")
+            job = JobContext(job_id="test-job-clear")
             
             set_current_job(job)
             try:
@@ -156,12 +169,15 @@ class TestOutputHelpers:
             finally:
                 set_current_job(None)
             
-            output1 = get_job_output("test-job")
+            # Use incremental=False to get full buffer without clearing
+            output1 = get_job_output("test-job-clear", incremental=False)
             assert "test output" in output1
             
-            clear_job_output("test-job")
+            clear_job_output("test-job-clear")
             
-            output2 = get_job_output("test-job")
+            # After clear, both incremental and buffer should be empty
+            output2 = get_job_output("test-job-clear", incremental=False)
             assert output2 == ""
         finally:
+            uninstall_routed_stdout()
             sys.stdout = original_stdout

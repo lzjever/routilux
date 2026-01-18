@@ -12,7 +12,7 @@ import time
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
-    from routilux.core.worker import JobState
+    from routilux.core.worker import WorkerState
     from routilux.core.slot import Slot
 
 
@@ -39,7 +39,7 @@ def time_interval_policy(min_interval_seconds: float):
     """
 
     def policy(
-        slots: dict[str, Slot], job_state: JobState
+        slots: dict[str, Slot], worker_state: "WorkerState"
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """Time interval activation policy.
 
@@ -50,9 +50,10 @@ def time_interval_policy(min_interval_seconds: float):
         Returns:
             Tuple of (should_activate, data_slice, policy_message).
         """
-        # Use composite key (job_id + routine_id) to avoid collisions
-        routine_id = job_state.current_routine_id or "unknown"
-        activation_key = f"{job_state.job_id}:{routine_id}"
+        # Use composite key (worker_id + routine_id) to avoid collisions
+        # Note: In new architecture, we use worker_id instead of job_id for activation tracking
+        routine_id = getattr(worker_state, "current_routine_id", None) or "unknown"
+        activation_key = f"{worker_state.worker_id}:{routine_id}"
         now = time.time()
 
         # Check if enough time has passed (thread-safe)
@@ -100,7 +101,7 @@ def batch_size_policy(min_batch_size: int):
     """
 
     def policy(
-        slots: dict[str, Slot], job_state: JobState
+        slots: dict[str, Slot], worker_state: "WorkerState"
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """Batch size activation policy.
 
@@ -155,7 +156,7 @@ def all_slots_ready_policy():
     """
 
     def policy(
-        slots: dict[str, Slot], job_state: JobState
+        slots: dict[str, Slot], worker_state: "WorkerState"
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """All slots ready activation policy.
 
@@ -188,7 +189,7 @@ def all_slots_ready_policy():
     return policy
 
 
-def custom_policy(check_function: Callable[[dict[str, Slot], JobState], bool]):
+def custom_policy(check_function: Callable[[dict[str, Slot], "WorkerState"], bool]):
     """Create a custom activation policy from a check function.
 
     The check function should return True if the routine should be activated,
@@ -196,14 +197,14 @@ def custom_policy(check_function: Callable[[dict[str, Slot], JobState], bool]):
     when activating.
 
     Args:
-        check_function: Function that takes (slots, job_state) and returns bool.
+        check_function: Function that takes (slots, worker_state) and returns bool.
             Should return True to activate, False to skip.
 
     Returns:
         Activation policy function.
 
     Examples:
-        >>> def my_check(slots, job_state):
+        >>> def my_check(slots, worker_state):
         ...     # Custom logic
         ...     return slots["input"].get_unconsumed_count() > 5
         >>> policy = custom_policy(my_check)
@@ -211,7 +212,7 @@ def custom_policy(check_function: Callable[[dict[str, Slot], JobState], bool]):
     """
 
     def policy(
-        slots: dict[str, Slot], job_state: JobState
+        slots: dict[str, Slot], worker_state: "WorkerState"
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """Custom activation policy.
 
@@ -223,7 +224,7 @@ def custom_policy(check_function: Callable[[dict[str, Slot], JobState], bool]):
             Tuple of (should_activate, data_slice, policy_message).
         """
         # Call custom check function
-        if not check_function(slots, job_state):
+        if not check_function(slots, worker_state):
             return False, {}, None
 
         # Extract data from all slots
@@ -255,7 +256,7 @@ def immediate_policy():
     """
 
     def policy(
-        slots: dict[str, Slot], job_state: JobState
+        slots: dict[str, Slot], worker_state: "WorkerState"
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """Immediate activation policy.
 
@@ -306,7 +307,7 @@ def breakpoint_policy(routine_id: str):
     """
 
     def policy(
-        slots: dict[str, Slot], job_state: JobState
+        slots: dict[str, Slot], worker_state: "WorkerState"
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """Breakpoint activation policy.
 
@@ -327,11 +328,12 @@ def breakpoint_policy(routine_id: str):
             # So we can use data directly
             slot_data_dict[slot_name] = data
 
-        # Save to job_state.debug_data
-        if not hasattr(job_state, "debug_data"):
-            job_state.debug_data = {}
+        # Save to worker_state.debug_data (if exists)
+        # Note: In new architecture, debug data should be stored in JobContext
+        if not hasattr(worker_state, "debug_data"):
+            worker_state.debug_data = {}
         
-        job_state.debug_data[routine_id] = {
+        worker_state.debug_data[routine_id] = {
             "slot_data": slot_data_dict,
             "timestamp": time.time(),
             "routine_id": routine_id,

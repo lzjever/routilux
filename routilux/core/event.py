@@ -127,6 +127,11 @@ class Event(Serializable):
                 "Event routing requires a WorkerExecutor."
             )
 
+        # Get current job context for propagation
+        from routilux.core.context import get_current_job
+
+        job_context = get_current_job()
+
         # Create routing task and submit to event loop thread
         from routilux.core.task import EventRoutingTask
 
@@ -135,6 +140,7 @@ class Event(Serializable):
             event_data=event_data,
             worker_state=worker_state,
             runtime=runtime,
+            job_context=job_context,  # Pass job_context for propagation
         )
 
         worker_executor.enqueue_task(routing_task)

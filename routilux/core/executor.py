@@ -180,7 +180,11 @@ class WorkerExecutor:
 
                 if isinstance(task, EventRoutingTask):
                     # Route event in event loop thread
+                    # Set job_context in context before routing
+                    old_job = _current_job.get(None)
                     try:
+                        if task.job_context:
+                            set_current_job(task.job_context)
                         task.runtime.handle_event_emit(
                             task.event, task.event_data, task.worker_state
                         )
@@ -189,6 +193,7 @@ class WorkerExecutor:
                             f"Error routing event for worker {self.worker_state.worker_id}: {e}"
                         )
                     finally:
+                        set_current_job(old_job)
                         self.task_queue.task_done()
                 elif isinstance(task, SlotActivationTask):
                     # Submit routine execution to global thread pool

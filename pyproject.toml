@@ -126,6 +126,7 @@ addopts = "-v --tb=short"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
     "timeout: timeout in seconds for the test (used by conftest)",
+    "api: marks tests as API endpoint tests (use 'make test-api' to run only these)",
 ]
 
 [tool.mypy]

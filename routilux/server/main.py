@@ -12,7 +12,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from routilux.server.middleware.auth import RequireAuth
-from routilux.server.routes import breakpoints, debug, discovery, flows, jobs, monitor, objects, websocket
+from routilux.server.routes import (
+    breakpoints,
+    debug,
+    discovery,
+    execute,
+    flows,
+    health,
+    jobs,
+    monitor,
+    objects,
+    websocket,
+    workers,
+)
 
 
 @asynccontextmanager
@@ -28,7 +40,7 @@ async def lifespan(app: FastAPI):
     from routilux.monitoring.runtime_registry import RuntimeRegistry
     runtime_registry = RuntimeRegistry.get_instance()
     # Create default runtime if it doesn't exist
-    runtime_registry.get_or_create_default(thread_pool_size=0)  # Use GlobalJobManager's pool
+    runtime_registry.get_or_create_default(thread_pool_size=0)
 
     if os.getenv("ROUTILUX_DEBUGGER_MODE") == "true":
         print("🔧 Debugger mode enabled - registering test flows...")
@@ -71,31 +83,37 @@ async def register_debugger_flows():
         create_linear_flow,
     )
 
-    from routilux.monitoring.storage import flow_store
+    from routilux.server.dependencies import get_flow_registry
 
+    flow_registry = get_flow_registry()
+    
     # Monitoring already enabled in lifespan()
     # Create and register flows
     linear_flow, _ = create_linear_flow()
-    flow_store.add(linear_flow)
+    flow_registry.register(linear_flow)
+    flow_registry.register_by_name(linear_flow.flow_id, linear_flow)
     print(f"  ✓ Registered: {linear_flow.flow_id}")
 
     branch_flow, _ = create_branching_flow()
-    flow_store.add(branch_flow)
+    flow_registry.register(branch_flow)
+    flow_registry.register_by_name(branch_flow.flow_id, branch_flow)
     print(f"  ✓ Registered: {branch_flow.flow_id}")
 
     complex_flow, _ = create_complex_flow()
-    flow_store.add(complex_flow)
+    flow_registry.register(complex_flow)
+    flow_registry.register_by_name(complex_flow.flow_id, complex_flow)
     print(f"  ✓ Registered: {complex_flow.flow_id}")
 
     error_flow, _ = create_error_flow()
-    flow_store.add(error_flow)
+    flow_registry.register(error_flow)
+    flow_registry.register_by_name(error_flow.flow_id, error_flow)
     print(f"  ✓ Registered: {error_flow.flow_id}")
 
 
 app = FastAPI(
     title="Routilux API",
     description="Monitoring, debugging, and flow builder API for Routilux",
-    version="0.10.0",
+    version="0.11.0",
     lifespan=lifespan,
 )
 
@@ -159,9 +177,23 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
-# Include routers
+# =============================================================================
+# API v1 Routes (New Architecture)
+# =============================================================================
+# These are the new refactored routes following the Worker/Job model
+
+app.include_router(workers.router, prefix="/api/v1", tags=["workers"])
+app.include_router(jobs.router, prefix="/api/v1", tags=["jobs"])
+app.include_router(execute.router, prefix="/api/v1", tags=["execute"])
+app.include_router(health.router, prefix="/api/v1", tags=["health"])
+
+# =============================================================================
+# Legacy Routes (for backward compatibility)
+# =============================================================================
+# These routes maintain backward compatibility with the old API
+
 app.include_router(flows.router, prefix="/api", tags=["flows"])
-app.include_router(jobs.router, prefix="/api", tags=["jobs"])
+app.include_router(flows.router, prefix="/api/v1", tags=["flows"])  # Also under v1
 app.include_router(breakpoints.router, prefix="/api", tags=["breakpoints"])
 app.include_router(debug.router, prefix="/api", tags=["debug"])
 app.include_router(monitor.router, prefix="/api", tags=["monitor"])
@@ -173,6 +205,7 @@ app.include_router(objects.router, prefix="/api/factory", tags=["factory"])
 from routilux.server.routes import runtimes
 
 app.include_router(runtimes.router, prefix="/api", tags=["runtimes"])
+app.include_router(runtimes.router, prefix="/api/v1", tags=["runtimes"])
 
 
 @app.get("/", dependencies=[RequireAuth])
@@ -180,31 +213,41 @@ def root():
     """Root endpoint."""
     return {
         "name": "Routilux API",
-        "version": "0.10.0",
+        "version": "0.11.0",
         "description": "Monitoring, debugging, and flow builder API",
+        "api_version": "v1",
+        "endpoints": {
+            "v1": "/api/v1",
+            "health": "/api/v1/health/live",
+            "docs": "/docs",
+        }
     }
 
 
 @app.get("/api/health", dependencies=[RequireAuth])
-def health():
-    """Health check endpoint.
-
-    Returns detailed health information including:
-    - Overall status
-    - Monitoring status
-    - Store accessibility
-    - Version information
+def legacy_health():
+    """Legacy health check endpoint.
+    
+    For the new health endpoints, use:
+    - GET /api/v1/health/live (liveness)
+    - GET /api/v1/health/ready (readiness)
+    - GET /api/v1/health/stats (detailed stats)
     """
     from routilux.monitoring.registry import MonitoringRegistry
-    from routilux.monitoring.storage import flow_store, job_store
+    from routilux.server.dependencies import get_runtime, get_flow_registry, get_job_storage
 
     # Check monitoring status
     monitoring_enabled = MonitoringRegistry.is_enabled()
 
     # Check store accessibility
     try:
-        flow_count = len(flow_store.list_all())
-        job_count = len(job_store.list_all())
+        flow_registry = get_flow_registry()
+        flow_count = len(flow_registry.list_all())
+        
+        runtime = get_runtime()
+        with runtime._jobs_lock:
+            job_count = sum(len(jobs) for jobs in runtime._active_jobs.values())
+        
         stores_accessible = True
     except Exception:
         flow_count = None
@@ -225,7 +268,7 @@ def health():
             "flow_count": flow_count,
             "job_count": job_count,
         },
-        "version": "0.10.0",
+        "version": "0.11.0",
     }
 
 
@@ -261,7 +304,7 @@ if __name__ == "__main__":
     reload = os.getenv("ROUTILUX_API_RELOAD", "true").lower() == "true"
 
     uvicorn.run(
-        "routilux.api.main:app",
+        "routilux.server.main:app",
         host=host,
         port=port,
         reload=reload,

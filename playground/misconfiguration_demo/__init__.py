@@ -1,2 +1,0 @@
-"""Misconfiguration demo package."""
-

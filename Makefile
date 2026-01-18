@@ -97,10 +97,11 @@ dev-install:
 	@echo "✅ Package and dependencies installed! Ready for development."
 
 test:
-	$(PYTHON_CMD) -m pytest tests/ -v
+	@echo "Running core tests (excluding API tests)..."
+	$(PYTHON_CMD) -m pytest tests/ -v -m "not api"
 
 test-cov:
-	$(PYTHON_CMD) -m pytest tests/ --cov=routilux --cov-report=html --cov-report=term
+	$(PYTHON_CMD) -m pytest tests/ -m "not api" --cov=routilux --cov-report=html --cov-report=term
 
 test-integration:
 	@echo "Running integration tests (requires external services)..."
@@ -108,7 +109,7 @@ test-integration:
 
 test-unit:
 	@echo "Running unit tests only..."
-	$(PYTHON_CMD) -m pytest tests/ -v -m "not integration"
+	$(PYTHON_CMD) -m pytest tests/ -v -m "not integration and not api"
 
 test-api:
 	@echo "Running API endpoint tests..."

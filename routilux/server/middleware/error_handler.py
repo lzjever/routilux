@@ -12,6 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from routilux.server.models.error import ErrorResponse
+from routilux.server.errors import ErrorCode, create_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -36,13 +37,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-        content=ErrorResponse(
-            error="validation_error",
-            error_code="VALIDATION_ERROR",
-            message="Request validation failed",
+        content=create_error_response(
+            ErrorCode.VALIDATION_ERROR,
+            "Request validation failed",
             details={"errors": serializable_errors},
-            timestamp=int(datetime.now().timestamp()),
-        ).model_dump(),
+        ),
     )
 
 
@@ -60,39 +59,49 @@ def _make_serializable(obj):
 
 async def http_exception_handler(request: Request, exc):
     """Handle HTTP exceptions."""
-    # Extract error details from exception
-    error_code = "http_error"
-    message = str(exc.detail)
-    details = None
-
-    # Safely handle dict detail
-    if isinstance(exc.detail, dict):
-        error_code = exc.detail.get("error", "http_error")
-        msg_val = exc.detail.get("message", exc.detail)
-        # Convert to string if needed
-        if not isinstance(msg_val, str):
-            try:
-                message = str(msg_val)
-            except Exception:
-                message = "Validation error"
-        else:
-            message = msg_val
-        details = exc.detail.get("details")
-
-    # Include both custom format and FastAPI's default 'detail' field for compatibility
-    error_response = ErrorResponse(
-        error=error_code,
-        error_code=error_code.upper(),
-        message=message,
-        details=details,
-        timestamp=int(datetime.now().timestamp()),
-    ).model_dump()
-    # Add 'detail' field for backward compatibility with FastAPI's default format
-    error_response["detail"] = message
+    # If detail is already a structured error dict (from create_error_response), use it
+    if isinstance(exc.detail, dict) and "error" in exc.detail:
+        error_dict = exc.detail
+        
+        # Check if it's the new format (error.code, error.message)
+        if isinstance(error_dict.get("error"), dict):
+            return JSONResponse(
+                status_code=exc.status_code,
+                content=error_dict,
+            )
+        
+        # Old format - convert to new format
+        error_code = error_dict.get("error", "http_error")
+        message = error_dict.get("message", str(exc.detail))
+        details = error_dict.get("details")
+        
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=create_error_response(
+                ErrorCode.INTERNAL_ERROR,
+                message,
+                details=details,
+            ),
+        )
+    
+    # Plain string detail
+    message = str(exc.detail) if exc.detail else "An error occurred"
+    
+    # Map status codes to error codes
+    error_code_map = {
+        400: ErrorCode.VALIDATION_ERROR,
+        401: ErrorCode.INTERNAL_ERROR,  # AUTH error not defined, use internal
+        403: ErrorCode.INTERNAL_ERROR,
+        404: ErrorCode.INTERNAL_ERROR,
+        409: ErrorCode.INTERNAL_ERROR,
+        500: ErrorCode.INTERNAL_ERROR,
+        503: ErrorCode.RUNTIME_SHUTDOWN,
+    }
+    error_code = error_code_map.get(exc.status_code, ErrorCode.INTERNAL_ERROR)
     
     return JSONResponse(
         status_code=exc.status_code,
-        content=error_response,
+        content=create_error_response(error_code, message),
     )
 
 
@@ -102,11 +111,8 @@ async def general_exception_handler(request: Request, exc: Exception):
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=ErrorResponse(
-            error="internal_server_error",
-            error_code="INTERNAL_SERVER_ERROR",
-            message="An internal server error occurred",
-            details=None,
-            timestamp=int(datetime.now().timestamp()),
-        ).model_dump(),
+        content=create_error_response(
+            ErrorCode.INTERNAL_ERROR,
+            "An internal server error occurred",
+        ),
     )

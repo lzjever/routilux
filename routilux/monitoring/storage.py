@@ -140,24 +140,20 @@ class JobStore:
             if job is not None:
                 return job
 
-            # Fall back to global registry
+            # Fall back to Runtime jobs
             try:
-                from routilux.core.registry import JobRegistry
-
-                registry = JobRegistry.get_instance()
-                job = registry.get(job_id)
-                if job is not None:
-                    # Auto-add to local store for future queries
-                    self._jobs[job.job_id] = job
-                    # Update flow_jobs mapping
-                    flow_id = job.flow_id
-                    if flow_id not in self._flow_jobs:
-                        self._flow_jobs[flow_id] = []
-                    if job.job_id not in self._flow_jobs[flow_id]:
-                        self._flow_jobs[flow_id].append(job.job_id)
-                return job
+                from routilux.monitoring.runtime_registry import RuntimeRegistry
+                
+                runtime_registry = RuntimeRegistry.get_instance()
+                for runtime in runtime_registry.get_all().values():
+                    job = runtime.get_job(job_id)
+                    if job is not None:
+                        # Note: job is a JobContext, not JobState
+                        # We store it anyway for compatibility
+                        return job
+                return None
             except ImportError:
-                # Registry not available, return None
+                # RuntimeRegistry not available, return None
                 return None
 
     def add(self, job_state: "JobState") -> None:
@@ -216,26 +212,26 @@ class JobStore:
             local_job_ids = self._flow_jobs.get(flow_id, [])
             local_jobs = [self._jobs[jid] for jid in local_job_ids if jid in self._jobs]
 
-            # Also get from global registry
+            # Also get from Runtime
             try:
-                from routilux.core.registry import JobRegistry
-
-                registry = JobRegistry.get_instance()
-                registry_jobs = registry.get_by_flow(flow_id)
-
-                # Merge (avoid duplicates)
+                from routilux.monitoring.runtime_registry import RuntimeRegistry
+                from routilux.core.registry import WorkerRegistry
+                
+                runtime_registry = RuntimeRegistry.get_instance()
+                worker_registry = WorkerRegistry.get_instance()
+                
                 job_ids = {j.job_id for j in local_jobs}
-                for job in registry_jobs:
-                    if job.job_id not in job_ids:
-                        local_jobs.append(job)
-                        # Cache in local store
-                        self._jobs[job.job_id] = job
-                        if flow_id not in self._flow_jobs:
-                            self._flow_jobs[flow_id] = []
-                        if job.job_id not in self._flow_jobs[flow_id]:
-                            self._flow_jobs[flow_id].append(job.job_id)
+                
+                for runtime in runtime_registry.get_all().values():
+                    # Get workers for this flow
+                    for worker in worker_registry.list_all():
+                        if worker.flow_id == flow_id:
+                            for job in runtime.list_jobs(worker_id=worker.worker_id):
+                                if job.job_id not in job_ids:
+                                    local_jobs.append(job)
+                                    job_ids.add(job.job_id)
             except ImportError:
-                # Registry not available, return local jobs only
+                # RuntimeRegistry not available, return local jobs only
                 pass
 
             return local_jobs
@@ -252,28 +248,20 @@ class JobStore:
         with self._lock:
             local_jobs = list(self._jobs.values())
 
-            # Also get jobs from global registry
+            # Also get jobs from Runtime
             try:
-                from routilux.core.registry import JobRegistry
-
-                registry = JobRegistry.get_instance()
-                registry_jobs = registry.list_all()
-
-                # Merge (avoid duplicates)
+                from routilux.monitoring.runtime_registry import RuntimeRegistry
+                
+                runtime_registry = RuntimeRegistry.get_instance()
                 job_ids = {j.job_id for j in local_jobs}
-                for job in registry_jobs:
-                    if job.job_id not in job_ids:
-                        local_jobs.append(job)
-                        # Cache in local store
-                        self._jobs[job.job_id] = job
-                        # Update flow_jobs mapping
-                        flow_id = job.flow_id
-                        if flow_id not in self._flow_jobs:
-                            self._flow_jobs[flow_id] = []
-                        if job.job_id not in self._flow_jobs[flow_id]:
-                            self._flow_jobs[flow_id].append(job.job_id)
+                
+                for runtime in runtime_registry.get_all().values():
+                    for job in runtime.list_jobs():
+                        if job.job_id not in job_ids:
+                            local_jobs.append(job)
+                            job_ids.add(job.job_id)
             except ImportError:
-                # Registry not available, return local jobs only
+                # RuntimeRegistry not available, return local jobs only
                 pass
 
             return local_jobs

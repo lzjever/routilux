@@ -29,7 +29,13 @@ if TYPE_CHECKING:
 from routilux.core.registry import FlowRegistry
 from routilux.monitoring.registry import MonitoringRegistry
 from routilux.monitoring.storage import job_store
-from routilux.core.runtime import get_runtime_instance
+
+
+def get_runtime_instance():
+    """Get default Runtime instance (compatibility wrapper)."""
+    from routilux.monitoring.runtime_registry import RuntimeRegistry
+    registry = RuntimeRegistry.get_instance()
+    return registry.get_or_create_default()
 
 
 class MonitorService:

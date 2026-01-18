@@ -87,10 +87,14 @@ from routilux.core.routine import (
     set_current_worker_state,
 )
 
+# Flow
+from routilux.core.flow import Flow, RoutineConfig, WorkerNotRunningError
+
+# Worker executor and manager
+from routilux.core.executor import WorkerExecutor
+from routilux.core.manager import WorkerManager, get_worker_manager, reset_worker_manager
+
 # Note: The following will be added as they are created:
-# from routilux.core.flow import Flow
-# from routilux.core.executor import WorkerExecutor
-# from routilux.core.manager import WorkerManager, get_worker_manager
 # from routilux.core.runtime import Runtime
 
 __all__ = [
@@ -142,10 +146,15 @@ __all__ = [
     "ExecutionContext",
     "get_current_worker_state",
     "set_current_worker_state",
-    # TODO: Add these when created
-    # "Flow",
-    # "WorkerExecutor",
-    # "WorkerManager",
-    # "get_worker_manager",
+    # Flow
+    "Flow",
+    "RoutineConfig",
+    "WorkerNotRunningError",
+    # Worker executor and manager
+    "WorkerExecutor",
+    "WorkerManager",
+    "get_worker_manager",
+    "reset_worker_manager",
+    # TODO: Add when created
     # "Runtime",
 ]

@@ -263,7 +263,7 @@ object instances don't exist in the new process.
        def __init__(self):
            super().__init__()
            # ✅ Correct: Use method from this routine
-           self.input_slot = self.define_slot("input", handler=self.process_data)
+           self.input_slot = self.add_slot("input", handler=self.process_data)
        
        def process_data(self, data):
            return {"processed": data}
@@ -278,7 +278,7 @@ object instances don't exist in the new process.
            other_routine = OtherRoutine()
            # ❌ Wrong: Using method from another routine
            # This will raise ValueError during serialization
-           self.input_slot = self.define_slot("input", handler=other_routine.process)
+           self.input_slot = self.add_slot("input", handler=other_routine.process)
 
 **Error Message**:
 
@@ -292,7 +292,7 @@ If you try to serialize a method from another routine, you'll get a clear error:
 
 **What Gets Validated**:
 
-* Slot handlers (in ``Routine.define_slot()``)
+* Slot handlers (in ``Routine.add_slot()``)
 * Merge strategies (if they are callable methods)
 * Conditional router conditions (if they are callable methods)
 
@@ -374,8 +374,8 @@ for distributed execution and recovery.
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["data"])
        
        def send(self, **kwargs):
            self.emit("output", data="initial_data")
@@ -384,8 +384,8 @@ for distributed execution and recovery.
    class DataProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def process(self, data=None, **kwargs):
            result = f"Processed: {data}"

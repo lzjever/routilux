@@ -180,15 +180,6 @@ class Routine(Serializable):
             self._events[name] = event
             return event
 
-    # Backward compatibility aliases
-    def define_slot(self, name: str, max_queue_length: int = 1000, watermark: float = 0.8) -> Slot:
-        """Alias for add_slot (backward compatibility)."""
-        return self.add_slot(name, max_queue_length=max_queue_length, watermark=watermark)
-
-    def define_event(self, name: str, output_params: list[str] | None = None) -> Event:
-        """Alias for add_event (backward compatibility)."""
-        return self.add_event(name, output_params=output_params)
-
     def emit(
         self,
         event_name: str,
@@ -296,6 +287,53 @@ class Routine(Serializable):
         """
         self._activation_policy = policy
         return self
+
+    def get_activation_policy_info(self) -> dict[str, Any]:
+        """Get activation policy information.
+
+        Returns:
+            Dictionary with policy type and description
+        """
+        if self._activation_policy is None:
+            return {
+                "type": "immediate",
+                "description": "Default activation policy - routine activates immediately when data arrives"
+            }
+        
+        # Try to get policy name/type
+        policy_name = getattr(self._activation_policy, "__name__", "custom")
+        policy_module = getattr(self._activation_policy, "__module__", "")
+        
+        # Check if it's a known policy type
+        if "breakpoint" in policy_name.lower() or "breakpoint" in policy_module.lower():
+            return {
+                "type": "breakpoint",
+                "description": "Breakpoint policy - routine pauses at breakpoint"
+            }
+        elif "batch" in policy_name.lower():
+            return {
+                "type": "batch",
+                "description": "Batch policy - routine activates when batch size reached"
+            }
+        elif "time" in policy_name.lower() or "interval" in policy_name.lower():
+            return {
+                "type": "time_interval",
+                "description": "Time interval policy - routine activates at intervals"
+            }
+        else:
+            return {
+                "type": "custom",
+                "description": f"Custom activation policy: {policy_name}",
+                "module": policy_module
+            }
+
+    def get_all_config(self) -> dict[str, Any]:
+        """Get all configuration values.
+
+        Returns:
+            Copy of the configuration dictionary
+        """
+        return self.config()  # Use existing config() method
 
     def set_logic(self, logic: Callable) -> Routine:
         """Set logic function for this routine.

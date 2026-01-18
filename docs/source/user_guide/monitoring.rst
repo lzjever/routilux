@@ -303,8 +303,8 @@ Example: Complete Monitoring Setup
    class Processor(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def logic(slot_data, policy_message, job_state):
                data = slot_data.get("input", [{}])[0].get("data", "")

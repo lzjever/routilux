@@ -79,8 +79,8 @@ Activate when all slots have at least one new data point.
    class Aggregator(Routine):
        def __init__(self):
            super().__init__()
-           self.input1 = self.define_slot("input1")
-           self.input2 = self.define_slot("input2")
+           self.input1 = self.add_slot("input1")
+           self.input2 = self.add_slot("input2")
 
            # Wait for both inputs
            routine.set_activation_policy(all_slots_ready_policy())
@@ -105,7 +105,7 @@ Activate when all slots have at least N unconsumed data points.
    class BatchProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input", max_queue_length=1000)
+           self.input = self.add_slot("input", max_queue_length=1000)
 
            # Wait for batch of 10 items
            routine.set_activation_policy(batch_size_policy(min_batch_size=10))
@@ -131,7 +131,7 @@ Activate at most once every N seconds, regardless of how many events arrive.
    class RateLimitedProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
+           self.input = self.add_slot("input")
 
            # Limit to one activation every 10 seconds
            routine.set_activation_policy(time_interval_policy(min_interval_seconds=10.0))

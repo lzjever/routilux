@@ -55,12 +55,12 @@ def handle_task_error(
         error_msg = f"Cannot handle task error: task.slot is None. Error: {error}"
         logging.getLogger(__name__).error(error_msg)
         # Still update job state if available
-        if task.job_state:
-            from routilux.core.status import ExecutionStatus
+    if task.worker_state:
+        from routilux.core.status import ExecutionStatus
 
-            task.job_state.status = ExecutionStatus.FAILED
-            task.job_state.record_execution("unknown", "error", {"error": error_msg})
-        _stop_execution(task.job_state, flow)
+        task.worker_state.status = ExecutionStatus.FAILED
+        task.worker_state.record_execution("unknown", "error", {"error": error_msg})
+    _stop_execution(task.worker_state, flow)
         return
 
     routine = task.slot.routine
@@ -82,7 +82,7 @@ def handle_task_error(
 
     if error_handler:
         should_retry = error_handler.handle_error(
-            error, routine, routine_id, flow, job_state=task.job_state
+            error, routine, routine_id, flow, worker_state=task.worker_state
         )
 
         if error_handler.strategy.value == "retry":
@@ -100,10 +100,11 @@ def handle_task_error(
                         priority=task.priority,
                         retry_count=task.retry_count + 1,
                         max_retries=max_retries,
-                        job_state=task.job_state,  # Preserve JobState in retry task
+                        worker_state=task.worker_state,  # Preserve WorkerState in retry task
+                        job_context=task.job_context,  # Preserve JobContext in retry task
                     )
-                    # Route to JobExecutor if available, otherwise use flow._enqueue_task()
-                    if not _enqueue_to_executor(retry_task, task.job_state):
+                    # Route to WorkerExecutor if available, otherwise use flow._enqueue_task()
+                    if not _enqueue_to_executor(retry_task, task.worker_state):
                         # CRITICAL fix: Validate required method exists before calling
                         if not hasattr(flow, "_enqueue_task"):
                             raise AttributeError(
@@ -113,54 +114,57 @@ def handle_task_error(
                     return
             # Max retries reached or non-retryable exception, fall through to default
             # Record error in execution history before marking as failed
-            if task.job_state and routine_id:
-                task.job_state.record_execution(
+            if task.worker_state and routine_id:
+                task.worker_state.record_execution(
                     routine_id, "error", {"slot": task.slot.name, "error": str(error)}
                 )
 
         elif error_handler.strategy.value == "continue":
-            if task.job_state and routine_id:
+            if task.worker_state and routine_id:
                 # Record error in execution history
-                task.job_state.record_execution(
+                task.worker_state.record_execution(
                     routine_id, "error", {"slot": task.slot.name, "error": str(error)}
                 )
             return
 
         elif error_handler.strategy.value == "skip":
-            if task.job_state and routine_id:
-                task.job_state.update_routine_state(routine_id, {"status": "skipped"})
+            if task.worker_state and routine_id:
+                task.worker_state.update_routine_state(routine_id, {"status": "skipped"})
             return
 
-    # Update JobState on failure
-    if task.job_state:
+    # Update WorkerState on failure
+    if task.worker_state:
         from routilux.core.status import ExecutionStatus
 
-        task.job_state.status = ExecutionStatus.FAILED
+        task.worker_state.status = ExecutionStatus.FAILED
         if routine_id:
-            task.job_state.update_routine_state(
+            task.worker_state.update_routine_state(
                 routine_id, {"status": "failed", "error": str(error)}
             )
 
-    _stop_execution(task.job_state, flow)
+    _stop_execution(task.worker_state, flow)
 
 
-def _enqueue_to_executor(task: "SlotActivationTask", job_state) -> bool:
-    """Enqueue task to JobExecutor if available.
+def _enqueue_to_executor(task: "SlotActivationTask", worker_state) -> bool:
+    """Enqueue task to WorkerExecutor if available.
 
     Args:
         task: SlotActivationTask to enqueue.
-        job_state: JobState for finding the executor.
+        worker_state: WorkerState for finding the executor.
 
     Returns:
         True if enqueued to executor, False otherwise.
     """
-    if job_state is None:
+    if worker_state is None:
         return False
 
-    from routilux.core.manager import get_job_manager
+    from routilux.core.manager import get_worker_manager
 
-    job_manager = get_job_manager()
-    executor = job_manager.get_job(job_state.job_id)
+    worker_manager = get_worker_manager()
+    # Get worker_id from worker_state
+    worker_id = getattr(worker_state, "worker_id", None)
+    if worker_id:
+        executor = worker_manager.get_worker(worker_id)
 
     if executor is not None:
         executor.enqueue_task(task)
@@ -169,18 +173,21 @@ def _enqueue_to_executor(task: "SlotActivationTask", job_state) -> bool:
     return False
 
 
-def _stop_execution(job_state, flow: "Flow") -> None:
-    """Stop execution - either JobExecutor or Flow.
+def _stop_execution(worker_state, flow: "Flow") -> None:
+    """Stop execution - either WorkerExecutor or Flow.
 
     Args:
-        job_state: JobState for finding the executor.
+        worker_state: WorkerState for finding the executor.
         flow: Flow object (fallback).
     """
-    if job_state is not None:
-        from routilux.core.manager import get_job_manager
+    if worker_state is not None:
+        from routilux.core.manager import get_worker_manager
 
-        job_manager = get_job_manager()
-        executor = job_manager.get_job(job_state.job_id)
+        worker_manager = get_worker_manager()
+        # Get worker_id from worker_state
+        worker_id = getattr(worker_state, "worker_id", None)
+        if worker_id:
+            executor = worker_manager.get_worker(worker_id)
 
         if executor is not None:
             # CRITICAL fix: Acquire lock before modifying _running flag

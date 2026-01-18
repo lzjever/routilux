@@ -629,7 +629,7 @@ class Flow:
 
 ```python
 class Routine:
-    def define_slot(
+    def add_slot(
         self,
         name: str,
         max_queue_length: int | None = None,  # 新增：支持覆盖

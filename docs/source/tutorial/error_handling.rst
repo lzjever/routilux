@@ -35,8 +35,8 @@ Let's see each strategy in action:
    class UnreliableRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.process)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.process)
+           self.output_event = self.add_event("output", ["data"])
            self.call_count = 0
        
        def process(self, **kwargs):
@@ -48,7 +48,7 @@ Let's see each strategy in action:
    class SuccessRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.receive)
+           self.input_slot = self.add_slot("input", handler=self.receive)
            self.executed = False
        
        def receive(self, data=None, **kwargs):
@@ -100,8 +100,8 @@ CONTINUE strategy logs errors but allows execution to continue:
    class FailingRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.process)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.process)
+           self.output_event = self.add_event("output", ["data"])
        
        def process(self, **kwargs):
            raise ValueError("This error will be logged but execution continues")
@@ -109,7 +109,7 @@ CONTINUE strategy logs errors but allows execution to continue:
    class SuccessRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.receive)
+           self.input_slot = self.add_slot("input", handler=self.receive)
        
        def receive(self, data=None, **kwargs):
            print("Success routine executed despite upstream error")
@@ -158,8 +158,8 @@ RETRY strategy automatically retries failed routines:
    class UnreliableRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.process)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.process)
+           self.output_event = self.add_event("output", ["data"])
            self.call_count = 0
        
        def process(self, **kwargs):
@@ -219,8 +219,8 @@ SKIP strategy skips failed routines and continues:
    class OptionalRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.process)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.process)
+           self.output_event = self.add_event("output", ["data"])
        
        def process(self, **kwargs):
            raise ValueError("This routine will be skipped")
@@ -228,7 +228,7 @@ SKIP strategy skips failed routines and continues:
    class RequiredRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.receive)
+           self.input_slot = self.add_slot("input", handler=self.receive)
            self.executed = False
        
        def receive(self, data=None, **kwargs):
@@ -280,8 +280,8 @@ You can set error handlers at the routine level to override flow-level handlers:
    class CriticalRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.process)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.process)
+           self.output_event = self.add_event("output", ["data"])
        
        def process(self, **kwargs):
            raise ValueError("Critical error")
@@ -289,8 +289,8 @@ You can set error handlers at the routine level to override flow-level handlers:
    class OptionalRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.process)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.process)
+           self.output_event = self.add_event("output", ["data"])
        
        def process(self, **kwargs):
            raise ValueError("Optional error")
@@ -348,8 +348,8 @@ methods:
    class CriticalRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.process)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.process)
+           self.output_event = self.add_event("output", ["data"])
            self.call_count = 0
        
        def process(self, **kwargs):
@@ -361,8 +361,8 @@ methods:
    class OptionalRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.process)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.process)
+           self.output_event = self.add_event("output", ["data"])
        
        def process(self, **kwargs):
            raise ValueError("Optional error - will be skipped")
@@ -419,8 +419,8 @@ Here's a complete example combining error handling strategies:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.generate)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.generate)
+           self.output_event = self.add_event("output", ["data"])
        
        def generate(self, **kwargs):
            self.emit("output", data="test_data")
@@ -428,8 +428,8 @@ Here's a complete example combining error handling strategies:
    class UnreliableValidator(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.validate)
-           self.output_event = self.define_event("output", ["data", "valid"])
+           self.input_slot = self.add_slot("input", handler=self.validate)
+           self.output_event = self.add_event("output", ["data", "valid"])
            self.call_count = 0
        
        def validate(self, data=None, **kwargs):
@@ -444,8 +444,8 @@ Here's a complete example combining error handling strategies:
    class Processor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def process(self, data=None, valid=None, **kwargs):
            data_value = data or kwargs.get("data", "")
@@ -460,7 +460,7 @@ Here's a complete example combining error handling strategies:
    class Sink(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.receive)
+           self.input_slot = self.add_slot("input", handler=self.receive)
        
        def receive(self, result=None, **kwargs):
            result_value = result or kwargs.get("result", "")

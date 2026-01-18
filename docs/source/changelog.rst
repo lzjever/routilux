@@ -11,7 +11,7 @@ Breaking Changes
 ~~~~~~~~~~~~~~~~
 
 * ⚠️ **Unified Slot-Based Invocation**: Entry routines must now use a "trigger" slot instead of direct ``__call__`` invocation
-  * All entry routines must define a "trigger" slot: ``self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)``
+  * All entry routines must define a "trigger" slot: ``self.trigger_slot = self.add_slot("trigger", handler=self._handle_trigger)``
   * ``Flow.execute()`` now triggers entry routines via their "trigger" slot
   * Direct ``__call__`` invocation is deprecated for entry routines
 
@@ -83,8 +83,8 @@ After (required):
    class MyEntryRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self._handle_trigger)
+           self.output_event = self.add_event("output", ["data"])
        
        def _handle_trigger(self, **kwargs):
            # Entry logic here

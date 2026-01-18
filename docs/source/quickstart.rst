@@ -49,8 +49,8 @@ Step 1: Define Routines
 
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data"])
 
            def logic(trigger_data, policy_message, job_state):
                # Extract data
@@ -66,8 +66,8 @@ Step 1: Define Routines
 
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def logic(input_data, policy_message, job_state):
                # Extract and process
@@ -155,8 +155,8 @@ Here's a complete working example:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data"])
 
            def logic(trigger_data, policy_message, job_state):
                data = trigger_data[0].get("data", "default") if trigger_data else "default"
@@ -168,8 +168,8 @@ Here's a complete working example:
    class DataProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def logic(input_data, policy_message, job_state):
                if input_data:

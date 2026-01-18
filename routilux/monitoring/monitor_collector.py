@@ -383,11 +383,12 @@ class MonitorCollector:
         with self._lock:
             # Ensure metrics exist
             if job_id not in self._metrics:
-                # Try to get flow_id from job_state if available
-                from routilux.monitoring.storage import job_store
-
-                job_state = job_store.get(job_id)
-                flow_id = job_state.flow_id if job_state else "unknown"
+                # Get flow_id from JobContext
+                from routilux.server.dependencies import get_job_storage, get_runtime
+                job_storage = get_job_storage()
+                runtime = get_runtime()
+                job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+                flow_id = job_context.flow_id if job_context else "unknown"
                 self._metrics[job_id] = ExecutionMetrics(
                     job_id=job_id,
                     flow_id=flow_id,

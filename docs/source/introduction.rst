@@ -37,9 +37,9 @@ interfaces. This makes your workflows easy to understand, test, and maintain.
        def __init__(self):
            super().__init__()
            # Define input slot
-           self.input_slot = self.define_slot("input")
+           self.input_slot = self.add_slot("input")
            # Define output event
-           self.output_event = self.define_event("output", ["result"])
+           self.output_event = self.add_event("output", ["result"])
 
            def logic(slot_data, policy_message, job_state):
                data = slot_data.get("input", [{}])[0].get("data", "")
@@ -243,8 +243,8 @@ workflow applications.
            super().__init__()
            # Static configuration (set once)
            self.set_config(threshold=10, timeout=30)
-           self.input_slot = self.define_slot("input")
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input")
+           self.output_event = self.add_event("output", ["result"])
 
            def logic(slot_data, policy_message, job_state):
                # Read static config
@@ -304,8 +304,8 @@ or dive into the :doc:`user_guide/index` for detailed documentation.
    class MyRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def logic(slot_data, policy_message, job_state):
                data = slot_data.get("input", [{}])[0]

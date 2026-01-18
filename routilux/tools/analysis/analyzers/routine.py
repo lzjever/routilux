@@ -168,10 +168,10 @@ class RoutineAnalyzer:
 
         for node in ast.walk(init_method):
             if isinstance(node, ast.Call):
-                # Look for self.define_slot(...) calls
+                # Look for self.add_slot(...) calls
                 if isinstance(node.func, ast.Attribute):
-                    if node.func.attr == "define_slot":
-                        slot_info = self._parse_define_slot_call(node)
+                    if node.func.attr == "add_slot":
+                        slot_info = self._parse_add_slot_call(node)
                         if slot_info:
                             slots.append(slot_info)
 
@@ -190,10 +190,10 @@ class RoutineAnalyzer:
 
         for node in ast.walk(init_method):
             if isinstance(node, ast.Call):
-                # Look for self.define_event(...) calls
+                # Look for self.add_event(...) calls
                 if isinstance(node.func, ast.Attribute):
-                    if node.func.attr == "define_event":
-                        event_info = self._parse_define_event_call(node)
+                    if node.func.attr == "add_event":
+                        event_info = self._parse_add_event_call(node)
                         if event_info:
                             events.append(event_info)
 
@@ -219,11 +219,11 @@ class RoutineAnalyzer:
 
         return config
 
-    def _parse_define_slot_call(self, call_node: ast.Call) -> dict[str, Any] | None:
-        """Parse a define_slot call.
+    def _parse_add_slot_call(self, call_node: ast.Call) -> dict[str, Any] | None:
+        """Parse a add_slot call.
 
         Args:
-            call_node: AST call node for define_slot.
+            call_node: AST call node for add_slot.
 
         Returns:
             Dictionary containing slot information.
@@ -251,11 +251,11 @@ class RoutineAnalyzer:
 
         return slot_info
 
-    def _parse_define_event_call(self, call_node: ast.Call) -> dict[str, Any] | None:
-        """Parse a define_event call.
+    def _parse_add_event_call(self, call_node: ast.Call) -> dict[str, Any] | None:
+        """Parse a add_event call.
 
         Args:
-            call_node: AST call node for define_event.
+            call_node: AST call node for add_event.
 
         Returns:
             Dictionary containing event information.

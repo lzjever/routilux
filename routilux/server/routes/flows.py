@@ -585,9 +585,16 @@ async def validate_flow(flow_id: str):
         raise HTTPException(status_code=404, detail=f"Flow '{flow_id}' not found")
 
     issues = flow.validate()
+    # Separate errors from warnings
+    errors = [issue for issue in issues if issue.startswith("Error:")]
+    warnings = [issue for issue in issues if issue.startswith("Warning:")]
+    
+    # Flow is valid if there are no errors (warnings are acceptable)
     return {
-        "valid": len(issues) == 0,
+        "valid": len(errors) == 0,
         "issues": issues,
+        "errors": errors,
+        "warnings": warnings,
     }
 
 

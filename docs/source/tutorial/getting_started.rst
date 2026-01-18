@@ -49,9 +49,9 @@ through an event:
        def __init__(self):
            super().__init__()
            # Define an input slot
-           self.input_slot = self.define_slot("input")
+           self.input_slot = self.add_slot("input")
            # Define an output event
-           self.output_event = self.define_event("output", ["message"])
+           self.output_event = self.add_event("output", ["message"])
 
            # Define logic function
            def greet(slot_data, policy_message, job_state):
@@ -72,8 +72,8 @@ through an event:
 **Key Points**:
 
 - All routines inherit from ``Routine`` base class
-- Slots are defined with ``define_slot()`` (no handler needed)
-- Events are defined with ``define_event()`` with parameter names
+- Slots are defined with ``add_slot()`` (no handler needed)
+- Events are defined with ``add_event()`` with parameter names
 - Logic functions receive ``slot_data``, ``policy_message``, and ``job_state``
 - Activation policies control when the routine executes
 - **Routines MUST have an activation policy set, or they will never execute**
@@ -139,8 +139,8 @@ To execute a flow, we need to:
    class Greeter(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input")
-           self.output_event = self.define_event("output", ["message"])
+           self.input_slot = self.add_slot("input")
+           self.output_event = self.add_event("output", ["message"])
 
            def greet(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -211,8 +211,8 @@ to the second:
 
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data"])
 
            def generate(slot_data, policy_message, job_state):
                trigger_list = slot_data.get("trigger", [])
@@ -227,8 +227,8 @@ to the second:
 
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def process(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -298,8 +298,8 @@ Let's create a complete example with three routines connected in a pipeline:
 
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data"])
 
            def generate(slot_data, policy_message, job_state):
                trigger_list = slot_data.get("trigger", [])
@@ -314,8 +314,8 @@ Let's create a complete example with three routines connected in a pipeline:
 
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["transformed"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["transformed"])
 
            def transform(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -331,7 +331,7 @@ Let's create a complete example with three routines connected in a pipeline:
 
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
+           self.input = self.add_slot("input")
 
            def print_result(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -400,7 +400,7 @@ Common Pitfalls
    class MyRoutine(Routine):
        def __init__(self):
            # Missing super().__init__()!
-           self.input_slot = self.define_slot("input")
+           self.input_slot = self.add_slot("input")
            # This will fail because _slots and _events are not initialized
 
 **Solution**: Always call ``super().__init__()`` first in your ``__init__`` method.
@@ -413,8 +413,8 @@ Common Pitfalls
    class MyRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def process(slot_data, policy_message, job_state):
                self.emit("output", result="done")
@@ -477,7 +477,7 @@ Best Practices
 --------------
 
 1. **Use descriptive names**: Choose clear names for routines, slots, and events
-2. **Define events with parameter names**: Always specify parameter names in ``define_event()``
+2. **Define events with parameter names**: Always specify parameter names in ``add_event()``
 3. **Always set activation policy**: Routines won't execute without it
 4. **Always register flows**: Use FlowRegistry before execution
 5. **Always wait for completion**: Use ``wait_until_all_jobs_finished()`` or ``job.wait()``

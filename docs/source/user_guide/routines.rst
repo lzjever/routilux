@@ -31,10 +31,10 @@ Slots are input mechanisms for routines. Define slots to receive data from event
 .. code-block:: python
 
    # Basic slot
-   self.input_slot = self.define_slot("input")
+   self.input_slot = self.add_slot("input")
 
    # Custom queue size
-   self.input_slot = self.define_slot("input", max_queue_length=100, watermark=0.8)
+   self.input_slot = self.add_slot("input", max_queue_length=100, watermark=0.8)
 
 .. note:: **No Handlers in Slots**
 
@@ -49,7 +49,7 @@ Events are output mechanisms for routines. Define an event with output parameter
 .. code-block:: python
 
    # Basic event
-   self.output_event = self.define_event("output", ["result", "status"])
+   self.output_event = self.add_event("output", ["result", "status"])
 
 Setting Activation Policy
 ------------------------
@@ -96,9 +96,9 @@ Complete Example
        def __init__(self):
            super().__init__()
            # Define input slot
-           self.input = self.define_slot("input")
+           self.input = self.add_slot("input")
            # Define output event
-           self.output = self.define_event("output", ["result"])
+           self.output = self.add_event("output", ["result"])
 
            # Define logic function
            def process(input_data, policy_message, job_state):
@@ -224,10 +224,10 @@ Slots have queue-based data storage:
 .. code-block:: python
 
    # Default: max_queue_length=1000, watermark=0.8
-   slot = self.define_slot("input")
+   slot = self.add_slot("input")
 
    # Custom queue size
-   slot = self.define_slot(
+   slot = self.add_slot(
        "input",
        max_queue_length=100,
        watermark=0.7

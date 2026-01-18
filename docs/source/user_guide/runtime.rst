@@ -388,8 +388,8 @@ Complete Example
    class MyRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def logic(input_data, policy_message, job_state):
                if input_data:

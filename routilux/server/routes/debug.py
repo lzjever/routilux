@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from routilux.monitoring.registry import MonitoringRegistry
-from routilux.monitoring.storage import job_store
+# Note: job_store (old system) removed - use get_job_storage() instead
 from routilux.server.middleware.auth import RequireAuth
 from routilux.server.models.debug import ExpressionEvalRequest, ExpressionEvalResponse
 from routilux.server.security import SecurityError, TimeoutError, safe_evaluate
@@ -26,9 +26,16 @@ class VariableSetRequest(BaseModel):
 @router.get("/jobs/{job_id}/debug/session", dependencies=[RequireAuth])
 async def get_debug_session(job_id: str):
     """Get debug session information."""
-    # Verify job exists
-    job_state = job_store.get(job_id)
-    if not job_state:
+    # Verify job exists (check both old job_store and new job storage)
+    from routilux.server.dependencies import get_job_storage
+    from routilux.server.dependencies import get_runtime
+    
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    
+    # Get job from new storage system
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
     registry = MonitoringRegistry.get_instance()
@@ -58,8 +65,12 @@ async def get_debug_session(job_id: str):
 async def resume_debug(job_id: str):
     """Resume execution from breakpoint."""
     # Verify job exists
-    job_state = job_store.get(job_id)
-    if not job_state:
+    from routilux.server.dependencies import get_job_storage, get_runtime
+    
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
     registry = MonitoringRegistry.get_instance()
@@ -81,8 +92,12 @@ async def resume_debug(job_id: str):
 async def step_over(job_id: str):
     """Step over current line."""
     # Verify job exists
-    job_state = job_store.get(job_id)
-    if not job_state:
+    from routilux.server.dependencies import get_job_storage, get_runtime
+    
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
     registry = MonitoringRegistry.get_instance()
@@ -104,8 +119,12 @@ async def step_over(job_id: str):
 async def step_into(job_id: str):
     """Step into function."""
     # Verify job exists
-    job_state = job_store.get(job_id)
-    if not job_state:
+    from routilux.server.dependencies import get_job_storage, get_runtime
+    
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
     registry = MonitoringRegistry.get_instance()
@@ -127,8 +146,12 @@ async def step_into(job_id: str):
 async def get_variables(job_id: str, routine_id: str = None):
     """Get variables at current breakpoint."""
     # Verify job exists
-    job_state = job_store.get(job_id)
-    if not job_state:
+    from routilux.server.dependencies import get_job_storage, get_runtime
+    
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
     registry = MonitoringRegistry.get_instance()
@@ -172,8 +195,12 @@ async def get_variables(job_id: str, routine_id: str = None):
 async def set_variable(job_id: str, name: str, request: VariableSetRequest):
     """Set variable value at current breakpoint."""
     # Verify job exists
-    job_state = job_store.get(job_id)
-    if not job_state:
+    from routilux.server.dependencies import get_job_storage, get_runtime
+    
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
     registry = MonitoringRegistry.get_instance()
@@ -204,8 +231,12 @@ async def set_variable(job_id: str, name: str, request: VariableSetRequest):
 async def get_call_stack(job_id: str):
     """Get call stack."""
     # Verify job exists
-    job_state = job_store.get(job_id)
-    if not job_state:
+    from routilux.server.dependencies import get_job_storage, get_runtime
+    
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
     registry = MonitoringRegistry.get_instance()
@@ -269,8 +300,12 @@ async def evaluate_expression(job_id: str, request: ExpressionEvalRequest):
         )
 
     # Verify job exists
-    job_state = job_store.get(job_id)
-    if not job_state:
+    from routilux.server.dependencies import get_job_storage, get_runtime
+    
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
     # Get debug session

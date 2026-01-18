@@ -135,11 +135,7 @@ if _analysis_available:
         ]
     )
 
-# Backward compatibility aliases (deprecated, will be removed)
-# These allow existing code to continue working during transition
-JobState = WorkerState  # type: ignore
-GlobalJobManager = WorkerManager  # type: ignore
-JobExecutor = WorkerExecutor  # type: ignore
-get_job_manager = get_worker_manager  # type: ignore
+# Note: All backward compatibility aliases removed
+# Use WorkerState, WorkerManager, WorkerExecutor, get_worker_manager instead
 
 __version__ = "0.10.0"

@@ -16,7 +16,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from routilux.monitoring.event_manager import get_event_manager
 from routilux.monitoring.registry import MonitoringRegistry
-from routilux.monitoring.storage import flow_store, job_store
+from routilux.monitoring.storage import flow_store
+# Note: job_store (old system) removed - use get_job_storage() instead
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -185,13 +186,16 @@ async def job_monitor_websocket(websocket: WebSocket, job_id: str):
 
         # Verify job exists (with error handling)
         try:
-            job_state = job_store.get(job_id)
+            from routilux.server.dependencies import get_job_storage, get_runtime
+            job_storage = get_job_storage()
+            runtime = get_runtime()
+            job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
         except Exception as e:
             logger.error(f"Error checking job {job_id}: {e}")
             await websocket.close(code=1011, reason="Internal error checking job")
             return
 
-        if not job_state:
+        if not job_context:
             await websocket.close(code=1008, reason=f"Job '{job_id}' not found")
             return
 
@@ -293,13 +297,16 @@ async def job_debug_websocket(websocket: WebSocket, job_id: str):
 
         # Verify job exists
         try:
-            job_state = job_store.get(job_id)
+            from routilux.server.dependencies import get_job_storage, get_runtime
+            job_storage = get_job_storage()
+            runtime = get_runtime()
+            job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
         except Exception as e:
             logger.error(f"Error checking job {job_id}: {e}")
             await websocket.close(code=1011, reason="Internal error checking job")
             return
 
-        if not job_state:
+        if not job_context:
             await websocket.close(code=1008, reason=f"Job '{job_id}' not found")
             return
 
@@ -414,7 +421,10 @@ async def flow_monitor_websocket(websocket: WebSocket, flow_id: str):
 
         # Get all jobs for this flow
         try:
-            jobs = job_store.get_by_flow(flow_id)
+            # Get jobs by flow_id from new storage
+            from routilux.server.dependencies import get_job_storage
+            job_storage = get_job_storage()
+            jobs = job_storage.list_jobs(flow_id=flow_id)
         except Exception as e:
             logger.error(f"Error getting jobs for flow {flow_id}: {e}")
             await websocket.close(code=1011, reason="Internal error getting jobs")
@@ -550,8 +560,11 @@ async def generic_websocket(websocket: WebSocket):
                         # Subscribe to a job
                         if job_id not in subscribers:
                             # Verify job exists
-                            job_state = job_store.get(job_id)
-                            if not job_state:
+                            from routilux.server.dependencies import get_job_storage, get_runtime
+                            job_storage = get_job_storage()
+                            runtime = get_runtime()
+                            job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+                            if not job_context:
                                 await safe_send_json(
                                     websocket,
                                     {

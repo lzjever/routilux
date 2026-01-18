@@ -30,8 +30,8 @@ data correctly:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["name", "age", "city"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["name", "age", "city"])
        
        def send(self, **kwargs):
            # Emit multiple parameters
@@ -40,7 +40,7 @@ data correctly:
    class DataReceiver(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.receive)
+           self.input_slot = self.add_slot("input", handler=self.receive)
        
        def receive(self, name=None, age=None, city=None, **kwargs):
            # Extract parameters with defaults
@@ -74,7 +74,7 @@ data correctly:
 
 - Parameters are passed as keyword arguments to slot handlers
 - Use the pattern ``param = param or kwargs.get("param", default)`` for safe extraction
-- All parameters specified in ``define_event()`` are available in the handler
+- All parameters specified in ``add_event()`` are available in the handler
 
 Step 2: Parameter Mapping in Connections
 -----------------------------------------
@@ -90,8 +90,8 @@ when you want to transform data or match different naming conventions:
    class Source(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["user_name", "user_age"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["user_name", "user_age"])
        
        def send(self, **kwargs):
            self.emit("output", user_name="Bob", user_age=25)
@@ -99,7 +99,7 @@ when you want to transform data or match different naming conventions:
    class Target(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.receive)
+           self.input_slot = self.add_slot("input", handler=self.receive)
        
        def receive(self, name=None, age=None, **kwargs):
            # Expects "name" and "age", not "user_name" and "user_age"
@@ -151,8 +151,8 @@ You can pass complex data structures (dicts, lists) through events:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["data"])
        
        def send(self, **kwargs):
            # Send a complex data structure
@@ -168,8 +168,8 @@ You can pass complex data structures (dicts, lists) through events:
    class DataProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def process(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", {})
@@ -234,8 +234,8 @@ extraction:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["data", "metadata"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["data", "metadata"])
        
        def send(self, **kwargs):
            self.emit("output", data="test data", metadata={"source": "tutorial"})
@@ -243,7 +243,7 @@ extraction:
    class DataReceiver(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.receive)
+           self.input_slot = self.add_slot("input", handler=self.receive)
        
        def receive(self, data=None, metadata=None, **kwargs):
            # Use helper method for cleaner extraction
@@ -294,8 +294,8 @@ passed:
    class DebugSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["value", "extra"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["value", "extra"])
        
        def send(self, **kwargs):
            print(f"[DEBUG] Source emitting: value='test', extra='info'")
@@ -304,7 +304,7 @@ passed:
    class DebugReceiver(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.receive)
+           self.input_slot = self.add_slot("input", handler=self.receive)
        
        def receive(self, **kwargs):
            # Print all received kwargs for debugging
@@ -341,7 +341,7 @@ passed:
 **Key Points**:
 
 - Print kwargs in handlers to see what data is received
-- Check parameter names match between ``define_event()`` and handler
+- Check parameter names match between ``add_event()`` and handler
 - Verify connections are set up correctly
 - Use debug prints during development
 
@@ -364,12 +364,12 @@ Common Pitfalls
 .. code-block:: python
    :emphasize-lines: 1, 4
 
-   self.output_event = self.define_event("output", ["user_name"])  # Defined as "user_name"
+   self.output_event = self.add_event("output", ["user_name"])  # Defined as "user_name"
    
    def receive(self, username=None, **kwargs):  # Looking for "username"!
        username = username or kwargs.get("username")  # Won't find it
 
-**Solution**: Use exact parameter names from ``define_event()``, or use parameter mapping.
+**Solution**: Use exact parameter names from ``add_event()``, or use parameter mapping.
 
 **Pitfall 3: Modifying mutable data structures**
 

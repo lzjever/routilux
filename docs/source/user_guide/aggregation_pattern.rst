@@ -49,7 +49,7 @@ Here's a simple aggregator that waits for 3 messages:
        def __init__(self, source_id: str):
            super().__init__()
            self.source_id = source_id
-           self.output_event = self.define_event("output", ["data", "source_id"])
+           self.output_event = self.add_event("output", ["data", "source_id"])
        
        def __call__(self, **kwargs):
            super().__call__(**kwargs)
@@ -66,12 +66,12 @@ Here's a simple aggregator that waits for 3 messages:
            self.processed = False  # Flag to ensure single processing
            
            # Use append strategy to accumulate data
-           self.input_slot = self.define_slot(
+           self.input_slot = self.add_slot(
                "input",
                handler=self._handle_input,
                merge_strategy="append"  # Key: append strategy
            )
-           self.output_event = self.define_event("aggregated", ["all_data", "count"])
+           self.output_event = self.add_event("aggregated", ["all_data", "count"])
        
        def _handle_input(self, **kwargs):
            """Handle input and check if all messages received."""

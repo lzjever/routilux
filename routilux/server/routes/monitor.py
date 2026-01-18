@@ -9,7 +9,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from routilux.monitoring.monitor_service import get_monitor_service
 from routilux.monitoring.registry import MonitoringRegistry
-from routilux.monitoring.storage import flow_store, job_store
+from routilux.monitoring.storage import flow_store
+# Note: job_store (old system) removed - use get_job_storage() instead
 from routilux.server.middleware.auth import RequireAuth
 from routilux.server.models.monitor import (
     ExecutionEventResponse,
@@ -121,8 +122,12 @@ async def get_job_metrics(job_id: str):
         HTTPException: 500 if monitor collector is not available
     """
     # Verify job exists
-    job_state = job_store.get(job_id)
-    if not job_state:
+    from routilux.server.dependencies import get_job_storage, get_runtime
+    
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
     registry = MonitoringRegistry.get_instance()
@@ -286,8 +291,12 @@ async def get_job_trace(
         HTTPException: 422 if limit is invalid
     """
     # Verify job exists
-    job_state = job_store.get(job_id)
-    if not job_state:
+    from routilux.server.dependencies import get_job_storage, get_runtime
+    
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
     registry = MonitoringRegistry.get_instance()
@@ -388,12 +397,15 @@ async def get_job_logs(job_id: str):
         HTTPException: 404 if job not found
     """
     # Verify job exists
-    job_state = job_store.get(job_id)
-    if not job_state:
+    from routilux.server.dependencies import get_job_storage, get_runtime
+    
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    # Get logs from job state
-    logs = job_state.shared_log if hasattr(job_state, "shared_log") else []
+    logs = getattr(job_context, "trace_log", [])
 
     return {
         "job_id": job_id,
@@ -416,8 +428,10 @@ async def get_flow_metrics(flow_id: str):
     if not collector:
         raise HTTPException(status_code=500, detail="Monitor collector not available")
 
-    # Get all jobs for this flow
-    jobs = job_store.get_by_flow(flow_id)
+    # Get all jobs for this flow from new storage
+    from routilux.server.dependencies import get_job_storage
+    job_storage = get_job_storage()
+    jobs = job_storage.list_jobs(flow_id=flow_id)
 
     # Aggregate metrics
     total_jobs = len(jobs)

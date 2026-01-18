@@ -21,7 +21,7 @@ class MemoryJobStorage:
 
     def __init__(self):
         self._jobs: Dict[str, JobContext] = {}
-        self._job_flow_map: Dict[str, str] = {}  # job_id -> flow_id
+        # Note: _job_flow_map removed - JobContext now contains flow_id directly
         self._lock = threading.RLock()
 
     def save_job(self, job: JobContext, flow_id: Optional[str] = None) -> None:
@@ -33,8 +33,8 @@ class MemoryJobStorage:
         """
         with self._lock:
             self._jobs[job.job_id] = job
-            if flow_id:
-                self._job_flow_map[job.job_id] = flow_id
+            # Note: flow_id parameter kept for backward compatibility but ignored
+            # JobContext now contains flow_id directly
 
     def get_job(self, job_id: str) -> Optional[JobContext]:
         """Get job by ID.
@@ -81,7 +81,6 @@ class MemoryJobStorage:
         with self._lock:
             if job_id in self._jobs:
                 del self._jobs[job_id]
-                self._job_flow_map.pop(job_id, None)
                 return True
             return False
 
@@ -116,10 +115,8 @@ class MemoryJobStorage:
                 jobs = [j for j in jobs if j.worker_id == worker_id]
 
             if flow_id:
-                matching_job_ids = {
-                    jid for jid, fid in self._job_flow_map.items() if fid == flow_id
-                }
-                jobs = [j for j in jobs if j.job_id in matching_job_ids]
+                # JobContext now contains flow_id directly
+                jobs = [j for j in jobs if j.flow_id == flow_id]
 
             if status:
                 jobs = [j for j in jobs if j.status == status]
@@ -156,10 +153,8 @@ class MemoryJobStorage:
                 jobs = [j for j in jobs if j.worker_id == worker_id]
 
             if flow_id:
-                matching_job_ids = {
-                    jid for jid, fid in self._job_flow_map.items() if fid == flow_id
-                }
-                jobs = [j for j in jobs if j.job_id in matching_job_ids]
+                # JobContext now contains flow_id directly
+                jobs = [j for j in jobs if j.flow_id == flow_id]
 
             if status:
                 jobs = [j for j in jobs if j.status == status]
@@ -176,7 +171,20 @@ class MemoryJobStorage:
             Flow ID if known, None otherwise
         """
         with self._lock:
-            return self._job_flow_map.get(job_id)
+            job = self._jobs.get(job_id)
+            if job:
+                return job.flow_id
+            # Try Runtime
+            try:
+                from routilux.monitoring.runtime_registry import RuntimeRegistry
+                registry = RuntimeRegistry.get_instance()
+                for runtime in registry.get_all().values():
+                    job = runtime.get_job(job_id)
+                    if job:
+                        return job.flow_id
+            except Exception:
+                pass
+            return None
 
     def _sync_from_runtime(self) -> None:
         """Sync jobs from Runtime to local storage."""
@@ -197,7 +205,6 @@ class MemoryJobStorage:
         """Clear all jobs (for testing)."""
         with self._lock:
             self._jobs.clear()
-            self._job_flow_map.clear()
 
 
 class MemoryIdempotencyBackend:

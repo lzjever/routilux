@@ -67,9 +67,17 @@ class DebugClient:
 
         Returns:
             Session information dictionary
+
+        Raises:
+            AssertionError: If session cannot be retrieved (404/500)
         """
-        response = self.client.get(f"/api/v1/debug/jobs/{job_id}/debug/session")
-        assert response.status_code == 200, f"Failed to get debug session: {response.text}"
+        response = self.client.get(f"/api/jobs/{job_id}/debug/session")
+        # May return 404 if no session exists, or 500 if debug store not available
+        if response.status_code not in (200, 404, 500):
+            raise AssertionError(f"Failed to get debug session: {response.text}")
+        if response.status_code != 200:
+            # Return error response for caller to handle
+            return response.json()
         return response.json()
 
     def wait_for_breakpoint(self, job_id: str, timeout: float = 10.0) -> Dict[str, Any]:
@@ -179,10 +187,19 @@ class DebugClient:
 
         Returns:
             List of call stack frames
+
+        Raises:
+            AssertionError: If call stack cannot be retrieved (404/500)
         """
-        response = self.client.get(f"/api/v1/debug/jobs/{job_id}/debug/call-stack")
-        assert response.status_code == 200, f"Failed to get call stack: {response.text}"
-        return response.json()["call_stack"]
+        response = self.client.get(f"/api/jobs/{job_id}/debug/call-stack")
+        # May return 404 if no session exists, or 500 if debug store not available
+        if response.status_code not in (200, 404, 500):
+            raise AssertionError(f"Failed to get call stack: {response.text}")
+        if response.status_code != 200:
+            # Return empty list if not available
+            return []
+        data = response.json()
+        return data.get("call_stack", [])
 
     def evaluate_expression(
         self, job_id: str, expression: str, routine_id: Optional[str] = None

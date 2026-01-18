@@ -152,7 +152,7 @@ different error handling strategies:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.output_event = self.define_event("output", ["data"])
+           self.output_event = self.add_event("output", ["data"])
        
        def __call__(self):
            self.emit("output", data="important data")
@@ -160,8 +160,8 @@ different error handling strategies:
    class OptionalProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def __call__(self):
            # This may fail, but it's optional
@@ -174,7 +174,7 @@ different error handling strategies:
    class CriticalProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
+           self.input_slot = self.add_slot("input", handler=self.process)
            self.processed = False
        
        def __call__(self):
@@ -274,7 +274,7 @@ CONTINUE Strategy
    class UnreliableRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.output_event = self.define_event("output", ["data"])
+           self.output_event = self.add_event("output", ["data"])
        
        def __call__(self):
            # May fail sometimes, but that's OK
@@ -337,7 +337,7 @@ RETRY Strategy
        def __init__(self):
            super().__init__()
            self.attempts = 0
-           self.output_event = self.define_event("output", ["data"])
+           self.output_event = self.add_event("output", ["data"])
        
        def __call__(self):
            self.attempts += 1
@@ -375,7 +375,7 @@ RETRY Strategy
        def __init__(self):
            super().__init__()
            self.attempts = 0
-           self.output_event = self.define_event("output", ["response"])
+           self.output_event = self.add_event("output", ["response"])
        
        def __call__(self):
            self.attempts += 1
@@ -540,7 +540,7 @@ SKIP Strategy
    class OptionalRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.output_event = self.define_event("output", ["data"])
+           self.output_event = self.add_event("output", ["data"])
        
        def __call__(self):
            # This may fail, but it's optional
@@ -549,7 +549,7 @@ SKIP Strategy
    class MainRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
+           self.input_slot = self.add_slot("input", handler=self.process)
        
        def process(self, data):
            print(f"Processing: {data}")
@@ -583,8 +583,8 @@ SKIP Strategy
        def __init__(self):
            super().__init__()
            # Define trigger slot for entry routine
-           self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-           self.output_event = self.define_event("output", ["enhanced_data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self._handle_trigger)
+           self.output_event = self.add_event("output", ["enhanced_data"])
        
        def _handle_trigger(self, **kwargs):
            # Enhancement service unavailable - skip this step
@@ -595,8 +595,8 @@ SKIP Strategy
        def __init__(self):
            super().__init__()
            # Define trigger slot for entry routine
-           self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-           self.output_event = self.define_event("output", ["logged_data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self._handle_trigger)
+           self.output_event = self.add_event("output", ["logged_data"])
        
        def _handle_trigger(self, **kwargs):
            # We tried to log but it failed - continue anyway
@@ -660,8 +660,8 @@ execution errors.
    class DataProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def process(self, data):
            # This error will be caught and logged, but won't stop the flow
@@ -805,7 +805,7 @@ making it easy to express the importance of different routines in your workflow.
        """Critical: Must fetch data successfully"""
        def __init__(self):
            super().__init__()
-           self.output_event = self.define_event("output", ["data"])
+           self.output_event = self.add_event("output", ["data"])
        
        def __call__(self):
            # Simulate network operation that may fail
@@ -818,8 +818,8 @@ making it easy to express the importance of different routines in your workflow.
        """Optional: Enhancement that can fail"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["enriched_data"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["enriched_data"])
        
        def __call__(self):
            # This may fail, but it's optional
@@ -833,7 +833,7 @@ making it easy to express the importance of different routines in your workflow.
        """Critical: Must validate data"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
+           self.input_slot = self.add_slot("input", handler=self.process)
            self.validated = False
        
        def __call__(self):
@@ -847,7 +847,7 @@ making it easy to express the importance of different routines in your workflow.
        """Optional: Metrics collection"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
+           self.input_slot = self.add_slot("input", handler=self.process)
        
        def __call__(self):
            # Optional metrics - failure is OK
@@ -957,7 +957,7 @@ important considerations:
        def __init__(self, name):
            super().__init__()
            self.name = name
-           self.output_event = self.define_event("output", ["data"])
+           self.output_event = self.add_event("output", ["data"])
        
        def __call__(self):
            # May fail
@@ -1095,8 +1095,8 @@ Real-World Examples
        """Critical: Payment must succeed"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("order", handler=self.process)
-           self.output_event = self.define_event("payment_complete", ["order_id"])
+           self.input_slot = self.add_slot("order", handler=self.process)
+           self.output_event = self.add_event("payment_complete", ["order_id"])
        
        def __call__(self):
            # Critical payment operation
@@ -1110,7 +1110,7 @@ Real-World Examples
        """Critical: Inventory must be updated"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("order", handler=self.process)
+           self.input_slot = self.add_slot("order", handler=self.process)
        
        def __call__(self):
            raise ConnectionError("Inventory service error")
@@ -1123,7 +1123,7 @@ Real-World Examples
        """Optional: Email notification"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("order", handler=self.process)
+           self.input_slot = self.add_slot("order", handler=self.process)
        
        def __call__(self):
            raise ValueError("Email service unavailable")
@@ -1136,7 +1136,7 @@ Real-World Examples
        """Optional: Analytics logging"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("order", handler=self.process)
+           self.input_slot = self.add_slot("order", handler=self.process)
        
        def __call__(self):
            raise ValueError("Analytics service down")
@@ -1183,7 +1183,7 @@ Real-World Examples
        """Critical: Primary data source"""
        def __init__(self):
            super().__init__()
-           self.output_event = self.define_event("output", ["data"])
+           self.output_event = self.add_event("output", ["data"])
        
        def __call__(self):
            raise ConnectionError("Primary source unavailable")
@@ -1192,7 +1192,7 @@ Real-World Examples
        """Optional: Secondary data source for enrichment"""
        def __init__(self):
            super().__init__()
-           self.output_event = self.define_event("output", ["enrichment"])
+           self.output_event = self.add_event("output", ["enrichment"])
        
        def __call__(self):
            raise ValueError("Secondary source unavailable")
@@ -1201,8 +1201,8 @@ Real-World Examples
        """Critical: Must aggregate data"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("primary", handler=self.process_primary)
-           self.input_slot2 = self.define_slot("secondary", handler=self.process_secondary)
+           self.input_slot = self.add_slot("primary", handler=self.process_primary)
+           self.input_slot2 = self.add_slot("secondary", handler=self.process_secondary)
            self.aggregated = False
        
        def __call__(self):
@@ -1248,7 +1248,7 @@ Real-World Examples
        def __init__(self):
            super().__init__()
            self.attempts = 0
-           self.output_event = self.define_event("output", ["response"])
+           self.output_event = self.add_event("output", ["response"])
        
        def __call__(self):
            self.attempts += 1
@@ -1331,7 +1331,7 @@ Skip optional processing steps that aren't critical:
    class MainProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.output_event = self.define_event("output", ["result"])
+           self.output_event = self.add_event("output", ["result"])
        
        def __call__(self):
            self.emit("output", result="processed")
@@ -1339,8 +1339,8 @@ Skip optional processing steps that aren't critical:
    class OptionalEnhancer(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["enhanced"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["enhanced"])
        
        def __call__(self):
            # Optional enhancement - can be skipped
@@ -1386,7 +1386,7 @@ Combine critical and optional routines in a single workflow:
    class DataFetcher(Routine):
        def __init__(self):
            super().__init__()
-           self.output_event = self.define_event("output", ["data"])
+           self.output_event = self.add_event("output", ["data"])
        
        def __call__(self):
            self.emit("output", data="important data")
@@ -1394,7 +1394,7 @@ Combine critical and optional routines in a single workflow:
    class CriticalProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
+           self.input_slot = self.add_slot("input", handler=self.process)
            self.processed = False
        
        def __call__(self):
@@ -1406,7 +1406,7 @@ Combine critical and optional routines in a single workflow:
    class OptionalLogger(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
+           self.input_slot = self.add_slot("input", handler=self.process)
        
        def __call__(self):
            raise ValueError("Logging failed")
@@ -1485,8 +1485,8 @@ This example shows a complete e-commerce order processing workflow with proper e
        """Critical: Must validate order"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("order", handler=self.process)
-           self.output_event = self.define_event("validated", ["order"])
+           self.input_slot = self.add_slot("order", handler=self.process)
+           self.output_event = self.add_event("validated", ["order"])
        
        def __call__(self):
            # Critical validation
@@ -1502,8 +1502,8 @@ This example shows a complete e-commerce order processing workflow with proper e
        """Critical: Payment must succeed"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("order", handler=self.process)
-           self.output_event = self.define_event("paid", ["order_id"])
+           self.input_slot = self.add_slot("order", handler=self.process)
+           self.output_event = self.add_event("paid", ["order_id"])
        
        def __call__(self):
            # Critical payment operation
@@ -1519,8 +1519,8 @@ This example shows a complete e-commerce order processing workflow with proper e
        """Critical: Inventory must be updated"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("order", handler=self.process)
-           self.output_event = self.define_event("reserved", ["order_id"])
+           self.input_slot = self.add_slot("order", handler=self.process)
+           self.output_event = self.add_event("reserved", ["order_id"])
        
        def __call__(self):
            # Critical inventory operation
@@ -1536,7 +1536,7 @@ This example shows a complete e-commerce order processing workflow with proper e
        """Optional: Email notification"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("order", handler=self.process)
+           self.input_slot = self.add_slot("order", handler=self.process)
        
        def __call__(self):
            # Optional email - failure is OK
@@ -1551,7 +1551,7 @@ This example shows a complete e-commerce order processing workflow with proper e
        """Optional: Analytics tracking"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("order", handler=self.process)
+           self.input_slot = self.add_slot("order", handler=self.process)
        
        def __call__(self):
            # Optional analytics - failure is OK
@@ -1613,7 +1613,7 @@ This example shows a data pipeline with primary and fallback data sources:
        """Critical: Primary data source"""
        def __init__(self):
            super().__init__()
-           self.output_event = self.define_event("output", ["data"])
+           self.output_event = self.add_event("output", ["data"])
        
        def __call__(self):
            # Primary source may fail
@@ -1623,8 +1623,8 @@ This example shows a data pipeline with primary and fallback data sources:
        """Critical: Fallback if primary fails"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("trigger", handler=self.process)
-           self.output_event = self.define_event("output", ["data"])
+           self.input_slot = self.add_slot("trigger", handler=self.process)
+           self.output_event = self.add_event("output", ["data"])
        
        def __call__(self):
            # Fallback source
@@ -1638,7 +1638,7 @@ This example shows a data pipeline with primary and fallback data sources:
        """Critical: Must process data"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("data", handler=self.process)
+           self.input_slot = self.add_slot("data", handler=self.process)
            self.processed = False
        
        def __call__(self):
@@ -1685,7 +1685,7 @@ This example shows error handling in a microservices architecture:
        """Critical: User authentication"""
        def __init__(self):
            super().__init__()
-           self.output_event = self.define_event("authenticated", ["user"])
+           self.output_event = self.add_event("authenticated", ["user"])
        
        def __call__(self):
            # Critical authentication
@@ -1695,8 +1695,8 @@ This example shows error handling in a microservices architecture:
        """Critical: Product information"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("user", handler=self.process)
-           self.output_event = self.define_event("products", ["product_list"])
+           self.input_slot = self.add_slot("user", handler=self.process)
+           self.output_event = self.add_event("products", ["product_list"])
        
        def __call__(self):
            # Critical product fetch
@@ -1710,7 +1710,7 @@ This example shows error handling in a microservices architecture:
        """Optional: Product recommendations"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("products", handler=self.process)
+           self.input_slot = self.add_slot("products", handler=self.process)
        
        def __call__(self):
            # Optional recommendations
@@ -1724,7 +1724,7 @@ This example shows error handling in a microservices architecture:
        """Optional: Caching"""
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("data", handler=self.process)
+           self.input_slot = self.add_slot("data", handler=self.process)
        
        def __call__(self):
            # Optional caching

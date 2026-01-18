@@ -409,7 +409,7 @@ You can also access monitoring features directly from Python:
    class MyRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.define_slot("trigger", handler=self.process)
+           self.add_slot("trigger", handler=self.process)
 
        def process(self, **kwargs):
            # This execution will be monitored
@@ -533,7 +533,7 @@ Example: Complete Monitoring Setup
        class Ingest(Routine):
            def __init__(self):
                super().__init__()
-               self.define_slot("trigger", handler=self.process)
+               self.add_slot("trigger", handler=self.process)
 
            def process(self, data, **kwargs):
                self.emit("data_ingested", count=len(data))
@@ -542,7 +542,7 @@ Example: Complete Monitoring Setup
        class Process(Routine):
            def __init__(self):
                super().__init__()
-               self.define_slot("data_ingested", handler=self.process)
+               self.add_slot("data_ingested", handler=self.process)
 
            def process(self, data, **kwargs):
                result = [x * 2 for x in data]
@@ -552,7 +552,7 @@ Example: Complete Monitoring Setup
        class Validate(Routine):
            def __init__(self):
                super().__init__()
-               self.define_slot("data_processed", handler=self.validate)
+               self.add_slot("data_processed", handler=self.validate)
 
            def validate(self, result, **kwargs):
                is_valid = all(x > 0 for x in result)

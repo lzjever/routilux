@@ -98,27 +98,35 @@ dev-install:
 	@echo "✅ Package and dependencies installed! Ready for development."
 
 test:
-	@echo "Running core tests (excluding API tests)..."
-	$(PYTHON_CMD) -m pytest tests/ -v -m "not api"
+	@echo "Running core tests (excluding API tests and userstory tests)..."
+	$(PYTHON_CMD) -m pytest tests/ -v --ignore=tests/userstory -m "not api" -n auto
 
 test-cov:
-	$(PYTHON_CMD) -m pytest tests/ -m "not api" --cov=routilux --cov-report=html --cov-report=term
+	$(PYTHON_CMD) -m pytest tests/ -m "not api" --cov=routilux --cov-report=html --cov-report=term -n auto
 
 test-integration:
 	@echo "Running integration tests (requires external services)..."
-	$(PYTHON_CMD) -m pytest tests/ -v -m integration
+	$(PYTHON_CMD) -m pytest tests/ -v -m integration -n auto
 
 test-unit:
 	@echo "Running unit tests only..."
-	$(PYTHON_CMD) -m pytest tests/ -v -m "not integration and not api"
+	$(PYTHON_CMD) -m pytest tests/ -v -m "not integration and not api" -n auto
 
 test-api:
 	@echo "Running API endpoint tests..."
-	$(PYTHON_CMD) -m pytest tests/ -v -m api
+	$(PYTHON_CMD) -m pytest tests/ -v -m api -n auto
 
 test-userstory:
-	@echo "Running user story integration tests..."
-	$(PYTHON_CMD) -m pytest tests/ -v -m userstory
+	@echo "Running user story integration tests (serial)..."
+	$(PYTHON_CMD) -m pytest tests/userstory/ -v -m userstory -n auto
+
+test-userstory-fast:
+	@echo "Running user story integration tests in parallel (recommended)..."
+	$(PYTHON_CMD) -m pytest tests/userstory/ -v -m userstory -n auto
+
+test-userstory-parallel:
+	@echo "Running user story integration tests in parallel (faster)..."
+	$(PYTHON_CMD) -m pytest tests/userstory/ -v -m userstory -n auto
 
 lint:
 	$(PYTHON_CMD) -m ruff check routilux/ tests/ examples/ --output-format=concise

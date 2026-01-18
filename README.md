@@ -49,8 +49,8 @@ class DataSource(Routine):
 
     def __init__(self):
         super().__init__()
-        self.trigger = self.define_slot("trigger")
-        self.output = self.define_event("output", ["data"])
+        self.trigger = self.add_slot("trigger")
+        self.output = self.add_event("output", ["data"])
 
         def logic(trigger_data, policy_message, job_state):
             # Process input data
@@ -66,8 +66,8 @@ class DataProcessor(Routine):
 
     def __init__(self):
         super().__init__()
-        self.input = self.define_slot("input")
-        self.output = self.define_event("output", ["result"])
+        self.input = self.add_slot("input")
+        self.output = self.add_event("output", ["result"])
 
         def logic(input_data, policy_message, job_state):
             # Extract data from slot

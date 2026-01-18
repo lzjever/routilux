@@ -62,8 +62,8 @@ A ``JobState`` is automatically created when you call ``flow.execute()``:
    class Source(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["data"])
        
        def send(self, **kwargs):
            self.emit("output", data="test")
@@ -625,7 +625,7 @@ Understanding the different threads involved in execution is essential:
        def __init__(self, name):
            super().__init__()
            self.name = name
-           self.trigger_slot = self.define_slot("trigger", handler=self.process)
+           self.trigger_slot = self.add_slot("trigger", handler=self.process)
        
        def process(self, **kwargs):
            thread_name = threading.current_thread().name
@@ -787,8 +787,8 @@ This is a critical scenario that demonstrates the robustness of the design:
        def __init__(self, name):
            super().__init__()
            self.name = name
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["data"])
        
        def send(self, **kwargs):
            # Access JobState via context variable (thread-safe)
@@ -807,7 +807,7 @@ This is a critical scenario that demonstrates the robustness of the design:
        def __init__(self, name):
            super().__init__()
            self.name = name
-           self.input_slot = self.define_slot("input", handler=self.process)
+           self.input_slot = self.add_slot("input", handler=self.process)
        
        def process(self, data=None, **kwargs):
            # Access JobState via context variable (thread-safe)

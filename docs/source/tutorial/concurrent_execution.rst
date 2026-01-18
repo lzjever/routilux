@@ -41,8 +41,8 @@ Runtime uses a shared thread pool for all jobs, allowing concurrent execution:
        def __init__(self):
            super().__init__()
            self.set_config(name="Operation", delay=0.2)
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["result"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["result"])
 
            def operate(slot_data, policy_message, job_state):
                delay = self.get_config("delay", 0.2)
@@ -111,8 +111,8 @@ Increase ``thread_pool_size`` to enable concurrent execution:
        def __init__(self):
            super().__init__()
            self.set_config(name="Operation", delay=0.2)
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["result"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["result"])
 
            def operate(slot_data, policy_message, job_state):
                delay = self.get_config("delay", 0.2)
@@ -182,8 +182,8 @@ A common pattern is fetching data from multiple sources in parallel:
        def __init__(self):
            super().__init__()
            self.set_config(source_name="Source", delay=0.1)
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data", "source"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data", "source"])
 
            def fetch(slot_data, policy_message, job_state):
                delay = self.get_config("delay", 0.1)
@@ -201,7 +201,7 @@ A common pattern is fetching data from multiple sources in parallel:
 
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
+           self.input = self.add_slot("input")
 
            def collect(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -287,7 +287,7 @@ When using concurrent execution, use JobState for thread-safe state management:
 
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
+           self.input = self.add_slot("input")
 
            def increment(slot_data, policy_message, job_state):
                # Get current routine state from JobState (thread-safe)
@@ -309,8 +309,8 @@ When using concurrent execution, use JobState for thread-safe state management:
 
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data"])
 
            def trigger_counter(slot_data, policy_message, job_state):
                self.emit("output", data="trigger")
@@ -386,8 +386,8 @@ Here's a complete example of parallel API calls with error handling:
        def __init__(self):
            super().__init__()
            self.set_config(api_name="API", delay=0.1)
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["response", "api_name"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["response", "api_name"])
 
            def call_api(slot_data, policy_message, job_state):
                delay = self.get_config("delay", 0.1)
@@ -413,7 +413,7 @@ Here's a complete example of parallel API calls with error handling:
 
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
+           self.input = self.add_slot("input")
 
            def aggregate(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])

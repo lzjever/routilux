@@ -250,6 +250,7 @@ class Runtime:
         job_context = JobContext(
             job_id=job_id or str(uuid.uuid4()),
             worker_id=worker_state.worker_id,
+            flow_id=flow.flow_id,  # Store flow_id directly in JobContext
             metadata=metadata or {},
         )
         job_context.start()
@@ -431,6 +432,9 @@ class Runtime:
             # Execute logic directly in this thread (we're already in WorkerExecutor's event loop)
             # This ensures job_context is already bound from EventRoutingTask processing
             try:
+                # Set runtime context on routine for emit() to work
+                routine._current_runtime = self
+                
                 # Prepare arguments
                 slot_data_lists = []
                 for slot_name in routine.slots.keys():
@@ -486,6 +490,47 @@ class Runtime:
         if flow:
             return flow._get_routine_id(routine)
         return None
+
+    def get_active_thread_count(self, job_id: str, routine_id: str) -> int:
+        """Get active thread count for a specific routine in a job.
+
+        Args:
+            job_id: Job identifier
+            routine_id: Routine identifier
+
+        Returns:
+            Number of active threads executing this routine (0 if not found)
+        """
+        with self._active_routines_lock:
+            # Check if routine is active for this job
+            # We need to find which worker this job belongs to
+            with self._jobs_lock:
+                for worker_id, jobs in self._active_jobs.items():
+                    if job_id in jobs:
+                        # Found the worker, check active routines
+                        active_routines = self._active_routines.get(worker_id, set())
+                        return 1 if routine_id in active_routines else 0
+            return 0
+
+    def get_all_active_thread_counts(self, job_id: str) -> dict[str, int]:
+        """Get active thread counts for all routines in a job.
+
+        Args:
+            job_id: Job identifier
+
+        Returns:
+            Dictionary mapping routine_id to thread count
+        """
+        with self._active_routines_lock:
+            # Find which worker this job belongs to
+            with self._jobs_lock:
+                for worker_id, jobs in self._active_jobs.items():
+                    if job_id in jobs:
+                        # Found the worker, get all active routines
+                        active_routines = self._active_routines.get(worker_id, set())
+                        return {routine_id: 1 if routine_id in active_routines else 0 
+                                for routine_id in active_routines}
+            return {}
 
     def get_job(self, job_id: str) -> JobContext | None:
         """Get job by ID.

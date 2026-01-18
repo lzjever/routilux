@@ -25,9 +25,9 @@ If a routine has 3 slots connected to 3 different upstream routines:
 
    # Target routine with 3 slots
    target = TargetRoutine()
-   target.slot1 = target.define_slot("input1", handler=handle1)
-   target.slot2 = target.define_slot("input2", handler=handle2)
-   target.slot3 = target.define_slot("input3", handler=handle3)
+   target.slot1 = target.add_slot("input1", handler=handle1)
+   target.slot2 = target.add_slot("input2", handler=handle2)
+   target.slot3 = target.add_slot("input3", handler=handle3)
    
    # Connect to 3 different sources
    flow.connect(source1_id, "output", target_id, "input1")
@@ -116,7 +116,7 @@ The default strategy completely replaces existing data with new data.
    class MyRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self._handle, merge_strategy="override")
+           self.input_slot = self.add_slot("input", handler=self._handle, merge_strategy="override")
        
        def _handle(self, **kwargs):
            print(f"Received: {kwargs}")
@@ -160,7 +160,7 @@ Accumulates values in lists, preserving all received data.
    class MyRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self._handle, merge_strategy="append")
+           self.input_slot = self.add_slot("input", handler=self._handle, merge_strategy="append")
        
        def _handle(self, **kwargs):
            print(f"Received: {kwargs}")
@@ -227,7 +227,7 @@ A callable that implements custom merge logic.
    class MyRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self._handle, merge_strategy=custom_merge)
+           self.input_slot = self.add_slot("input", handler=self._handle, merge_strategy=custom_merge)
        
        def _handle(self, **kwargs):
            print(f"Received: {kwargs}")
@@ -340,10 +340,10 @@ Parameter mapping allows you to transform parameter names when data flows throug
 .. code-block:: python
 
    # Source event emits "source_param"
-   event = routine1.define_event("output", ["source_param"])
+   event = routine1.add_event("output", ["source_param"])
    
    # Target slot expects "target_param"
-   slot = routine.define_slot("input", handler=lambda target_param: ...)
+   slot = routine.add_slot("input", handler=lambda target_param: ...)
    
    # Map source_param to target_param
    connection = Connection(

@@ -38,8 +38,8 @@ to send the same data to multiple processors:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data"])
 
            def generate(slot_data, policy_message, job_state):
                trigger_list = slot_data.get("trigger", [])
@@ -52,7 +52,7 @@ to send the same data to multiple processors:
    class ProcessorA(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
+           self.input = self.add_slot("input")
 
            def process(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -65,7 +65,7 @@ to send the same data to multiple processors:
    class ProcessorB(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
+           self.input = self.add_slot("input")
 
            def process(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -131,8 +131,8 @@ data from multiple sources. By default, new data replaces old data:
    class SourceA(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data", "source"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data", "source"])
 
            def generate(slot_data, policy_message, job_state):
                self.emit("output", data="Data from A", source="A")
@@ -143,8 +143,8 @@ data from multiple sources. By default, new data replaces old data:
    class SourceB(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data", "source"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data", "source"])
 
            def generate(slot_data, policy_message, job_state):
                self.emit("output", data="Data from B", source="B")
@@ -155,7 +155,7 @@ data from multiple sources. By default, new data replaces old data:
    class Aggregator(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
+           self.input = self.add_slot("input")
 
            def aggregate(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -236,8 +236,8 @@ decides what data to pass to the logic function.
    class Source1(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["value"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["value"])
 
            def generate(slot_data, policy_message, job_state):
                self.emit("output", value=1)
@@ -248,8 +248,8 @@ decides what data to pass to the logic function.
    class Source2(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["value"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["value"])
 
            def generate(slot_data, policy_message, job_state):
                self.emit("output", value=2)
@@ -261,8 +261,8 @@ decides what data to pass to the logic function.
        """Receives data only when all slots have data"""
        def __init__(self):
            super().__init__()
-           self.input1 = self.define_slot("input1")
-           self.input2 = self.define_slot("input2")
+           self.input1 = self.add_slot("input1")
+           self.input2 = self.add_slot("input2")
 
            def receive(slot_data, policy_message, job_state):
                input1_list = slot_data.get("input1", [])
@@ -337,8 +337,8 @@ You can create complex workflows with branching and converging paths:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data"])
 
            def generate(slot_data, policy_message, job_state):
                trigger_list = slot_data.get("trigger", [])
@@ -352,8 +352,8 @@ You can create complex workflows with branching and converging paths:
        def __init__(self):
            super().__init__()
            self.set_config(name="UPPER")
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def process(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -370,8 +370,8 @@ You can create complex workflows with branching and converging paths:
        def __init__(self):
            super().__init__()
            self.set_config(name="lower")
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def process(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -387,7 +387,7 @@ You can create complex workflows with branching and converging paths:
    class FinalAggregator(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
+           self.input = self.add_slot("input")
 
            def aggregate(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -479,7 +479,7 @@ Common Pitfalls
    class MyRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
+           self.input = self.add_slot("input")
            # Missing: self.set_activation_policy(...)
 
 **Solution**: Always set an activation policy.

@@ -227,8 +227,8 @@ Example entry routine:
        def __init__(self):
            super().__init__()
            # Define trigger slot - required for entry routines
-           self.trigger_slot = self.define_slot("trigger", handler=self._handle_trigger)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self._handle_trigger)
+           self.output_event = self.add_event("output", ["data"])
        
        def _handle_trigger(self, **kwargs):
            # This will be called by Flow.execute()

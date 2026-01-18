@@ -41,10 +41,10 @@ Connections support parameter mapping to transform parameter names:
 .. code-block:: python
 
    # Source event emits "source_param"
-   event = routine1.define_event("output", ["source_param"])
+   event = routine1.add_event("output", ["source_param"])
    
    # Target slot expects "target_param"
-   slot = routine.define_slot("input", handler=lambda target_param: ...)
+   slot = routine.add_slot("input", handler=lambda target_param: ...)
    
    # Map source_param to target_param
    connection = Connection(

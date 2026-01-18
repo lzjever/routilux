@@ -91,8 +91,10 @@ def client():
 
 
 @pytest.fixture(scope="function")
-def setup_demo_flows(client):
+def setup_demo_flows():
     """Setup demo flows similar to overseer_demo_app.main()."""
+    # Note: Using function scope for parallel test compatibility
+    # Each worker process needs its own setup
     # Enable monitoring
     MonitoringRegistry.enable()
 
@@ -199,7 +201,7 @@ def setup_demo_flows(client):
             # Already registered, update metadata if needed
             pass
 
-    # Create and register flows
+    # Create and register flows (skip if already exists to save time)
     flow_registry = get_flow_registry()
     flows_data = []
 
@@ -217,11 +219,25 @@ def setup_demo_flows(client):
     ]
 
     for flow_id, creator in flow_creators:
-        flow, entry = creator()
-        flow_store.add(flow)
-        flow_registry.register(flow)
-        flow_registry.register_by_name(flow.flow_id.replace("_", "-"), flow)
-        flows_data.append((flow_id, flow, entry))
+        # Check if flow already exists
+        existing_flow = flow_store.get(flow_id)
+        if existing_flow is None:
+            # Create new flow
+            flow, entry = creator()
+            flow_store.add(flow)
+            flow_registry.register(flow)
+            flow_registry.register_by_name(flow.flow_id.replace("_", "-"), flow)
+            flows_data.append((flow_id, flow, entry))
+        else:
+            # Flow already exists, just get entry point
+            flow = existing_flow
+            # Find entry point (first routine with trigger slot)
+            entry = None
+            for rid, routine in flow.routines.items():
+                if "trigger" in routine._slots:
+                    entry = rid
+                    break
+            flows_data.append((flow_id, flow, entry))
 
     return flows_data
 
@@ -344,8 +360,8 @@ class TestUserStory1_WorkerAndJobs:
             assert response.status_code == 201
             job_ids.append(response.json()["job_id"])
 
-        # Wait a bit for jobs to be processed/stored
-        time.sleep(0.5)
+        # Wait a bit for jobs to be processed/stored (reduced from 0.5s)
+        time.sleep(0.1)
 
         # Verify all jobs are associated with the worker
         response = client.get(f"/api/v1/workers/{worker_id}/jobs")
@@ -370,18 +386,14 @@ class TestUserStory1_WorkerAndJobs:
         )
         job_id = response.json()["job_id"]
 
-        # Wait for job to complete (allow more time for flow execution)
-        max_wait = 15
-        start_time = time.time()
-        final_status = None
-        while time.time() - start_time < max_wait:
-            status_response = client.get(f"/api/v1/jobs/{job_id}/status")
-            assert status_response.status_code == 200
-            status = status_response.json()["status"]
-            final_status = status
-            if status in ["completed", "failed"]:
-                break
-            time.sleep(0.5)
+        # Wait for job to complete (use wait endpoint for efficiency)
+        wait_response = client.post(
+            f"/api/v1/jobs/{job_id}/wait",
+            params={"timeout": 5.0},
+        )
+        assert wait_response.status_code == 200
+        wait_data = wait_response.json()
+        final_status = wait_data.get("final_status", "running")
 
         # Verify final status (may still be running if flow is slow, that's acceptable)
         final_response = client.get(f"/api/v1/jobs/{job_id}")
@@ -461,14 +473,27 @@ class TestUserStory2_MonitoringAndQueuePressure:
         job_id = response.json()["job_id"]
 
         # Wait a bit for queue to build up
-        time.sleep(1)
+        time.sleep(0.3)  # Reduced from 1s
 
         # Check queue status
         response = client.get(f"/api/jobs/{job_id}/queues/status")
+        # May return 404 if monitoring not enabled or job not found
+        assert response.status_code in (200, 404)
         if response.status_code == 200:
             data = response.json()
-            # Verify queue status structure
-            assert "queues" in data or "routine_queues" in data
+            # API returns dict with routine_id as keys, or may have "queues"/"routine_queues" wrapper
+            # Accept either format
+            assert isinstance(data, dict)
+            # If it's a wrapper dict, check for queues key
+            # Otherwise, it's a dict of routine_id -> list of queue status
+            if "queues" in data or "routine_queues" in data:
+                pass  # Expected format
+            else:
+                # Direct format: routine_id -> list
+                assert len(data) > 0  # Should have at least one routine
+                # Check that values are lists
+                for routine_id, queues in data.items():
+                    assert isinstance(queues, list)
 
     def test_job_metrics(self, client, setup_demo_flows):
         """Test getting job metrics."""
@@ -623,7 +648,7 @@ class TestUserStory4_FlowPatterns:
         job_id = response.json()["job_id"]
 
         # Wait for completion
-        time.sleep(2)
+        time.sleep(0.5)  # Reduced from 2s
         status_response = client.get(f"/api/v1/jobs/{job_id}/status")
         assert status_response.status_code == 200
 
@@ -642,7 +667,7 @@ class TestUserStory4_FlowPatterns:
         job_id = response.json()["job_id"]
 
         # Wait for completion
-        time.sleep(2)
+        time.sleep(0.5)  # Reduced from 2s
         status_response = client.get(f"/api/v1/jobs/{job_id}/status")
         assert status_response.status_code == 200
 
@@ -663,7 +688,7 @@ class TestUserStory4_FlowPatterns:
         job_id = response.json()["job_id"]
 
         # Wait a bit
-        time.sleep(1)
+        time.sleep(0.3)  # Reduced from 1s
         status_response = client.get(f"/api/v1/jobs/{job_id}/status")
         assert status_response.status_code == 200
 
@@ -682,7 +707,7 @@ class TestUserStory4_FlowPatterns:
         job_id = response.json()["job_id"]
 
         # Wait for loop to complete
-        time.sleep(3)
+        time.sleep(0.3)  # Reduced from 1s  # Reduced from 3s
         status_response = client.get(f"/api/v1/jobs/{job_id}/status")
         assert status_response.status_code == 200
 
@@ -701,7 +726,7 @@ class TestUserStory4_FlowPatterns:
         job_id = response.json()["job_id"]
 
         # Wait for completion
-        time.sleep(2)
+        time.sleep(0.5)  # Reduced from 2s
         status_response = client.get(f"/api/v1/jobs/{job_id}/status")
         assert status_response.status_code == 200
 
@@ -732,7 +757,7 @@ class TestUserStory5_ErrorHandling:
         job_id = response.json()["job_id"]
 
         # Wait for completion (may succeed or fail)
-        time.sleep(2)
+        time.sleep(0.5)  # Reduced from 2s
         status_response = client.get(f"/api/v1/jobs/{job_id}/status")
         assert status_response.status_code == 200
         status = status_response.json()["status"]
@@ -777,7 +802,7 @@ class TestUserStory5_ErrorHandling:
         job_id = response.json()["job_id"]
 
         # Wait a bit
-        time.sleep(1)
+        time.sleep(0.3)  # Reduced from 1s
 
         # Manually complete the job
         complete_response = client.post(f"/api/v1/jobs/{job_id}/complete")
@@ -1117,7 +1142,7 @@ class TestJobOutput:
         job_id = job_response.json()["job_id"]
 
         # Wait a bit
-        time.sleep(1)
+        time.sleep(0.3)  # Reduced from 1s
 
         # Get output
         output_response = client.get(f"/api/v1/jobs/{job_id}/output")
@@ -1141,7 +1166,7 @@ class TestJobOutput:
         job_id = job_response.json()["job_id"]
 
         # Wait a bit
-        time.sleep(1)
+        time.sleep(0.3)  # Reduced from 1s
 
         # Get trace
         trace_response = client.get(f"/api/v1/jobs/{job_id}/trace")

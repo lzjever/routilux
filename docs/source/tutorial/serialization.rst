@@ -40,8 +40,8 @@ You can serialize a flow to JSON for persistence:
    class SimpleProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def process(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -148,8 +148,8 @@ For serialization to work, routines must meet certain requirements:
 
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
            # Configuration stored in _config (serializable)
            self.set_config(threshold=10, enabled=True)
 
@@ -236,8 +236,8 @@ You can save JobState for workflow recovery:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data"])
 
            def generate(slot_data, policy_message, job_state):
                trigger_list = slot_data.get("trigger", [])
@@ -250,8 +250,8 @@ You can save JobState for workflow recovery:
    class Processor(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def process(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])
@@ -314,8 +314,8 @@ Resume execution from a saved JobState:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger = self.define_slot("trigger")
-           self.output = self.define_event("output", ["data"])
+           self.trigger = self.add_slot("trigger")
+           self.output = self.add_event("output", ["data"])
 
            def generate(slot_data, policy_message, job_state):
                trigger_list = slot_data.get("trigger", [])
@@ -328,8 +328,8 @@ Resume execution from a saved JobState:
    class Processor(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def process(slot_data, policy_message, job_state):
                # Check if resuming from previous execution
@@ -426,8 +426,8 @@ Here's a complete example showing proper serialization for cross-host recovery:
    class DataProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input = self.define_slot("input")
-           self.output = self.define_event("output", ["result"])
+           self.input = self.add_slot("input")
+           self.output = self.add_event("output", ["result"])
 
            def process(slot_data, policy_message, job_state):
                input_list = slot_data.get("input", [])

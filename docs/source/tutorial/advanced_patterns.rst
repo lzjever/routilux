@@ -34,8 +34,8 @@ from the same routine:
        
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.emit_all)
-           self.output_event = self.define_event("output", ["data", "source"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.emit_all)
+           self.output_event = self.add_event("output", ["data", "source"])
        
        def emit_all(self, **kwargs):
            # Emit multiple times in the same execution
@@ -50,12 +50,12 @@ from the same routine:
            super().__init__()
            # Store expected_count in _config (required for serialization)
            self.set_config(expected_count=3)
-           self.input_slot = self.define_slot(
+           self.input_slot = self.add_slot(
                "input",
                handler=self.aggregate,
                merge_strategy="append"  # Accumulate data
            )
-           self.output_event = self.define_event("output", ["results"])
+           self.output_event = self.add_event("output", ["results"])
            self.set_stat("message_count", 0)
        
        def aggregate(self, data=None, source=None, **kwargs):
@@ -140,8 +140,8 @@ Combine fan-out (one-to-many) and fan-in (many-to-one) patterns:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["data"])
        
        def send(self, **kwargs):
            self.emit("output", data="test_data")
@@ -149,8 +149,8 @@ Combine fan-out (one-to-many) and fan-in (many-to-one) patterns:
    class Processor1(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result", "processor"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result", "processor"])
        
        def process(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", "")
@@ -160,8 +160,8 @@ Combine fan-out (one-to-many) and fan-in (many-to-one) patterns:
    class Processor2(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result", "processor"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result", "processor"])
        
        def process(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", "")
@@ -171,7 +171,7 @@ Combine fan-out (one-to-many) and fan-in (many-to-one) patterns:
    class Aggregator(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot(
+           self.input_slot = self.add_slot(
                "input",
                handler=self.aggregate,
                merge_strategy="append"
@@ -233,8 +233,8 @@ Build resilient pipelines with error recovery:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["data"])
        
        def send(self, **kwargs):
            self.emit("output", data="test_data")
@@ -242,8 +242,8 @@ Build resilient pipelines with error recovery:
    class UnreliableValidator(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.validate)
-           self.output_event = self.define_event("output", ["data", "valid"])
+           self.input_slot = self.add_slot("input", handler=self.validate)
+           self.output_event = self.add_event("output", ["data", "valid"])
            self.call_count = 0
        
        def validate(self, data=None, **kwargs):
@@ -258,8 +258,8 @@ Build resilient pipelines with error recovery:
    class Processor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def process(self, data=None, valid=None, **kwargs):
            data_value = data or kwargs.get("data", "")
@@ -274,7 +274,7 @@ Build resilient pipelines with error recovery:
    class Sink(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.receive)
+           self.input_slot = self.add_slot("input", handler=self.receive)
        
        def receive(self, result=None, **kwargs):
            result_value = result or kwargs.get("result", "")
@@ -333,8 +333,8 @@ Here's a complete example combining multiple advanced patterns:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.generate)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.generate)
+           self.output_event = self.add_event("output", ["data"])
        
        def generate(self, count=5, **kwargs):
            count = count or kwargs.get("count", 5)
@@ -344,9 +344,9 @@ Here's a complete example combining multiple advanced patterns:
    class Router(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.route)
-           self.high_event = self.define_event("high", ["data"])
-           self.low_event = self.define_event("low", ["data"])
+           self.input_slot = self.add_slot("input", handler=self.route)
+           self.high_event = self.add_event("high", ["data"])
+           self.low_event = self.add_event("low", ["data"])
        
        def route(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", {})
@@ -360,8 +360,8 @@ Here's a complete example combining multiple advanced patterns:
    class HighValueProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def process(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", {})
@@ -371,8 +371,8 @@ Here's a complete example combining multiple advanced patterns:
    class LowValueProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def process(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", {})
@@ -382,7 +382,7 @@ Here's a complete example combining multiple advanced patterns:
    class Aggregator(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot(
+           self.input_slot = self.add_slot(
                "input",
                handler=self.aggregate,
                merge_strategy="append"
@@ -481,7 +481,7 @@ Common Pitfalls
    :emphasize-lines: 3
 
    # Wrong: "override" replaces data instead of accumulating
-   self.input_slot = self.define_slot("input", handler=self.aggregate)
+   self.input_slot = self.add_slot("input", handler=self.aggregate)
    # Use "append" instead!
 
 **Solution**: Use ``merge_strategy="append"`` for aggregation patterns.

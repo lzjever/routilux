@@ -27,8 +27,8 @@ Setting up a Test:
    class MyRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
 
        def process(self, data=None, **kwargs):
            extracted_data = self._extract_input_data(data, **kwargs)
@@ -92,8 +92,8 @@ Testing State Updates
    class CounterRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.increment)
-           self.output_event = self.define_event("output", ["count"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.increment)
+           self.output_event = self.add_event("output", ["count"])
 
        def increment(self, **kwargs):
            ctx = self.get_execution_context()
@@ -125,7 +125,7 @@ Testing Error Handling
    class ErrorRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
+           self.input_slot = self.add_slot("input", handler=self.process)
 
        def process(self, data):
            if data == "error":
@@ -154,9 +154,9 @@ Testing Multiple Slots
    class MultiSlotRoutine(Routine):
        def __init__(self):
            super().__init__()
-           self.slot1 = self.define_slot("slot1", handler=self.handle1)
-           self.slot2 = self.define_slot("slot2", handler=self.handle2)
-           self.output_event = self.define_event("output")
+           self.slot1 = self.add_slot("slot1", handler=self.handle1)
+           self.slot2 = self.add_slot("slot2", handler=self.handle2)
+           self.output_event = self.add_event("output")
 
        def handle1(self, data):
            self.emit("output", source="slot1", data=data)
@@ -188,8 +188,8 @@ Testing Configuration
        def __init__(self):
            super().__init__()
            self.set_config(threshold=10, mode="strict")
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output")
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output")
 
        def process(self, value):
            threshold = self.get_config("threshold", 0)
@@ -261,8 +261,8 @@ Testing Output Handlers:
        class OutputRoutine(Routine):
            def __init__(self):
                super().__init__()
-               self.input_slot = self.define_slot("input", handler=self.process)
-               self.output_event = self.define_event("output")
+               self.input_slot = self.add_slot("input", handler=self.process)
+               self.output_event = self.add_event("output")
 
            def process(self, data):
                self.send_output("result", data=data)

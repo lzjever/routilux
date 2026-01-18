@@ -34,8 +34,8 @@ creates a unique JobState that tracks:
    class SimpleProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def process(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", "")
@@ -53,8 +53,8 @@ creates a unique JobState that tracks:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["data"])
        
        def send(self, **kwargs):
            self.emit("output", data="test")
@@ -115,8 +115,8 @@ Routines should store execution-specific state in JobState:
    class StatefulProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def process(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", "")
@@ -164,8 +164,8 @@ Routines should store execution-specific state in JobState:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["data"])
        
        def send(self, **kwargs):
            for item in ["hello", "world", "routilux"]:
@@ -219,7 +219,7 @@ JobState provides shared data areas for execution-wide state:
    class DataCollector(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.collect)
+           self.input_slot = self.add_slot("input", handler=self.collect)
        
        def collect(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", "")
@@ -240,8 +240,8 @@ JobState provides shared data areas for execution-wide state:
    class DataProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def process(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", "")
@@ -265,8 +265,8 @@ JobState provides shared data areas for execution-wide state:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["data"])
        
        def send(self, **kwargs):
            for item in ["a", "b", "c"]:
@@ -333,8 +333,8 @@ Execution history records all routine executions:
    class SimpleProcessor(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.process)
-           self.output_event = self.define_event("output", ["result"])
+           self.input_slot = self.add_slot("input", handler=self.process)
+           self.output_event = self.add_event("output", ["result"])
        
        def process(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", "")
@@ -344,8 +344,8 @@ Execution history records all routine executions:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.send)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.send)
+           self.output_event = self.add_event("output", ["data"])
        
        def send(self, **kwargs):
            for item in ["a", "b", "c"]:
@@ -409,8 +409,8 @@ Here's a complete example combining state management features:
    class DataSource(Routine):
        def __init__(self):
            super().__init__()
-           self.trigger_slot = self.define_slot("trigger", handler=self.generate)
-           self.output_event = self.define_event("output", ["data"])
+           self.trigger_slot = self.add_slot("trigger", handler=self.generate)
+           self.output_event = self.add_event("output", ["data"])
        
        def generate(self, count=3, **kwargs):
            count = count or kwargs.get("count", 3)
@@ -426,8 +426,8 @@ Here's a complete example combining state management features:
    class Validator(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.validate)
-           self.output_event = self.define_event("output", ["data", "valid"])
+           self.input_slot = self.add_slot("input", handler=self.validate)
+           self.output_event = self.add_event("output", ["data", "valid"])
        
        def validate(self, data=None, **kwargs):
            data_value = data or kwargs.get("data", "")
@@ -458,7 +458,7 @@ Here's a complete example combining state management features:
    class Aggregator(Routine):
        def __init__(self):
            super().__init__()
-           self.input_slot = self.define_slot("input", handler=self.aggregate)
+           self.input_slot = self.add_slot("input", handler=self.aggregate)
        
        def aggregate(self, data=None, valid=None, **kwargs):
            data_value = data or kwargs.get("data", "")

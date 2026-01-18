@@ -1,0 +1,457 @@
+"""
+Routine base class for Routilux core.
+
+Improved Routine mechanism supporting slots (input) and events (output).
+"""
+
+from __future__ import annotations
+
+import threading
+from contextvars import ContextVar
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, NamedTuple, Optional, TypeVar
+
+from serilux import Serializable
+
+if TYPE_CHECKING:
+    from routilux.core.error import ErrorHandler, ErrorStrategy
+    from routilux.core.event import Event
+    from routilux.core.flow import Flow
+    from routilux.core.slot import Slot
+    from routilux.core.worker import WorkerState
+    from routilux.core.context import JobContext
+
+T = TypeVar("T")
+
+# Context variable for thread-safe worker_state access
+_current_worker_state: ContextVar[Optional["WorkerState"]] = ContextVar(
+    "_current_worker_state", default=None
+)
+
+
+class ExecutionContext(NamedTuple):
+    """Execution context containing flow, worker_state, and routine_id.
+
+    Returned by Routine.get_execution_context() to provide convenient
+    access to execution-related handles during routine execution.
+
+    Attributes:
+        flow: The Flow object managing this execution
+        worker_state: The WorkerState object tracking this execution
+        routine_id: The string ID of this routine in the flow
+        job_context: Optional JobContext for the current job
+    """
+
+    flow: "Flow"
+    worker_state: "WorkerState"
+    routine_id: str
+    job_context: Optional["JobContext"] = None
+
+
+# Note: Not using @register_serializable to avoid conflict with legacy module
+class Routine(Serializable):
+    """Improved Routine base class with enhanced capabilities.
+
+    Features:
+        - Support for slots (input slots)
+        - Support for events (output events)
+        - Configuration dictionary (_config) for storing routine-specific settings
+        - Separation of activation policy and logic
+
+    Important Constraints:
+        - Routines MUST NOT accept constructor parameters (except self).
+          This is required for proper serialization/deserialization.
+        - All configuration should be stored in the _config dictionary.
+        - During execution, routines MUST NOT modify any instance variables.
+        - All execution-related state should be stored in WorkerState.
+        - Routines can only READ from _config during execution.
+        - Routines can WRITE to WorkerState (via worker_state.update_routine_state()).
+
+    Note on Job-level vs Worker-level State:
+        - Worker-level state: Use WorkerState (long-running, persistent)
+        - Job-level state: Use JobContext (per-request, temporary)
+        - Access JobContext via get_current_job() in your logic
+
+    Examples:
+        >>> class MyRoutine(Routine):
+        ...     def setup(self):
+        ...         self.add_slot("input")
+        ...         self.add_event("output")
+        ...         self.set_config(name="processor", timeout=30)
+        ...     
+        ...     def logic(self, input_data, **kwargs):
+        ...         # Get job context for job-specific data
+        ...         from routilux.core import get_current_job
+        ...         job = get_current_job()
+        ...         if job:
+        ...             job.set_data("processed", True)
+        ...         # Emit output
+        ...         self.emit("output", result="processed")
+    """
+
+    def __init__(self):
+        """Initialize Routine object.
+
+        Note:
+            This constructor accepts no parameters (except self). All configuration
+            should be stored in self._config dictionary after object creation.
+        """
+        super().__init__()
+        self._id: str = hex(id(self))
+        self._slots: Dict[str, "Slot"] = {}
+        self._events: Dict[str, "Event"] = {}
+
+        # Configuration dictionary for storing routine-specific settings
+        self._config: Dict[str, Any] = {}
+        self._config_lock: threading.RLock = threading.RLock()
+
+        # Error handler for this routine (optional)
+        self._error_handler: Optional["ErrorHandler"] = None
+
+        # Activation policy and logic
+        self._activation_policy: Optional[Callable] = None
+        self._logic: Optional[Callable] = None
+
+        # Register serializable fields
+        self.add_serializable_fields(
+            [
+                "_id",
+                "_config",
+                "_error_handler",
+                "_slots",
+                "_events",
+                "_activation_policy",
+                "_logic",
+            ]
+        )
+
+    def __repr__(self) -> str:
+        """Return string representation."""
+        return f"{self.__class__.__name__}[{self._id}]"
+
+    def add_slot(
+        self, name: str, max_queue_length: int = 1000, watermark: float = 0.8
+    ) -> "Slot":
+        """Add an input slot for receiving data.
+
+        Args:
+            name: Slot name (must be unique within this routine)
+            max_queue_length: Maximum queue length (default: 1000)
+            watermark: Watermark threshold for auto-shrink (default: 0.8)
+
+        Returns:
+            Slot object
+
+        Raises:
+            ValueError: If slot name already exists
+        """
+        if max_queue_length <= 0:
+            raise ValueError(f"max_queue_length must be > 0, got {max_queue_length}")
+        if not 0.0 <= watermark <= 1.0:
+            raise ValueError(f"watermark must be between 0.0 and 1.0, got {watermark}")
+
+        with self._config_lock:
+            if name in self._slots:
+                raise ValueError(f"Slot '{name}' already exists in {self}")
+
+            from routilux.core.slot import Slot
+
+            slot = Slot(name, self, max_queue_length=max_queue_length, watermark=watermark)
+            self._slots[name] = slot
+            return slot
+
+    def add_event(self, name: str, output_params: Optional[List[str]] = None) -> "Event":
+        """Add an output event for transmitting data.
+
+        Args:
+            name: Event name (must be unique within this routine)
+            output_params: Optional list of parameter names (for documentation)
+
+        Returns:
+            Event object
+
+        Raises:
+            ValueError: If event name already exists
+        """
+        with self._config_lock:
+            if name in self._events:
+                raise ValueError(f"Event '{name}' already exists in {self}")
+
+            from routilux.core.event import Event
+
+            event = Event(name, self, output_params or [])
+            self._events[name] = event
+            return event
+
+    def emit(
+        self,
+        event_name: str,
+        runtime: Optional[Any] = None,
+        worker_state: Optional["WorkerState"] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Emit an event and send data to connected slots.
+
+        Args:
+            event_name: Name of the event to emit
+            runtime: Optional Runtime object
+            worker_state: Optional WorkerState object
+            **kwargs: Data to transmit
+
+        Raises:
+            ValueError: If event_name does not exist
+            RuntimeError: If runtime or worker_state cannot be determined
+        """
+        if event_name not in self._events:
+            raise ValueError(f"Event '{event_name}' does not exist in {self}")
+
+        event = self._events[event_name]
+
+        # Get runtime from instance attribute if not provided
+        if runtime is None:
+            runtime = getattr(self, "_current_runtime", None)
+            if runtime is None:
+                raise RuntimeError(
+                    "Runtime is required for emit(). "
+                    "Provide runtime parameter or ensure routine is executing within Runtime context."
+                )
+
+        if worker_state is None:
+            worker_state = _current_worker_state.get(None)
+            if worker_state is None:
+                raise RuntimeError(
+                    "WorkerState is required for emit(). "
+                    "Provide worker_state parameter."
+                )
+
+        event.emit(runtime=runtime, worker_state=worker_state, **kwargs)
+
+    def get_slot(self, name: str) -> Optional["Slot"]:
+        """Get specified slot."""
+        return self._slots.get(name)
+
+    def get_event(self, name: str) -> Optional["Event"]:
+        """Get specified event."""
+        return self._events.get(name)
+
+    @property
+    def slots(self) -> Dict[str, "Slot"]:
+        """Get all slots."""
+        return self._slots
+
+    @property
+    def events(self) -> Dict[str, "Event"]:
+        """Get all events."""
+        return self._events
+
+    def set_config(self, **kwargs: Any) -> None:
+        """Set configuration values.
+
+        Args:
+            **kwargs: Configuration key-value pairs
+        """
+        with self._config_lock:
+            # Prevent modification during execution
+            if hasattr(self, "_current_flow") and getattr(self, "_current_flow", None):
+                raise RuntimeError(
+                    "Cannot modify _config during execution. "
+                    "Use WorkerState for execution-specific state."
+                )
+            self._config.update(kwargs)
+
+    def get_config(self, key: str, default: Any = None) -> Any:
+        """Get a configuration value."""
+        with self._config_lock:
+            return self._config.get(key, default)
+
+    def config(self) -> Dict[str, Any]:
+        """Get a copy of the configuration dictionary."""
+        with self._config_lock:
+            return self._config.copy()
+
+    def set_error_handler(self, error_handler: "ErrorHandler") -> None:
+        """Set error handler for this routine."""
+        self._error_handler = error_handler
+
+    def get_error_handler(self) -> Optional["ErrorHandler"]:
+        """Get error handler for this routine."""
+        return self._error_handler
+
+    def set_activation_policy(self, policy: Callable) -> "Routine":
+        """Set activation policy for this routine.
+
+        The activation policy determines when the routine's logic should be executed.
+        It receives (slots, worker_state) and returns (should_activate, data_slice, policy_message).
+
+        Args:
+            policy: Activation policy function
+
+        Returns:
+            Self for method chaining
+        """
+        self._activation_policy = policy
+        return self
+
+    def set_logic(self, logic: Callable) -> "Routine":
+        """Set logic function for this routine.
+
+        The logic function processes data from slots.
+
+        Args:
+            logic: Logic function
+
+        Returns:
+            Self for method chaining
+        """
+        self._logic = logic
+        return self
+
+    def get_execution_context(self) -> Optional[ExecutionContext]:
+        """Get execution context (flow, worker_state, routine_id, job_context).
+
+        Returns:
+            ExecutionContext if in execution context, None otherwise
+        """
+        flow = getattr(self, "_current_flow", None)
+        if flow is None:
+            return None
+
+        worker_state = _current_worker_state.get(None)
+        if worker_state is None:
+            return None
+
+        routine_id = flow._get_routine_id(self) if hasattr(flow, "_get_routine_id") else None
+        if routine_id is None:
+            return None
+
+        # Get job context
+        from routilux.core.context import get_current_job
+
+        job_context = get_current_job()
+
+        return ExecutionContext(
+            flow=flow,
+            worker_state=worker_state,
+            routine_id=routine_id,
+            job_context=job_context,
+        )
+
+    def get_state(
+        self, worker_state: "WorkerState", key: Optional[str] = None, default: Any = None
+    ) -> Any:
+        """Get routine-specific state from worker_state.
+
+        Args:
+            worker_state: WorkerState object
+            key: Optional key to get specific value
+            default: Default value if key doesn't exist
+
+        Returns:
+            Routine state or specific key value
+        """
+        flow = getattr(self, "_current_flow", None)
+        routine_id = flow._get_routine_id(self) if flow else None
+        if routine_id is None:
+            return default if key else default
+
+        state = worker_state.get_routine_state(routine_id)
+        if state is None:
+            return default if key else default
+
+        if key is None:
+            return state
+        return state.get(key, default)
+
+    def set_state(self, worker_state: "WorkerState", key: str, value: Any) -> None:
+        """Set routine-specific state in worker_state.
+
+        Args:
+            worker_state: WorkerState object
+            key: Key to set
+            value: Value to set
+        """
+        flow = getattr(self, "_current_flow", None)
+        routine_id = flow._get_routine_id(self) if flow else None
+        if routine_id is None:
+            return
+
+        current_state = worker_state.get_routine_state(routine_id) or {}
+        current_state[key] = value
+        worker_state.update_routine_state(routine_id, current_state)
+
+    def update_state(self, worker_state: "WorkerState", updates: Dict[str, Any]) -> None:
+        """Update multiple routine-specific state keys at once.
+
+        Args:
+            worker_state: WorkerState object
+            updates: Dictionary of key-value pairs to update
+        """
+        flow = getattr(self, "_current_flow", None)
+        routine_id = flow._get_routine_id(self) if flow else None
+        if routine_id is None:
+            return
+
+        current_state = worker_state.get_routine_state(routine_id) or {}
+        current_state.update(updates)
+        worker_state.update_routine_state(routine_id, current_state)
+
+    def __call__(self, **kwargs: Any) -> None:
+        """Execute routine (deprecated - use slot handlers instead).
+
+        Note:
+            Direct calling of routines is deprecated. Routines should be
+            executed through slot handlers via set_logic().
+        """
+        pass
+
+    def serialize(self) -> Dict[str, Any]:
+        """Serialize the Routine."""
+        data = super().serialize()
+        # Handle slots and events serialization
+        if "_slots" in data:
+            data["_slots"] = {
+                name: slot.serialize() for name, slot in self._slots.items()
+            }
+        if "_events" in data:
+            data["_events"] = {
+                name: event.serialize() for name, event in self._events.items()
+            }
+        return data
+
+    def deserialize(
+        self, data: Dict[str, Any], strict: bool = False, registry: Any = None
+    ) -> None:
+        """Deserialize the Routine."""
+        # Handle slots
+        if "_slots" in data and isinstance(data["_slots"], dict):
+            from routilux.core.slot import Slot
+
+            for name, slot_data in data["_slots"].items():
+                if isinstance(slot_data, dict):
+                    slot = Slot(name, self)
+                    slot.deserialize(slot_data, strict=strict, registry=registry)
+                    self._slots[name] = slot
+            del data["_slots"]
+
+        # Handle events
+        if "_events" in data and isinstance(data["_events"], dict):
+            from routilux.core.event import Event
+
+            for name, event_data in data["_events"].items():
+                if isinstance(event_data, dict):
+                    event = Event(name, self)
+                    event.deserialize(event_data, strict=strict, registry=registry)
+                    self._events[name] = event
+            del data["_events"]
+
+        super().deserialize(data, strict=strict, registry=registry)
+
+
+# Convenience function
+def get_current_worker_state() -> Optional["WorkerState"]:
+    """Get the current worker state from context."""
+    return _current_worker_state.get(None)
+
+
+def set_current_worker_state(worker_state: Optional["WorkerState"]) -> None:
+    """Set the current worker state in context (internal use)."""
+    _current_worker_state.set(worker_state)

@@ -3,6 +3,13 @@ Monitoring and debugging infrastructure for Routilux.
 
 This module provides optional monitoring, debugging, and breakpoint functionality.
 All features are disabled by default and have zero overhead when not enabled.
+
+Usage:
+    >>> from routilux.monitoring import MonitoringRegistry
+    >>> MonitoringRegistry.enable()  # Enable monitoring and register hooks
+    >>> 
+    >>> # Or use environment variable:
+    >>> # ROUTILUX_ENABLE_MONITORING=true
 """
 
 import os
@@ -30,19 +37,35 @@ from routilux.monitoring.monitor_collector import (  # noqa: E402
     MonitorCollector,
     RoutineMetrics,
 )
+from routilux.monitoring.execution_hooks import (  # noqa: E402
+    MonitoringExecutionHooks,
+    get_monitoring_hooks,
+    enable_monitoring_hooks,
+    disable_monitoring_hooks,
+)
 
 __all__ = [
+    # Registry
     "MonitoringRegistry",
+    # Execution hooks
+    "MonitoringExecutionHooks",
+    "get_monitoring_hooks",
+    "enable_monitoring_hooks",
+    "disable_monitoring_hooks",
+    # Breakpoints
     "BreakpointManager",
     "Breakpoint",
+    # Debug sessions
     "DebugSession",
     "DebugSessionStore",
     "CallFrame",
+    # Monitor collector
     "MonitorCollector",
     "ExecutionMetrics",
     "RoutineMetrics",
     "ExecutionEvent",
     "ErrorRecord",
+    # Event manager
     "JobEventManager",
     "get_event_manager",
 ]

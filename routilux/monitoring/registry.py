@@ -49,8 +49,8 @@ class MonitoringRegistry:
     def enable(cls) -> None:
         """Enable monitoring globally.
 
-        This initializes all monitoring services. Once enabled, monitoring
-        hooks will collect data and check breakpoints.
+        This initializes all monitoring services and registers execution hooks.
+        Once enabled, monitoring hooks will collect data and check breakpoints.
         """
         # First get the instance (without holding the lock)
         instance = cls.get_instance()
@@ -79,15 +79,25 @@ class MonitoringRegistry:
             # Set enabled AFTER all services are initialized
             cls._enabled = True
 
+        # Register execution hooks with core (outside lock to avoid deadlock)
+        from routilux.monitoring.execution_hooks import enable_monitoring_hooks
+
+        enable_monitoring_hooks()
+
     @classmethod
     def disable(cls) -> None:
         """Disable monitoring globally.
 
-        This stops all monitoring operations. Hooks will return immediately
-        without doing any work.
+        This stops all monitoring operations and unregisters execution hooks.
+        Hooks will return immediately without doing any work.
         """
         with cls._lock:
             cls._enabled = False
+
+        # Unregister execution hooks from core (outside lock to avoid deadlock)
+        from routilux.monitoring.execution_hooks import disable_monitoring_hooks
+
+        disable_monitoring_hooks()
 
     @classmethod
     def is_enabled(cls) -> bool:

@@ -9,8 +9,8 @@ Tests that:
 """
 
 import pytest
-from routilux.factory.factory import ObjectFactory
-from routilux.factory.metadata import ObjectMetadata
+from routilux.tools.factory.factory import ObjectFactory
+from routilux.tools.factory.metadata import ObjectMetadata
 from routilux import Flow, Routine
 from routilux.monitoring.registry import MonitoringRegistry
 from routilux.monitoring.flow_registry import FlowRegistry

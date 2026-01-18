@@ -16,7 +16,7 @@ import pytest
 import httpx
 from fastapi.testclient import TestClient
 
-from routilux.api.main import app
+from routilux.server.main import app
 from routilux.monitoring.flow_registry import FlowRegistry
 from routilux.monitoring.registry import MonitoringRegistry
 from routilux.monitoring.storage import flow_store, job_store

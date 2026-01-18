@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch
 
 import httpx
 from fastapi.testclient import TestClient
-from routilux.api.main import app
+from routilux.server.main import app
 from routilux import Flow, Routine
 from routilux.activation_policies import immediate_policy
 from routilux.job_state import JobState
@@ -24,8 +24,8 @@ from routilux.monitoring.flow_registry import FlowRegistry
 from routilux.monitoring.storage import flow_store, job_store
 from routilux.runtime import Runtime
 from routilux.status import ExecutionStatus
-from routilux.factory.factory import ObjectFactory
-from routilux.factory.metadata import ObjectMetadata
+from routilux.tools.factory.factory import ObjectFactory
+from routilux.tools.factory.metadata import ObjectMetadata
 
 # Integration tests marker
 pytestmark = pytest.mark.integration

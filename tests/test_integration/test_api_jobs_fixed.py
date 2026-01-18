@@ -8,7 +8,7 @@ import pytest
 
 import httpx
 from fastapi.testclient import TestClient
-from routilux.api.main import app
+from routilux.server.main import app
 from routilux import Flow, Routine
 from routilux.activation_policies import immediate_policy
 from routilux.monitoring.flow_registry import FlowRegistry

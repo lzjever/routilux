@@ -12,8 +12,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from routilux import Flow, Routine
-from routilux.api.main import app
-from routilux.factory.factory import ObjectFactory
+from routilux.server.main import app
+from routilux.tools.factory.factory import ObjectFactory
 from routilux.monitoring.storage import flow_store
 
 # Integration tests marker

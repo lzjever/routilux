@@ -139,7 +139,7 @@ class TestOverseerDemoAppRegistration:
     
     def test_routines_registered(self):
         """Test: Routines are registered in factory."""
-        from routilux.factory.factory import ObjectFactory
+        from routilux.tools.factory.factory import ObjectFactory
         
         factory = ObjectFactory.get_instance()
         # Clean factory before test
@@ -158,7 +158,7 @@ class TestOverseerDemoAppRegistration:
         # We can't easily test the full app without starting the server,
         # but we can verify the factory can register routines
         from routilux import Routine
-        from routilux.factory.metadata import ObjectMetadata
+        from routilux.tools.factory.metadata import ObjectMetadata
         
         test_routine = type("TestRoutine", (Routine,), {})
         metadata = ObjectMetadata(

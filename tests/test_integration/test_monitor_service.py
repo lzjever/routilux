@@ -20,7 +20,7 @@ import pytest
 
 # Check if API dependencies are available
 try:
-    from routilux.api.models.monitor import (
+    from routilux.server.models.monitor import (
         JobMonitoringData,
         RoutineExecutionStatus,
         RoutineInfo,

@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 
 from routilux import Flow, Routine
 from routilux.activation_policies import batch_size_policy, immediate_policy
-from routilux.api.main import app
+from routilux.server.main import app
 from routilux.monitoring.flow_registry import FlowRegistry
 from routilux.monitoring.storage import flow_store, job_store
 from routilux.runtime import Runtime
@@ -397,7 +397,7 @@ class TestMonitoringAPIAuthentication:
 
     def test_monitoring_endpoints_require_auth(self, api_client, test_job):
         """Test: All monitoring endpoints require authentication"""
-        from routilux.api.config import get_config
+        from routilux.server.config import get_config
         
         config = get_config()
         # Skip test if auth is disabled (common in test environments)

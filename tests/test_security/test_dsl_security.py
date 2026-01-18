@@ -11,7 +11,7 @@ Tests verify that:
 import pytest
 
 from routilux import Flow, Routine
-from routilux.factory.factory import ObjectFactory
+from routilux.tools.factory.factory import ObjectFactory
 from routilux.monitoring.storage import flow_store
 
 

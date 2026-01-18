@@ -6,10 +6,10 @@ Tests the enhanced /api/factory/objects endpoint with object_type filtering.
 
 import pytest
 from fastapi.testclient import TestClient
-from routilux.api.main import app
+from routilux.server.main import app
 from routilux import Flow, Routine
-from routilux.factory.factory import ObjectFactory
-from routilux.factory.metadata import ObjectMetadata
+from routilux.tools.factory.factory import ObjectFactory
+from routilux.tools.factory.metadata import ObjectMetadata
 from routilux.monitoring.storage import flow_store
 
 pytestmark = pytest.mark.integration

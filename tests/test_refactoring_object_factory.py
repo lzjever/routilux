@@ -15,8 +15,8 @@ import time
 import pytest
 
 from routilux import Flow, Routine
-from routilux.factory.factory import ObjectFactory
-from routilux.factory.metadata import ObjectMetadata
+from routilux.tools.factory.factory import ObjectFactory
+from routilux.tools.factory.metadata import ObjectMetadata
 
 
 class TestObjectFactoryInterface:

@@ -10,7 +10,7 @@ import pytest
 
 from routilux import Flow, Routine
 from routilux.activation_policies import immediate_policy
-from routilux.factory.factory import ObjectFactory
+from routilux.tools.factory.factory import ObjectFactory
 from routilux.monitoring.flow_registry import FlowRegistry
 from routilux.runtime import Runtime
 from routilux.status import ExecutionStatus

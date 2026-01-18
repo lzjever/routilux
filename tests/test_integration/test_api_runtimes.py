@@ -11,7 +11,7 @@ Tests Runtime Registry and API functionality including:
 import pytest
 from fastapi.testclient import TestClient
 
-from routilux.api.main import app
+from routilux.server.main import app
 from routilux.monitoring.runtime_registry import RuntimeRegistry
 
 

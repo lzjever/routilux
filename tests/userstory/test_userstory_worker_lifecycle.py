@@ -395,6 +395,7 @@ class TestWorkerDeletion:
 
         # Wait a bit for cleanup
         import time
+
         time.sleep(0.1)
 
         # Verify worker is gone (may still exist in registry but not in active workers)
@@ -446,6 +447,7 @@ class TestWorkerDeletion:
 
         # Wait a bit for cleanup
         import time
+
         time.sleep(0.1)
 
         # List workers

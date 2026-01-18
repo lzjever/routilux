@@ -7,6 +7,8 @@ from typing import Dict, List
 from fastapi import APIRouter, HTTPException, Query
 
 from routilux.flow import Flow
+from routilux.monitoring.monitor_service import get_monitor_service
+from routilux.monitoring.registry import MonitoringRegistry
 from routilux.monitoring.storage import flow_store
 from routilux.server.middleware.auth import RequireAuth
 from routilux.server.models.flow import (
@@ -395,6 +397,52 @@ async def delete_flow(flow_id: str):
     flow_store.remove(flow_id)
 
 
+@router.get("/flows/{flow_id}/metrics", dependencies=[RequireAuth])
+async def get_flow_metrics(flow_id: str):
+    """Get aggregated metrics for all jobs of a flow."""
+    flow = flow_store.get(flow_id)
+    if not flow:
+        raise HTTPException(status_code=404, detail=f"Flow '{flow_id}' not found")
+
+    registry = MonitoringRegistry.get_instance()
+    collector = registry.monitor_collector
+
+    if not collector:
+        raise HTTPException(status_code=500, detail="Monitor collector not available")
+
+    # Get all jobs for this flow from new storage
+    from routilux.server.dependencies import get_job_storage
+
+    job_storage = get_job_storage()
+    jobs = job_storage.list_jobs(flow_id=flow_id)
+
+    # Aggregate metrics
+    total_jobs = len(jobs)
+    completed_jobs = sum(1 for job in jobs if str(job.status) in ("completed", "COMPLETED"))
+    failed_jobs = sum(1 for job in jobs if str(job.status) in ("failed", "FAILED"))
+
+    # Get metrics for each job
+    job_metrics = []
+    for job in jobs:
+        metrics = collector.get_metrics(job.job_id)
+        if metrics:
+            job_metrics.append(
+                {
+                    "job_id": job.job_id,
+                    "duration": metrics.duration,
+                    "status": str(job.status),
+                }
+            )
+
+    return {
+        "flow_id": flow_id,
+        "total_jobs": total_jobs,
+        "completed_jobs": completed_jobs,
+        "failed_jobs": failed_jobs,
+        "job_metrics": job_metrics,
+    }
+
+
 @router.get("/flows/{flow_id}/dsl", dependencies=[RequireAuth])
 async def export_flow_dsl(
     flow_id: str,
@@ -402,7 +450,7 @@ async def export_flow_dsl(
         "yaml",
         pattern="^(yaml|json)$",
         description="Export format: 'yaml' (human-readable) or 'json' (machine-readable). Default: yaml.",
-        example="yaml",
+        examples=["yaml"],
     ),
 ):
     """Export flow as DSL (Domain Specific Language).
@@ -588,7 +636,7 @@ async def validate_flow(flow_id: str):
     # Separate errors from warnings
     errors = [issue for issue in issues if issue.startswith("Error:")]
     warnings = [issue for issue in issues if issue.startswith("Warning:")]
-    
+
     # Flow is valid if there are no errors (warnings are acceptable)
     return {
         "valid": len(errors) == 0,
@@ -596,6 +644,24 @@ async def validate_flow(flow_id: str):
         "errors": errors,
         "warnings": warnings,
     }
+
+
+@router.get(
+    "/flows/{flow_id}/routines/{routine_id}/info",
+    response_model=RoutineInfo,
+    dependencies=[RequireAuth],
+)
+async def get_routine_info(flow_id: str, routine_id: str):
+    """Get routine metadata information (policy, config, slots, events)."""
+    flow = flow_store.get(flow_id)
+    if not flow:
+        raise HTTPException(status_code=404, detail=f"Flow '{flow_id}' not found")
+
+    service = get_monitor_service()
+    try:
+        return service.get_routine_info(flow_id, routine_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get(

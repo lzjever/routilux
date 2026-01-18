@@ -6,13 +6,13 @@ from fastapi import APIRouter, HTTPException
 
 from routilux.monitoring.breakpoint_manager import Breakpoint
 from routilux.monitoring.registry import MonitoringRegistry
+
 # Note: job_store (old system) removed - use get_job_storage() instead
 from routilux.server.middleware.auth import RequireAuth
 from routilux.server.models.breakpoint import (
     BreakpointCreateRequest,
     BreakpointListResponse,
     BreakpointResponse,
-    BreakpointUpdateRequest,
 )
 
 router = APIRouter()
@@ -47,14 +47,14 @@ async def create_breakpoint(job_id: str, request: BreakpointCreateRequest):
     """Create a breakpoint for a job."""
     # Verify job exists (use new job storage)
     from routilux.server.dependencies import get_job_storage, get_runtime
-    
+
     job_storage = get_job_storage()
     runtime = get_runtime()
-    
+
     job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
     if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
-    
+
     # JobContext now contains flow_id directly
     flow_id = job_context.flow_id
     if not flow_id:
@@ -91,20 +91,16 @@ async def create_breakpoint(job_id: str, request: BreakpointCreateRequest):
         from routilux.activation_policies import breakpoint_policy
 
         bp_policy = breakpoint_policy(request.routine_id)
-        # Set policy on worker if using new system, or job_state if using old
-        if job_context:
-            # For new system, we need to set policy on the worker
-            from routilux.core.registry import WorkerRegistry
-            worker_registry = WorkerRegistry.get_instance()
-            worker = worker_registry.get(job_context.worker_id)
-            if worker:
-                # Store policy in worker state
-                if not hasattr(worker, '_job_activation_policies'):
-                    worker._job_activation_policies = {}
-                worker._job_activation_policies[job_id] = {request.routine_id: bp_policy}
-        else:
-            # Old system
-            job_state.set_routine_activation_policy(request.routine_id, bp_policy)
+        # Set policy on worker for the new system
+        from routilux.core.registry import WorkerRegistry
+
+        worker_registry = WorkerRegistry.get_instance()
+        worker = worker_registry.get(job_context.worker_id)
+        if worker:
+            # Store policy in worker state
+            if not hasattr(worker, "_job_activation_policies"):
+                worker._job_activation_policies = {}
+            worker._job_activation_policies[job_id] = {request.routine_id: bp_policy}
 
         # Store original policy in breakpoint for restoration
         # Note: We'll store it in a way that can be retrieved later
@@ -143,10 +139,10 @@ async def list_breakpoints(job_id: str):
     """List all breakpoints for a job."""
     # Verify job exists (use new job storage)
     from routilux.server.dependencies import get_job_storage, get_runtime
-    
+
     job_storage = get_job_storage()
     runtime = get_runtime()
-    
+
     job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
     if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
@@ -172,14 +168,14 @@ async def delete_breakpoint(job_id: str, breakpoint_id: str):
     """Delete a breakpoint."""
     # Verify job exists (use new job storage)
     from routilux.server.dependencies import get_job_storage, get_runtime
-    
+
     job_storage = get_job_storage()
     runtime = get_runtime()
-    
+
     job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
     if not job_context:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
-    
+
     # JobContext now contains flow_id directly
     flow_id = job_context.flow_id
     if not flow_id:
@@ -196,56 +192,14 @@ async def delete_breakpoint(job_id: str, breakpoint_id: str):
     breakpoint = next((bp for bp in breakpoints if bp.breakpoint_id == breakpoint_id), None)
 
     if breakpoint and breakpoint.type == "routine" and breakpoint.routine_id:
-        # Restore original policy
-        from routilux.core.registry import FlowRegistry
-
-        flow_registry = FlowRegistry.get_instance()
-        
-        flow = flow_registry.get(flow_id)
-
-        if flow and breakpoint.routine_id in flow.routines:
-            routine = flow.routines[breakpoint.routine_id]
-            # Get original policy from breakpoint or routine
-            original_policy = getattr(breakpoint, "_original_policy", None)
-
-            # Policy restoration handled at worker level
-            # Note: Breakpoint policies are managed by BreakpointManager
-            # The original policy restoration logic may need to be implemented
-            # based on how breakpoints are stored and managed
-            pass  # TODO: Implement policy restoration if needed
+        # Policy restoration handled at worker level
+        # Note: Breakpoint policies are managed by BreakpointManager
+        # The original policy restoration logic may need to be implemented
+        # based on how breakpoints are stored and managed
+        pass  # TODO: Implement policy restoration if needed
 
     breakpoint_mgr.remove_breakpoint(breakpoint_id, job_id)
 
 
-@router.put(
-    "/jobs/{job_id}/breakpoints/{breakpoint_id}",
-    response_model=BreakpointResponse,
-    dependencies=[RequireAuth],
-)
-async def update_breakpoint(job_id: str, breakpoint_id: str, request: BreakpointUpdateRequest):
-    """Update breakpoint (enable/disable)."""
-    # Verify job exists (use new job storage)
-    from routilux.server.dependencies import get_job_storage, get_runtime
-    
-    job_storage = get_job_storage()
-    runtime = get_runtime()
-    
-    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
-    if not job_context:
-        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
-
-    registry = MonitoringRegistry.get_instance()
-    breakpoint_mgr = registry.breakpoint_manager
-
-    if not breakpoint_mgr:
-        raise HTTPException(status_code=404, detail="Breakpoint manager not available")
-
-    breakpoints = breakpoint_mgr.get_breakpoints(job_id)
-    breakpoint = next((bp for bp in breakpoints if bp.breakpoint_id == breakpoint_id), None)
-
-    if not breakpoint:
-        raise HTTPException(status_code=404, detail=f"Breakpoint '{breakpoint_id}' not found")
-
-    breakpoint.enabled = request.enabled
-
-    return _breakpoint_to_response(breakpoint)
+# Note: Breakpoint enable/disable has been moved to workers category
+# Use PUT /api/workers/{worker_id}/breakpoints/{breakpoint_id} instead

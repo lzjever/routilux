@@ -46,8 +46,9 @@ class TestBreakpointDebugging:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get debug session (API is at /api/jobs/..., not /api/v1/debug/jobs/...)
         response = api_client.get(f"/api/jobs/{job_id}/debug/session")
         # May return 404 if no debug session exists, or 500 if debug store not available
@@ -84,8 +85,9 @@ class TestBreakpointDebugging:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get debug session (API is at /api/jobs/..., not /api/jobs/...)
         response = api_client.get(f"/api/jobs/{job_id}/debug/session")
         # May return 404 if no debug session exists (no breakpoint set)
@@ -149,8 +151,9 @@ class TestVariableInspection:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get variables without routine_id
         response = api_client.get(f"/api/jobs/{job_id}/debug/variables")
         # May fail if not paused at breakpoint, or 404 if debug store not available
@@ -187,8 +190,9 @@ class TestCallStackInspection:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get call stack
         response = api_client.get(f"/api/jobs/{job_id}/debug/call-stack")
         # May return 404 if debug store not available, no session, or job not found
@@ -429,15 +433,18 @@ class TestDebugWorkflowIntegration:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get session info (may fail if debug store not available)
         session = debug_client.get_session(job_id)
         # Session may not exist if no breakpoint set or debug store not available
         if "error" in session:
             # Debug store not available or job not found - skip test
-            pytest.skip(f"Debug session not available: {session.get('error', {}).get('message', 'Unknown')}")
-        
+            pytest.skip(
+                f"Debug session not available: {session.get('error', {}).get('message', 'Unknown')}"
+            )
+
         assert session.get("job_id") == job_id
 
         # Get call stack

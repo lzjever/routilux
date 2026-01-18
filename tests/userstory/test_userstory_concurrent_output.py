@@ -31,16 +31,19 @@ class OutputCaptureRoutine(Routine):
 
         # Set activation policy to execute immediately when slot receives data
         from routilux.activation_policies import immediate_policy
+
         self.set_activation_policy(immediate_policy())
 
     def logic(self, *slot_data, **kwargs):
         # Debug: Verify logic is being called
         import sys
+
         sys.stderr.write("DEBUG: logic() START\n")
 
         try:
             # Get job context using the context module
             from routilux.core.context import get_current_job
+
             job_context = get_current_job()
             job_id = job_context.job_id if job_context else "unknown"
             sys.stderr.write(f"DEBUG: job_id={job_id}\n")
@@ -60,7 +63,7 @@ class OutputCaptureRoutine(Routine):
 
             # Print multiple messages with job_id to verify isolation
             for i in range(message_count):
-                msg = f"[Job:{job_id}] Message {i+1}/{message_count} - Index:{index}"
+                msg = f"[Job:{job_id}] Message {i + 1}/{message_count} - Index:{index}"
                 print(msg)
                 sys.stdout.flush()  # Ensure output is written immediately
                 # Small delay to simulate processing
@@ -69,13 +72,18 @@ class OutputCaptureRoutine(Routine):
             # Get worker_state from kwargs and pass to emit
             worker_state = kwargs.get("worker_state")
             if worker_state:
-                self.emit("output", {"job_id": job_id, "messages": message_count, "index": index}, worker_state=worker_state)
+                self.emit(
+                    "output",
+                    {"job_id": job_id, "messages": message_count, "index": index},
+                    worker_state=worker_state,
+                )
 
             # Debug: Confirm execution completed
             sys.stderr.write(f"DEBUG: logic() completed for job {job_id}\n")
         except Exception as e:
             sys.stderr.write(f"ERROR in logic(): {e}\n")
             import traceback
+
             traceback.print_exc()
 
 
@@ -126,6 +134,7 @@ class TestConcurrentOutputStreaming:
 
         # Debug: Check RoutedStdout status
         from routilux.core.output import get_routed_stdout
+
         routed_stdout = get_routed_stdout()
         if routed_stdout:
             stats = routed_stdout.get_stats()
@@ -307,7 +316,9 @@ class TestConcurrentOutputStreaming:
             assert len(lines) == 3, f"Expected 3 lines for job {job_id}, got {len(lines)}"
 
             # Verify all lines have the correct job_id (no mixing)
-            assert all(f"[Job:{job_id}]" in line for line in lines), f"Output mixing detected for job {job_id}"
+            assert all(f"[Job:{job_id}]" in line for line in lines), (
+                f"Output mixing detected for job {job_id}"
+            )
 
         print(f"\n✓ No output mixing detected across {num_jobs} concurrent jobs")
 
@@ -406,7 +417,9 @@ class TestStressOutputCapture:
                 # Verify job_id appears in all lines
                 assert all(f"[Job:{job_id}]" in line for line in lines)
 
-        assert success_count == len(all_job_ids), f"Only {success_count}/{len(all_job_ids)} jobs had correct output"
+        assert success_count == len(all_job_ids), (
+            f"Only {success_count}/{len(all_job_ids)} jobs had correct output"
+        )
 
         print(f"\n✓ Load test passed - {len(all_job_ids)} jobs across {len(routines)} routines")
 
@@ -465,4 +478,6 @@ class TestOutputCaptureThreadSafety:
             assert len(lines) == 4, f"Expected 4 lines for job {job_id}, got {len(lines)}"
             assert all(f"[Job:{job_id}]" in line for line in lines), f"Job ID mismatch in {job_id}"
 
-        print(f"\n✓ Thread safety test passed - {num_jobs} jobs, {len(output_results)} concurrent reads")
+        print(
+            f"\n✓ Thread safety test passed - {num_jobs} jobs, {len(output_results)} concurrent reads"
+        )

@@ -434,7 +434,7 @@ class Runtime:
             try:
                 # Set runtime context on routine for emit() to work
                 routine._current_runtime = self
-                
+
                 # Prepare arguments
                 slot_data_lists = []
                 for slot_name in routine.slots.keys():
@@ -528,8 +528,10 @@ class Runtime:
                     if job_id in jobs:
                         # Found the worker, get all active routines
                         active_routines = self._active_routines.get(worker_id, set())
-                        return {routine_id: 1 if routine_id in active_routines else 0 
-                                for routine_id in active_routines}
+                        return {
+                            routine_id: 1 if routine_id in active_routines else 0
+                            for routine_id in active_routines
+                        }
             return {}
 
     def get_job(self, job_id: str) -> JobContext | None:

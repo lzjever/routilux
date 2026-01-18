@@ -57,7 +57,7 @@ class FlowCreateRequest(BaseModel):
         None,
         description="Optional flow identifier. If not provided, a UUID will be automatically generated. "
         "Must be unique across all flows. Use this ID to reference the flow in subsequent API calls.",
-        example="my_data_processing_flow",
+        examples=["my_data_processing_flow"],
     )
     dsl: Optional[str] = Field(
         None,
@@ -65,13 +65,15 @@ class FlowCreateRequest(BaseModel):
         "If provided, the flow will be created from this YAML definition. "
         "See DSL documentation for format details. "
         "Mutually exclusive with `dsl_dict` - if both are provided, `dsl` takes precedence.",
-        example="""flow_id: my_flow
+        examples=[
+            """flow_id: my_flow
 routines:
   source:
     class: DataSource
     config:
       name: Source
-connections: []""",
+connections: []"""
+        ],
     )
     dsl_dict: Optional[Dict[str, Any]] = Field(
         None,
@@ -79,16 +81,18 @@ connections: []""",
         "If provided, the flow will be created from this JSON definition. "
         "Mutually exclusive with `dsl` - if both are provided, `dsl` takes precedence. "
         "This is useful when building flows programmatically.",
-        example={
-            "flow_id": "my_flow",
-            "routines": {
-                "source": {
-                    "class": "DataSource",
-                    "config": {"name": "Source"},
-                }
-            },
-            "connections": [],
-        },
+        examples=[
+            {
+                "flow_id": "my_flow",
+                "routines": {
+                    "source": {
+                        "class": "DataSource",
+                        "config": {"name": "Source"},
+                    }
+                },
+                "connections": [],
+            }
+        ],
     )
 
     model_config = {
@@ -145,7 +149,7 @@ class AddRoutineRequest(BaseModel):
         ...,
         description="Unique identifier for this routine within the flow. "
         "Must be unique within the flow. Use this ID to reference the routine in connections and other operations.",
-        example="data_processor",
+        examples=["data_processor"],
     )
     object_name: str = Field(
         ...,
@@ -153,7 +157,7 @@ class AddRoutineRequest(BaseModel):
         "1. A factory name (recommended): Registered name in ObjectFactory (e.g., 'data_source', 'data_transformer') "
         "2. A class path: Full module path to the class (e.g., 'mymodule.DataProcessor') "
         "Factory names are checked first, then class paths. Use factory names when possible for better security and discoverability.",
-        example="data_transformer",
+        examples=["data_transformer"],
     )
     config: Optional[Dict[str, Any]] = Field(
         None,
@@ -161,7 +165,7 @@ class AddRoutineRequest(BaseModel):
         "These values will be merged with any default configuration from the factory prototype. "
         "The exact configuration options depend on the routine type. "
         "Common options include: 'name', 'timeout', 'processing_delay', etc.",
-        example={"name": "MyProcessor", "transformation": "uppercase", "timeout": 30},
+        examples=[{"name": "MyProcessor", "transformation": "uppercase", "timeout": 30}],
     )
 
     model_config = {
@@ -221,27 +225,27 @@ class AddConnectionRequest(BaseModel):
         ...,
         description="ID of the routine that emits the event (source of data). "
         "Must be a routine that exists in the flow.",
-        example="data_source",
+        examples=["data_source"],
     )
     source_event: str = Field(
         ...,
         description="Name of the event emitted by the source routine. "
         "Must be an event defined in the source routine. "
         "Use GET /api/factory/objects/{name}/interface to discover available events.",
-        example="output",
+        examples=["output"],
     )
     target_routine: str = Field(
         ...,
         description="ID of the routine that receives the data (target). "
         "Must be a routine that exists in the flow.",
-        example="data_processor",
+        examples=["data_processor"],
     )
     target_slot: str = Field(
         ...,
         description="Name of the input slot in the target routine that receives the data. "
         "Must be a slot defined in the target routine. "
         "Use GET /api/factory/objects/{name}/interface to discover available slots.",
-        example="input",
+        examples=["input"],
     )
 
     model_config = {
@@ -288,34 +292,34 @@ class RoutineInfo(BaseModel):
     routine_id: str = Field(
         ...,
         description="Unique identifier of this routine within the flow.",
-        example="data_processor",
+        examples=["data_processor"],
     )
     class_name: str = Field(
         ...,
         description="Name of the routine class (e.g., 'DataTransformer', 'DataSource'). "
         "This is the Python class name, useful for debugging and logging.",
-        example="DataTransformer",
+        examples=["DataTransformer"],
     )
     slots: List[str] = Field(
         ...,
         description="List of input slot names defined in this routine. "
         "These are the slots that can receive data from other routines' events. "
         "Use these names when creating connections (target_slot).",
-        example=["input", "secondary"],
+        examples=[["input", "secondary"]],
     )
     events: List[str] = Field(
         ...,
         description="List of output event names defined in this routine. "
         "These are the events that this routine can emit to send data to other routines. "
         "Use these names when creating connections (source_event).",
-        example=["output", "error"],
+        examples=[["output", "error"]],
     )
     config: Dict[str, Any] = Field(
         ...,
         description="Configuration dictionary for this routine. "
         "Contains all configuration parameters set on the routine instance. "
         "This is a read-only snapshot of the routine's configuration.",
-        example={"name": "DataProcessor", "transformation": "uppercase", "timeout": 30},
+        examples=[{"name": "DataProcessor", "transformation": "uppercase", "timeout": 30}],
     )
 
 
@@ -343,27 +347,27 @@ class ConnectionInfo(BaseModel):
         ...,
         description="Auto-generated identifier for this connection. "
         "Format: 'conn_{index}'. Used when deleting connections.",
-        example="conn_0",
+        examples=["conn_0"],
     )
     source_routine: str = Field(
         ...,
         description="ID of the routine that emits data (source).",
-        example="data_source",
+        examples=["data_source"],
     )
     source_event: str = Field(
         ...,
         description="Name of the event that emits data from the source routine.",
-        example="output",
+        examples=["output"],
     )
     target_routine: str = Field(
         ...,
         description="ID of the routine that receives data (target).",
-        example="data_processor",
+        examples=["data_processor"],
     )
     target_slot: str = Field(
         ...,
         description="Name of the slot that receives data in the target routine.",
-        example="input",
+        examples=["input"],
     )
 
 
@@ -410,45 +414,49 @@ class FlowResponse(BaseModel):
     flow_id: str = Field(
         ...,
         description="Unique identifier for this flow. Use this ID to reference the flow in API calls.",
-        example="data_processing_flow",
+        examples=["data_processing_flow"],
     )
     routines: Dict[str, RoutineInfo] = Field(
         ...,
         description="Dictionary mapping routine IDs to routine information. "
         "Keys are routine IDs, values are RoutineInfo objects containing slots, events, and config.",
-        example={
-            "data_source": {
-                "routine_id": "data_source",
-                "class_name": "DataSource",
-                "slots": ["trigger"],
-                "events": ["output"],
-                "config": {"name": "Source"},
+        examples=[
+            {
+                "data_source": {
+                    "routine_id": "data_source",
+                    "class_name": "DataSource",
+                    "slots": ["trigger"],
+                    "events": ["output"],
+                    "config": {"name": "Source"},
+                }
             }
-        },
+        ],
     )
     connections: List[ConnectionInfo] = Field(
         ...,
         description="List of all connections in the flow. "
         "Each connection represents a data flow path from a source routine's event to a target routine's slot.",
-        example=[
-            {
-                "connection_id": "conn_0",
-                "source_routine": "data_source",
-                "source_event": "output",
-                "target_routine": "data_processor",
-                "target_slot": "input",
-            }
+        examples=[
+            [
+                {
+                    "connection_id": "conn_0",
+                    "source_routine": "data_source",
+                    "source_event": "output",
+                    "target_routine": "data_processor",
+                    "target_slot": "input",
+                }
+            ]
         ],
     )
     created_at: Optional[datetime] = Field(
         None,
         description="Timestamp when the flow was created. ISO 8601 format.",
-        example="2025-01-15T10:00:00",
+        examples=["2025-01-15T10:00:00"],
     )
     updated_at: Optional[datetime] = Field(
         None,
         description="Timestamp when the flow was last updated. ISO 8601 format.",
-        example="2025-01-15T10:05:00",
+        examples=["2025-01-15T10:05:00"],
     )
 
 
@@ -479,5 +487,5 @@ class FlowListResponse(BaseModel):
     total: int = Field(
         ...,
         description="Total number of flows in the system.",
-        example=10,
+        examples=[10],
     )

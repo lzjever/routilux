@@ -9,11 +9,13 @@ import asyncio
 import logging
 import time
 from datetime import datetime
-from typing import Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
 from routilux.core.context import JobContext
+from routilux.monitoring.monitor_service import get_monitor_service
+from routilux.monitoring.registry import MonitoringRegistry
 from routilux.server.dependencies import (
     get_idempotency_backend,
     get_job_storage,
@@ -29,6 +31,15 @@ from routilux.server.models.job import (
     JobResponse,
     JobSubmitRequest,
     JobTraceResponse,
+)
+from routilux.server.models.monitor import (
+    ExecutionEventResponse,
+    ExecutionMetricsResponse,
+    ExecutionTraceResponse,
+    JobMonitoringData,
+    RoutineExecutionStatus,
+    RoutineMetricsResponse,
+    SlotQueueStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -283,6 +294,284 @@ async def get_job_trace(job_id: str):
         trace_log=job_context.trace_log,
         total_entries=len(job_context.trace_log),
     )
+
+
+@router.get(
+    "/jobs/{job_id}/metrics", response_model=ExecutionMetricsResponse, dependencies=[RequireAuth]
+)
+async def get_job_metrics(job_id: str):
+    """Get execution metrics for a job."""
+    from routilux.server.dependencies import get_job_storage, get_runtime
+
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, f"Job '{job_id}' not found"),
+        )
+
+    registry = MonitoringRegistry.get_instance()
+    collector = registry.monitor_collector
+
+    if not collector:
+        raise HTTPException(status_code=500, detail="Monitor collector not available")
+
+    metrics = collector.get_metrics(job_id)
+    if not metrics:
+        raise HTTPException(status_code=404, detail=f"No metrics found for job '{job_id}'")
+
+    # Convert to response model
+    routine_metrics = {
+        rid: RoutineMetricsResponse(
+            routine_id=rm.routine_id,
+            execution_count=rm.execution_count,
+            total_duration=rm.total_duration,
+            avg_duration=rm.avg_duration,
+            min_duration=rm.min_duration,
+            max_duration=rm.max_duration,
+            error_count=rm.error_count,
+            last_execution=rm.last_execution,
+        )
+        for rid, rm in metrics.routine_metrics.items()
+    }
+
+    # Convert ErrorRecord objects to dictionaries
+    errors = [
+        {
+            "error_id": err.error_id,
+            "job_id": err.job_id,
+            "routine_id": err.routine_id,
+            "timestamp": err.timestamp.isoformat(),
+            "error_type": err.error_type,
+            "error_message": err.error_message,
+            "traceback": err.traceback,
+        }
+        for err in metrics.errors
+    ]
+
+    return ExecutionMetricsResponse(
+        job_id=metrics.job_id,
+        flow_id=metrics.flow_id,
+        start_time=metrics.start_time if metrics.start_time else datetime.now(),
+        end_time=metrics.end_time,
+        duration=metrics.duration,
+        routine_metrics=routine_metrics,
+        total_events=metrics.total_events,
+        total_slot_calls=metrics.total_slot_calls,
+        total_event_emits=metrics.total_event_emits,
+        errors=errors,
+    )
+
+
+@router.get(
+    "/jobs/{job_id}/execution-trace",
+    response_model=ExecutionTraceResponse,
+    dependencies=[RequireAuth],
+)
+async def get_job_execution_trace(
+    job_id: str,
+    limit: Optional[int] = Query(
+        None,
+        ge=1,
+        le=10000,
+        description="Maximum number of trace events to return. Range: 1-10000.",
+    ),
+):
+    """Get execution trace for a job (from MonitorCollector)."""
+    from routilux.server.dependencies import get_job_storage, get_runtime
+
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, f"Job '{job_id}' not found"),
+        )
+
+    registry = MonitoringRegistry.get_instance()
+    collector = registry.monitor_collector
+
+    if not collector:
+        raise HTTPException(status_code=500, detail="Monitor collector not available")
+
+    events = collector.get_execution_trace(job_id, limit)
+
+    event_responses = [
+        ExecutionEventResponse(
+            event_id=event.event_id,
+            job_id=event.job_id,
+            routine_id=event.routine_id,
+            event_type=event.event_type,
+            timestamp=event.timestamp,
+            data=event.data,
+            duration=event.duration,
+            status=event.status,
+        )
+        for event in events
+    ]
+
+    return ExecutionTraceResponse(
+        events=event_responses,
+        total=len(event_responses),
+    )
+
+
+@router.get("/jobs/{job_id}/logs", dependencies=[RequireAuth])
+async def get_job_logs(job_id: str):
+    """Get execution logs for a job."""
+    from routilux.server.dependencies import get_job_storage, get_runtime
+
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, f"Job '{job_id}' not found"),
+        )
+
+    logs = getattr(job_context, "trace_log", [])
+
+    return {
+        "job_id": job_id,
+        "logs": logs,
+        "total": len(logs),
+    }
+
+
+@router.get("/jobs/{job_id}/data", dependencies=[RequireAuth])
+async def get_job_data(job_id: str):
+    """Get job-level data."""
+    from routilux.server.dependencies import get_job_storage, get_runtime
+
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, f"Job '{job_id}' not found"),
+        )
+
+    return {
+        "job_id": job_id,
+        "data": job_context.data,
+    }
+
+
+@router.get(
+    "/jobs/{job_id}/monitoring",
+    response_model=JobMonitoringData,
+    dependencies=[RequireAuth],
+)
+async def get_job_monitoring_data(job_id: str):
+    """Get complete monitoring data for a job."""
+    from routilux.server.dependencies import get_job_storage, get_runtime
+
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, f"Job '{job_id}' not found"),
+        )
+
+    service = get_monitor_service()
+    try:
+        return service.get_job_monitoring_data(job_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, str(e)),
+        )
+
+
+@router.get(
+    "/jobs/{job_id}/routines/status",
+    response_model=Dict[str, RoutineExecutionStatus],
+    dependencies=[RequireAuth],
+)
+async def get_routines_status(job_id: str):
+    """Get execution status for all routines in a job."""
+    from routilux.server.dependencies import get_job_storage, get_runtime
+
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, f"Job '{job_id}' not found"),
+        )
+
+    service = get_monitor_service()
+    try:
+        return service.get_all_routines_status(job_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, str(e)),
+        )
+
+
+@router.get(
+    "/jobs/{job_id}/routines/{routine_id}/queue-status",
+    response_model=List[SlotQueueStatus],
+    dependencies=[RequireAuth],
+)
+async def get_routine_queue_status(job_id: str, routine_id: str):
+    """Get queue status for all slots in a specific routine."""
+    from routilux.server.dependencies import get_job_storage, get_runtime
+
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, f"Job '{job_id}' not found"),
+        )
+
+    service = get_monitor_service()
+    try:
+        return service.get_routine_queue_status(job_id, routine_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, str(e)),
+        )
+
+
+@router.get(
+    "/jobs/{job_id}/queues/status",
+    response_model=Dict[str, List[SlotQueueStatus]],
+    dependencies=[RequireAuth],
+)
+async def get_job_queues_status(job_id: str):
+    """Get queue status for all routines in a job."""
+    from routilux.server.dependencies import get_job_storage, get_runtime
+
+    job_storage = get_job_storage()
+    runtime = get_runtime()
+    job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
+    if not job_context:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, f"Job '{job_id}' not found"),
+        )
+
+    service = get_monitor_service()
+    try:
+        return service.get_all_queues_status(job_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(ErrorCode.JOB_NOT_FOUND, str(e)),
+        )
 
 
 @router.post("/jobs/{job_id}/complete", response_model=JobResponse, dependencies=[RequireAuth])

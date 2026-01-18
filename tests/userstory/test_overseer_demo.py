@@ -17,29 +17,24 @@ User Stories Tested:
 - Story 6: User uses different runtimes for isolation
 """
 
-import asyncio
 import time
-from datetime import datetime
-from typing import Dict, List, Optional
 
 import pytest
 
 # Mark all tests in this file as userstory tests
 pytestmark = pytest.mark.userstory
-import requests
+# Import demo app components
+import sys
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
-from routilux.core.registry import FlowRegistry, get_flow_registry
+from routilux.core.registry import get_flow_registry
 from routilux.core.runtime import Runtime
 from routilux.monitoring.registry import MonitoringRegistry
 from routilux.monitoring.runtime_registry import RuntimeRegistry
 from routilux.monitoring.storage import flow_store
 from routilux.server.main import app
-from routilux.server.storage.memory import MemoryIdempotencyBackend, MemoryJobStorage
-
-# Import demo app components
-import sys
-from pathlib import Path
 
 examples_dir = Path(__file__).parent.parent / "examples"
 if str(examples_dir) not in sys.path:
@@ -392,8 +387,6 @@ class TestUserStory1_WorkerAndJobs:
             params={"timeout": 5.0},
         )
         assert wait_response.status_code == 200
-        wait_data = wait_response.json()
-        final_status = wait_data.get("final_status", "running")
 
         # Verify final status (may still be running if flow is slow, that's acceptable)
         final_response = client.get(f"/api/v1/jobs/{job_id}")

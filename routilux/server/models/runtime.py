@@ -19,29 +19,29 @@ class RuntimeInfo(BaseModel):
     runtime_id: str = Field(
         ...,
         description="Unique identifier for this runtime. Use this ID when starting jobs.",
-        example="production",
+        examples=["production"],
     )
     thread_pool_size: int = Field(
         ...,
         description="Maximum number of worker threads in the thread pool. "
         "0 means using GlobalJobManager's thread pool.",
-        example=10,
+        examples=[10],
     )
     is_default: bool = Field(
         ...,
         description="Whether this is the default runtime. "
         "If runtime_id is not specified when starting a job, the default runtime is used.",
-        example=True,
+        examples=[True],
     )
     active_job_count: int = Field(
         ...,
         description="Number of active jobs currently running in this runtime.",
-        example=5,
+        examples=[5],
     )
     is_shutdown: bool = Field(
         ...,
         description="Whether this runtime has been shut down.",
-        example=False,
+        examples=[False],
     )
 
     model_config = {
@@ -79,12 +79,12 @@ class RuntimeListResponse(BaseModel):
     total: int = Field(
         ...,
         description="Total number of registered runtimes.",
-        example=2,
+        examples=[2],
     )
     default_runtime_id: Optional[str] = Field(
         None,
         description="ID of the default runtime. This is used when runtime_id is not specified.",
-        example="production",
+        examples=["production"],
     )
 
     model_config = {
@@ -152,14 +152,14 @@ class RuntimeCreateRequest(BaseModel):
     runtime_id: str = Field(
         ...,
         description="Unique identifier for this runtime. Must be unique across all runtimes.",
-        example="production",
+        examples=["production"],
     )
     thread_pool_size: int = Field(
         10,
         description="Maximum number of worker threads in the thread pool. "
         "Set to 0 to use GlobalJobManager's thread pool. "
         "Default: 10. Maximum recommended: 100.",
-        example=20,
+        examples=[20],
         ge=0,
         le=1000,
     )
@@ -167,7 +167,7 @@ class RuntimeCreateRequest(BaseModel):
         False,
         description="Whether to set this runtime as the default. "
         "If True, this runtime will be used when runtime_id is not specified.",
-        example=False,
+        examples=[False],
     )
 
     model_config = {

@@ -163,14 +163,19 @@ class FlowBuilder:
         response = self.client.post(f"/api/v1/flows/{self.flow_id}/validate")
         assert response.status_code == 200, f"Validation request failed: {response.text}"
         data = response.json()
-        
+
         # Check if there are errors (warnings are acceptable by default)
         if not data["valid"]:
-            errors = data.get("errors", [issue for issue in data.get("issues", []) if issue.startswith("Error:")])
+            errors = data.get(
+                "errors", [issue for issue in data.get("issues", []) if issue.startswith("Error:")]
+            )
             if errors:
                 raise AssertionError(f"Flow validation failed with errors: {errors}")
             elif not allow_warnings:
-                warnings = data.get("warnings", [issue for issue in data.get("issues", []) if issue.startswith("Warning:")])
+                warnings = data.get(
+                    "warnings",
+                    [issue for issue in data.get("issues", []) if issue.startswith("Warning:")],
+                )
                 if warnings:
                     raise AssertionError(f"Flow validation has warnings: {warnings}")
         return self

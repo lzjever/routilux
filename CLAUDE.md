@@ -2,199 +2,149 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Common Commands
+## Project Overview
 
+Routilux is an event-driven workflow orchestration framework built in Python. It provides flexible workflow execution with connection management, state tracking, and real-time monitoring capabilities.
+
+**Tech Stack:** Python 3.8-3.14, FastAPI (optional API), serilux (serialization)
+
+**Core Architecture:** Event-driven workflow orchestration with routines communicating via events (output) and slots (input), managed by a central Flow orchestrator.
+
+## Development Commands
+
+### Setup
 ```bash
-# Install package with all development dependencies (uses uv if available)
-make dev-install
+make dev-install          # Install package + all dependencies (recommended)
+make setup-venv           # Install dependencies only (CI/CD, tools only)
+```
 
-# Run tests
-make test                    # Run core tests (excluding API tests)
-make test-cov                # Run tests with coverage
-make test-unit               # Run only unit tests
-make test-api                # Run API endpoint tests
-make test-integration        # Run integration tests
+### Testing
+```bash
+make test                 # Core tests only (excludes API, userstory)
+make test-cov             # With coverage report (htmlcov/)
+make test-api             # API endpoint tests
+make test-userstory       # User story integration tests
+make test-integration     # Tests requiring external services
+make test-unit            # Unit tests only
 
-# Run a single test file
-pytest tests/test_core_flow.py -v
+# Run single test
+pytest tests/test_specific.py::test_function -v
+```
 
-# Run a single test function
-pytest tests/test_core_flow.py::test_flow_add_routine -v
+### Code Quality
+```bash
+make lint                 # Ruff linting
+make format               # Ruff formatting (line-length: 100, double quotes)
+make format-check         # Check formatting
+make type-check           # Mypy type checking
+make check               # Run all checks (lint + format-check + test)
+```
 
-# Code quality
-make lint                    # Run ruff linting
-make format                  # Format code with ruff
-make format-check            # Check formatting without modifying
-make type-check              # Run mypy type checking
-make check                   # Run all checks (lint + format check + tests)
+### Building & Publishing
+```bash
+make build               # Create distributions
+make check-package       # Verify package
+PYPI_TOKEN=xxx make upload       # Upload to PyPI
+TEST_PYPI_TOKEN=xxx make upload-test  # Upload to TestPyPI
+```
 
-# Build and docs
-make build                   # Build source and wheel distributions
-make docs                    # Build documentation
+### Documentation
+```bash
+make docs                # Build Sphinx docs
 ```
 
 ## Architecture Overview
 
-Routilux is an event-driven workflow orchestration framework with a layered architecture:
+### Core Module (`routilux/core/`)
 
-```
-routilux/                    # Package root
-├── core/                    # Core workflow engine (zero external deps, only serilux)
-│   ├── routine.py           # Routine base class
-│   ├── event.py             # Event class for data emission
-│   ├── slot.py              # Slot class for data reception
-│   ├── connection.py        # Connection between event and slot
-│   ├── flow.py              # Flow (workflow definition)
-│   ├── worker.py            # WorkerState (long-running worker state)
-│   ├── executor.py          # WorkerExecutor (per-worker task execution)
-│   ├── manager.py           # WorkerManager (global worker manager)
-│   ├── runtime.py           # Runtime (central execution manager)
-│   ├── context.py           # JobContext (per-request execution context)
-│   ├── output.py            # RoutedStdout (stdout capture by job_id)
-│   ├── registry.py          # FlowRegistry, WorkerRegistry
-│   ├── status.py            # Status enums (ExecutionStatus, RoutineStatus, JobStatus)
-│   ├── error.py             # ErrorHandler, ErrorStrategy
-│   ├── hooks.py             # Abstract execution hooks interface
-│   └── task.py              # SlotActivationTask, EventRoutingTask
-│
-├── monitoring/              # Optional monitoring (depends on core)
-│   ├── monitor_service.py   # Monitoring service
-│   ├── event_manager.py     # Event management
-│   ├── runtime_registry.py  # Runtime registry
-│   └── ...                  # Breakpoint, debug, WebSocket support
-│
-├── server/                  # Optional FastAPI server (depends on core + monitoring)
-│   ├── main.py              # FastAPI application entry point
-│   ├── routes/              # API endpoints (flows, workers, jobs, monitor, debug)
-│   ├── models/              # Pydantic models for API
-│   └── storage/             # Storage abstraction (memory, database)
-│
-├── flow/                    # Flow builder utilities
-├── tools/                   # Analysis, DSL, factory, testing utilities
-└── activation_policies.py   # Built-in activation policies
-```
+The workflow engine is built on these key concepts:
 
-### Key Architectural Concepts
+- **Routine**: Base class for processing units. Routines define input `slots` and output `events`. They MUST NOT accept constructor parameters (for serialization). Store config in `_config` dict, execution state in `WorkerState`.
 
-**Worker vs Job (Important Terminology)**
+- **Flow**: Orchestrator that manages multiple Routine nodes and their connections. Routes events from routine outputs to routine inputs via Connections.
 
-- **Worker**: A long-running execution context for a Flow (was called `JobState` in older versions). A worker maintains routine state, execution history, and can process multiple jobs over its lifetime.
-- **Job**: A single execution request (like an HTTP request). Jobs are created via `Runtime.post()` and have their own `JobContext` for tracking.
+- **Runtime**: Execution environment for posting jobs to flows.
 
-The architecture was recently refactored (see `ARCHITECTURE_REFACTORING_PLAN.md`) to separate concerns properly and enable the core module to work without monitoring dependencies.
+- **Worker**: Each routine runs in its own WorkerExecutor, managed by WorkerManager. Workers maintain state across executions (worker-level state, persistent) vs JobContext (per-request, temporary).
 
-**Execution Model**
+- **Activation Policies**: Control when routines execute:
+  - `immediate_policy`: Execute immediately when slot receives data
+  - `all_slots_ready_policy`: Wait for all slots to have data
+  - `batch_size_policy`: Process in batches
+  - `time_interval_policy`: Time-based execution
+  - `breakpoint_policy`: Debug breakpoint support
+  - `custom_policy`: User-defined policies
 
-1. Flows contain Routines connected via Event-Slot connections
-2. Workers are created from Flows and maintain long-running state
-3. Jobs are submitted to Workers via `Runtime.post()`
-4. Each Job has a `JobContext` that propagates through routine execution
-5. `RoutedStdout` captures print() output by `job_id` for per-request logging
+- **Slot/Event/Connection**: Data flow mechanisms. Slots receive data (input), Events emit data (output), Connections link events to slots.
 
-**Thread Safety**
+### Flow Management (`routilux/flow/`)
 
-- All operations are thread-safe by design
-- `ContextVar` (`_current_job`, `_current_worker_state`) used for thread-local context
-- `WorkerState` uses `RLock` for state mutations
-- Independent task queues per worker
+- **FlowBuilder**: Declarative flow construction
+- **Validation**: Flow structure validation
+- **State Management**: Job state persistence (pending → running → completed/failed/paused/cancelled)
 
-**Critical Constraints**
+### Monitoring & Debugging (`routilux/monitoring/`)
 
-- Routines MUST have parameterless constructors (for serialization)
-- Use `self.set_config()` for configuration, not `__init__` parameters
-- Store execution state in `JobContext`, not instance variables
-- The same Routine object can execute concurrently across different jobs
+- **Breakpoint Manager**: Debug breakpoints and conditional execution
+- **Event Manager**: Real-time event streaming via WebSocket
+- **Monitor Service**: Comprehensive monitoring and metrics
+- **Debug Session**: Interactive debugging workflows
 
-## Activation Policies
+### HTTP API Server (`routilux/server/`)
 
-Activation policies control when routines execute based on slot data availability:
+FastAPI-based REST API with routes for:
+- Flows, jobs, workers, runtimes
+- Breakpoints and debugging
+- WebSocket monitoring
+- Route modules in `routilux/server/routes/`
 
-```python
-from routilux.activation_policies import (
-    immediate_policy,           # Activate immediately when any slot receives data
-    all_slots_ready_policy,    # Activate when all slots have at least 1 item
-    batch_size_policy,          # Activate when all slots have at least N items
-    time_interval_policy,       # Activate at most once per time interval
-    custom_policy,              # Define your own activation logic
-    breakpoint_policy,          # Debug breakpoint (pauses execution)
-)
+## Key Architectural Patterns
 
-routine.set_activation_policy(immediate_policy())
-```
+### Event-Driven Communication
+Routines communicate via events (output) and slots (input) with async, decoupled execution.
 
-## State Management Patterns
+### Registry Pattern
+Central registries (`FlowRegistry`, `WorkerRegistry`) for global flow/worker management with plugin-like architecture.
 
-```python
-# Configuration (read-only during execution)
-self.set_config(name="my_routine", timeout=30)
-value = self.get_config("timeout", 10)
+### State Management Hierarchy
+1. **Worker-level state** (`WorkerState`): Long-running, persistent across executions
+2. **Job-level state** (`JobContext`): Per-request, temporary - access via `get_current_job()`
 
-# Job-level data (shared across routines in same job)
-job_context.set_data("key", value)
-value = job_context.get_data("key")
+### Output Capture
+Use `install_routed_stdout()` at program startup to route print() statements to job-specific output buffers. Retrieve via `get_job_output(job_id)`.
 
-# Worker-level state (persists across jobs)
-worker_state.routine_states[routine_id] = {"count": 5}
-```
+## Important Constraints
 
-## Output Capture
+### Routine Design
+- Routines MUST NOT accept constructor parameters (serialization requirement)
+- Store configuration in `_config` dictionary (read-only during execution)
+- Store execution state in `WorkerState` via `worker_state.update_routine_state()`
+- Use `JobContext` (via `get_current_job()`) for per-request state
 
-The framework provides per-job stdout capture via `RoutedStdout`:
+### Code Style
+- Line length: 100 characters
+- Double quotes for strings
+- Ruff for linting/formatting
+- Mypy for type checking (Python 3.7 target)
 
-```python
-from routilux import install_routed_stdout, get_job_output
+### Test Organization
+- Core tests: `tests/`
+- User story tests: `tests/userstory/` (multi-API workflows)
+- Markers: `@pytest.mark.integration`, `@pytest.mark.api`, `@pytest.mark.userstory`
+- Parallel execution via pytest-xdist (`-n auto`)
 
-# Install at program startup (optional, enables print() capture)
-install_routed_stdout()
+## Dependency Management
 
-# In routine logic, print() works normally
-print("This will be captured per-job")
-
-# Get output for a specific job
-output = get_job_output(job_id, incremental=False)
-```
-
-## Testing Patterns
-
-Tests use pytest and follow naming conventions:
-- `tests/test_core_*.py` - Core module tests
-- `tests/test_api_v1.py` - API endpoint tests
-- Test markers: `api`, `integration`, `timeout`
-
-Key test utilities:
-- `RoutineTester` - For testing individual routines
-- Mock workers/jobs for isolated testing
-
-## API Server (Optional)
-
-The FastAPI server (`routilux.server`) provides REST and WebSocket endpoints:
-
+**Preferred:** UV (modern Python packaging)
 ```bash
-# Install with server dependencies
-pip install routilux[server]
-
-# Run the server
-python -m routilux.server.main
+uv sync --group docs --all-extras
 ```
 
-Key endpoints:
-- `/api/flows` - Flow management
-- `/api/workers` - Worker lifecycle (was `/api/jobs`)
-- `/api/jobs` - Job management (per-request jobs)
-- `/api/monitor` - Monitoring and debugging
-- WebSocket support for real-time job output streaming
+**Fallback:** pip + virtualenv
+```bash
+pip install -e ".[dev]"
+```
 
-## Dependencies
+## Current Branch Status
 
-- **Core**: Only `serilux` (serialization framework)
-- **Monitoring**: No additional dependencies
-- **Server**: `fastapi`, `uvicorn`, `slowapi`
-- **Dev**: `pytest`, `pytest-cov`, `ruff`, `mypy`
-
-## Important Notes
-
-1. **Do not modify instance variables during execution** - use `JobContext` for request state
-2. **Routines must have parameterless constructors** - use `set_config()` instead
-3. **Use `Runtime.post()`** to submit jobs, not `Runtime.exec()` (deprecated)
-4. **Worker vs Job terminology** - Workers are long-running, Jobs are single requests
-5. **Thread safety is built-in** - all operations are thread-safe by design
+Branch: `refactor/architecture-v2` - Major architectural cleanup and refactoring in progress. Legacy modules have been removed, and the codebase has been restructured around the core/flow/monitoring/server architecture.

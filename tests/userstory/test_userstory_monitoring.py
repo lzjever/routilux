@@ -45,8 +45,9 @@ class TestJobExecutionMetrics:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get metrics (API is at /api/jobs/..., not /api/v1/jobs/...)
         response = api_client.get(f"/api/jobs/{job_id}/metrics")
         # May not have metrics if monitor collector not available
@@ -80,8 +81,9 @@ class TestJobExecutionMetrics:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get metrics (API is at /api/jobs/..., not /api/v1/jobs/...)
         response = api_client.get(f"/api/jobs/{job_id}/metrics")
         if response.status_code == 200:
@@ -121,8 +123,9 @@ class TestJobExecutionTrace:
 
         # Get trace (wait a bit for job to start)
         import time
+
         time.sleep(0.2)
-        
+
         # Get trace
         response = api_client.get(f"/api/v1/jobs/{job_id}/trace")
         assert response.status_code == 200
@@ -155,8 +158,9 @@ class TestJobExecutionTrace:
 
         # Get trace with limit (wait a bit for job to start)
         import time
+
         time.sleep(0.2)
-        
+
         # Get trace (note: API doesn't support limit parameter, but we can check total_entries)
         response = api_client.get(f"/api/v1/jobs/{job_id}/trace")
         assert response.status_code == 200
@@ -197,8 +201,9 @@ class TestJobLogs:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get logs (API is at /api/jobs/..., not /api/v1/jobs/...)
         response = api_client.get(f"/api/jobs/{job_id}/logs")
         # May return 404 if monitoring not fully enabled or job not found
@@ -242,8 +247,9 @@ class TestQueueStatusMonitoring:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get queue status for a routine (API is at /api/jobs/..., not /api/v1/jobs/...)
         response = api_client.get(f"/api/jobs/{job_id}/routines/source/queue-status")
         # May return 404 if monitoring not fully enabled or job not found
@@ -279,8 +285,9 @@ class TestQueueStatusMonitoring:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get all queue status (API is at /api/jobs/..., not /api/v1/jobs/...)
         response = api_client.get(f"/api/jobs/{job_id}/queues/status")
         # May return 404 if monitoring not fully enabled or job not found
@@ -311,8 +318,9 @@ class TestQueueStatusMonitoring:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get queue status (API is at /api/jobs/..., not /api/v1/jobs/...)
         response = api_client.get(f"/api/jobs/{job_id}/routines/sink/queue-status")
         # May return 404 if monitoring not fully enabled or job not found
@@ -357,8 +365,9 @@ class TestComprehensiveMonitoring:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get complete monitoring data (API is at /api/jobs/..., not /api/v1/jobs/...)
         response = api_client.get(f"/api/jobs/{job_id}/monitoring")
         # May return 404 if monitoring not fully enabled or job not found
@@ -366,10 +375,10 @@ class TestComprehensiveMonitoring:
         if response.status_code == 200:
             data = response.json()
             assert "job_id" in data
+            assert "flow_id" in data
+            assert "job_status" in data
+            assert "routines" in data
         # If 404, that's acceptable - job may have completed too quickly or monitoring not enabled
-        assert "flow_id" in data
-        assert "job_status" in data
-        assert "routines" in data
 
     def test_monitoring_data_includes_routine_info(self, api_client, registered_pipeline_flow):
         """Test that monitoring data includes routine information."""
@@ -394,8 +403,9 @@ class TestComprehensiveMonitoring:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get monitoring data (API is at /api/jobs/..., not /api/v1/jobs/...)
         response = api_client.get(f"/api/jobs/{job_id}/monitoring")
         # May return 404 if monitoring not fully enabled or job not found
@@ -403,12 +413,13 @@ class TestComprehensiveMonitoring:
         if response.status_code == 200:
             data = response.json()
 
-        # Check routine data structure
-        routines = data.get("routines", {})
-        for routine_id, routine_data in routines.items():
-            assert "execution_status" in routine_data
-            assert "queue_status" in routine_data
-            assert "info" in routine_data
+            # Check routine data structure
+            routines = data.get("routines", {})
+            for routine_id, routine_data in routines.items():
+                assert "execution_status" in routine_data
+                assert "queue_status" in routine_data
+                assert "info" in routine_data
+        # If 404, that's acceptable - monitoring may not be fully enabled
 
 
 class TestRoutineStatusMonitoring:
@@ -441,8 +452,9 @@ class TestRoutineStatusMonitoring:
 
         # Wait a bit for job to start
         import time
+
         time.sleep(0.2)
-        
+
         # Get routines status (API is at /api/jobs/..., not /api/v1/jobs/...)
         response = api_client.get(f"/api/jobs/{job_id}/routines/status")
         # May return 404 if monitoring not fully enabled or job not found
@@ -513,12 +525,14 @@ class TestPerformanceAnalysis:
 
         # Wait a bit for jobs to be processed
         import time
+
         time.sleep(0.5)
-        
+
         # Wait a bit for jobs to be processed
         import time
+
         time.sleep(0.5)
-        
+
         # Get flow metrics (API is at /api/flows/..., not /api/v1/flows/...)
         response = api_client.get(f"/api/flows/{flow_id}/metrics")
         # May return 404 if metrics not available

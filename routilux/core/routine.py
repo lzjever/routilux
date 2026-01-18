@@ -297,34 +297,34 @@ class Routine(Serializable):
         if self._activation_policy is None:
             return {
                 "type": "immediate",
-                "description": "Default activation policy - routine activates immediately when data arrives"
+                "description": "Default activation policy - routine activates immediately when data arrives",
             }
-        
+
         # Try to get policy name/type
         policy_name = getattr(self._activation_policy, "__name__", "custom")
         policy_module = getattr(self._activation_policy, "__module__", "")
-        
+
         # Check if it's a known policy type
         if "breakpoint" in policy_name.lower() or "breakpoint" in policy_module.lower():
             return {
                 "type": "breakpoint",
-                "description": "Breakpoint policy - routine pauses at breakpoint"
+                "description": "Breakpoint policy - routine pauses at breakpoint",
             }
         elif "batch" in policy_name.lower():
             return {
                 "type": "batch",
-                "description": "Batch policy - routine activates when batch size reached"
+                "description": "Batch policy - routine activates when batch size reached",
             }
         elif "time" in policy_name.lower() or "interval" in policy_name.lower():
             return {
                 "type": "time_interval",
-                "description": "Time interval policy - routine activates at intervals"
+                "description": "Time interval policy - routine activates at intervals",
             }
         else:
             return {
                 "type": "custom",
                 "description": f"Custom activation policy: {policy_name}",
-                "module": policy_module
+                "module": policy_module,
             }
 
     def get_all_config(self) -> dict[str, Any]:

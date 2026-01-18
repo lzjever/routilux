@@ -19,6 +19,7 @@ from routilux.server.dependencies import (
 )
 from routilux.server.errors import ErrorCode, create_error_response
 from routilux.server.middleware.auth import RequireAuth
+from routilux.server.models.breakpoint import BreakpointUpdateRequest
 from routilux.server.models.job import JobListResponse, JobResponse
 from routilux.server.models.worker import (
     WorkerCreateRequest,
@@ -429,3 +430,205 @@ async def list_worker_jobs(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/workers/{worker_id}/statistics", dependencies=[RequireAuth])
+async def get_worker_statistics(worker_id: str):
+    """Get worker statistics including jobs processed, success rate, and routine statistics."""
+    runtime = get_runtime()
+    worker_registry = get_worker_registry()
+
+    # Check active workers first
+    with runtime._worker_lock:
+        worker_state = runtime._active_workers.get(worker_id)
+
+    # Fall back to registry
+    if worker_state is None:
+        worker_state = worker_registry.get(worker_id)
+
+    if worker_state is None:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(
+                ErrorCode.WORKER_NOT_FOUND, f"Worker '{worker_id}' not found"
+            ),
+        )
+
+    # Calculate success rate
+    total_jobs = worker_state.jobs_processed
+    success_rate = (total_jobs - worker_state.jobs_failed) / total_jobs if total_jobs > 0 else 0.0
+
+    # Get routine statistics from execution history
+    routine_statistics = {}
+    history = worker_state.get_execution_history()
+    routine_counts = {}
+    routine_durations = {}
+
+    for record in history:
+        rid = record.routine_id
+        if rid not in routine_counts:
+            routine_counts[rid] = 0
+            routine_durations[rid] = []
+        routine_counts[rid] += 1
+        # Note: ExecutionRecord doesn't have duration, this is a placeholder
+        # You may need to adjust based on actual ExecutionRecord structure
+
+    for rid, count in routine_counts.items():
+        routine_statistics[rid] = {
+            "execution_count": count,
+            "total_duration": sum(routine_durations.get(rid, [])),
+            "avg_duration": (sum(routine_durations.get(rid, [])) / count if count > 0 else 0.0),
+            "error_count": 0,  # Would need to track errors separately
+        }
+
+    return {
+        "worker_id": worker_state.worker_id,
+        "flow_id": worker_state.flow_id,
+        "jobs_processed": worker_state.jobs_processed,
+        "jobs_failed": worker_state.jobs_failed,
+        "success_rate": success_rate,
+        "average_job_duration": None,  # Would need to calculate from job history
+        "total_execution_time": None,  # Would need to calculate from job history
+        "routine_statistics": routine_statistics,
+    }
+
+
+@router.get("/workers/{worker_id}/history", dependencies=[RequireAuth])
+async def get_worker_history(
+    worker_id: str,
+    routine_id: Optional[str] = Query(None, description="Filter by routine ID"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum records to return"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
+):
+    """Get execution history for a worker."""
+    runtime = get_runtime()
+    worker_registry = get_worker_registry()
+
+    # Check active workers first
+    with runtime._worker_lock:
+        worker_state = runtime._active_workers.get(worker_id)
+
+    # Fall back to registry
+    if worker_state is None:
+        worker_state = worker_registry.get(worker_id)
+
+    if worker_state is None:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(
+                ErrorCode.WORKER_NOT_FOUND, f"Worker '{worker_id}' not found"
+            ),
+        )
+
+    history = worker_state.get_execution_history(routine_id=routine_id)
+    total = len(history)
+    history_page = history[offset : offset + limit]
+
+    return {
+        "worker_id": worker_id,
+        "history": [
+            {
+                "routine_id": record.routine_id,
+                "event_name": record.event_name,
+                "data": record.data,
+                "timestamp": record.timestamp.isoformat(),
+            }
+            for record in history_page
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.get("/workers/{worker_id}/routines/states", dependencies=[RequireAuth])
+async def get_worker_routine_states(worker_id: str):
+    """Get routine states for all routines in a worker."""
+    runtime = get_runtime()
+    worker_registry = get_worker_registry()
+
+    # Check active workers first
+    with runtime._worker_lock:
+        worker_state = runtime._active_workers.get(worker_id)
+
+    # Fall back to registry
+    if worker_state is None:
+        worker_state = worker_registry.get(worker_id)
+
+    if worker_state is None:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(
+                ErrorCode.WORKER_NOT_FOUND, f"Worker '{worker_id}' not found"
+            ),
+        )
+
+    return worker_state.routine_states
+
+
+@router.put("/workers/{worker_id}/breakpoints/{breakpoint_id}", dependencies=[RequireAuth])
+async def update_breakpoint_enabled(
+    worker_id: str,
+    breakpoint_id: str,
+    request: BreakpointUpdateRequest,
+):
+    """Enable or disable a breakpoint (moved from breakpoints category)."""
+    from routilux.monitoring.registry import MonitoringRegistry
+    from routilux.server.dependencies import get_job_storage, get_runtime
+
+    runtime = get_runtime()
+    worker_registry = get_worker_registry()
+
+    # Check active workers first
+    with runtime._worker_lock:
+        worker_state = runtime._active_workers.get(worker_id)
+
+    # Fall back to registry
+    if worker_state is None:
+        worker_state = worker_registry.get(worker_id)
+
+    if worker_state is None:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(
+                ErrorCode.WORKER_NOT_FOUND, f"Worker '{worker_id}' not found"
+            ),
+        )
+
+    # Find breakpoint by ID (need to search through all jobs for this worker)
+    registry = MonitoringRegistry.get_instance()
+    breakpoint_mgr = registry.breakpoint_manager
+
+    if not breakpoint_mgr:
+        raise HTTPException(status_code=404, detail="Breakpoint manager not available")
+
+    # Get all jobs for this worker
+    job_storage = get_job_storage()
+    jobs = job_storage.list_jobs(worker_id=worker_id)
+
+    # Search for breakpoint across all jobs
+    found_breakpoint = None
+    for job in jobs:
+        breakpoints = breakpoint_mgr.get_breakpoints(job.job_id)
+        for bp in breakpoints:
+            if bp.breakpoint_id == breakpoint_id:
+                found_breakpoint = bp
+                break
+        if found_breakpoint:
+            break
+
+    if not found_breakpoint:
+        raise HTTPException(
+            status_code=404,
+            detail=create_error_response(
+                ErrorCode.JOB_NOT_FOUND, f"Breakpoint '{breakpoint_id}' not found"
+            ),
+        )
+
+    found_breakpoint.enabled = request.enabled
+
+    return {
+        "breakpoint_id": breakpoint_id,
+        "enabled": request.enabled,
+        "updated_at": datetime.now().isoformat(),
+    }

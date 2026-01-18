@@ -177,6 +177,7 @@ class MemoryJobStorage:
             # Try Runtime
             try:
                 from routilux.monitoring.runtime_registry import RuntimeRegistry
+
                 registry = RuntimeRegistry.get_instance()
                 for runtime in registry.get_all().values():
                     job = runtime.get_job(job_id)

@@ -36,36 +36,36 @@ class ObjectMetadataResponse(BaseModel):
     name: str = Field(
         ...,
         description="Unique name of the object in the factory. Use this name when creating routines from factory.",
-        example="data_source",
+        examples=["data_source"],
     )
     description: str = Field(
         ...,
         description="Human-readable description of what this object does.",
-        example="Generates sample data with metadata",
+        examples=["Generates sample data with metadata"],
     )
     category: str = Field(
         ...,
         description="Category grouping for this object. Useful for filtering and organization. "
         "Common categories: 'data_generation', 'validation', 'transformation', 'monitoring', etc.",
-        example="data_generation",
+        examples=["data_generation"],
     )
     tags: List[str] = Field(
         ...,
         description="List of tags associated with this object. Useful for searching and filtering. "
         "Tags are lowercase and typically describe the object's purpose or features.",
-        example=["source", "generator"],
+        examples=[["source", "generator"]],
     )
     example_config: Dict[str, Any] = Field(
         ...,
         description="Example configuration dictionary showing how to configure this object. "
         "Use this as a reference when creating routines. "
         "The actual config you provide will be merged with defaults.",
-        example={"name": "MyDataSource"},
+        examples=[{"name": "MyDataSource"}],
     )
     version: str = Field(
         ...,
         description="Version string for this object. Useful for tracking object versions.",
-        example="1.0.0",
+        examples=["1.0.0"],
     )
 
 
@@ -93,14 +93,14 @@ class ObjectInfo(BaseModel):
     name: str = Field(
         ...,
         description="Unique name of the object in the factory.",
-        example="data_source",
+        examples=["data_source"],
     )
     type: str = Field(
         ...,
         description="Type of prototype: 'class' (class-based prototype) or 'instance' (instance-based prototype). "
         "Class prototypes create new instances each time. Instance prototypes clone a configured instance. "
         "This describes HOW the object is stored, not WHAT it is.",
-        example="class",
+        examples=["class"],
     )
     object_type: str = Field(
         ...,
@@ -108,32 +108,32 @@ class ObjectInfo(BaseModel):
         "This distinguishes between Routines (executable components) and Flows (workflow definitions). "
         "Use this field to filter objects by type. "
         "Routines can be added to flows. Flows can be used as templates to create new flows.",
-        example="routine",
+        examples=["routine"],
     )
     description: str = Field(
         ...,
         description="Human-readable description of what this object does.",
-        example="Generates sample data with metadata",
+        examples=["Generates sample data with metadata"],
     )
     category: str = Field(
         ...,
         description="Category grouping for this object.",
-        example="data_generation",
+        examples=["data_generation"],
     )
     tags: List[str] = Field(
         ...,
         description="List of tags for searching and filtering.",
-        example=["source", "generator"],
+        examples=[["source", "generator"]],
     )
     example_config: Dict[str, Any] = Field(
         ...,
         description="Example configuration dictionary.",
-        example={"name": "MyDataSource"},
+        examples=[{"name": "MyDataSource"}],
     )
     version: str = Field(
         ...,
         description="Version string for this object.",
-        example="1.0.0",
+        examples=["1.0.0"],
     )
 
 
@@ -172,5 +172,5 @@ class ObjectListResponse(BaseModel):
     total: int = Field(
         ...,
         description="Total number of objects in the list (after filtering, if applied).",
-        example=12,
+        examples=[12],
     )

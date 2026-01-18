@@ -133,7 +133,7 @@ class TestInteractiveFlowBuilder:
         # Export as YAML (skip if yaml not available)
         if yaml is None:
             pytest.skip("yaml module not available")
-        
+
         yaml_dsl = flow_builder.export_dsl("yaml")
 
         # Export as JSON
@@ -145,7 +145,7 @@ class TestInteractiveFlowBuilder:
         # Recreate from YAML (skip if yaml not available)
         if yaml is None:
             pytest.skip("yaml module not available")
-        
+
         # Recreate from YAML
         try:
             flow_builder.create_from_dsl("from_yaml", yaml_dsl)
@@ -264,7 +264,7 @@ connections: []
         # Parse both and compare structure (skip if yaml not available)
         if yaml is None:
             pytest.skip("yaml module not available")
-        
+
         original_dict = yaml.safe_load(original_dsl)
         exported_dict = yaml.safe_load(exported_dsl)
 
@@ -375,7 +375,7 @@ class TestCompleteFlowBuildingWorkflow:
         # Export (skip if yaml not available)
         if yaml is None:
             pytest.skip("yaml module not available")
-        
+
         dsl = flow_builder.export_dsl("yaml")
         assert "flow_id: complete_workflow" in dsl
 

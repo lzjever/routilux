@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     )
 from routilux.core.registry import FlowRegistry
 from routilux.monitoring.registry import MonitoringRegistry
+
 # Note: job_store (old system) removed - use get_job_storage() instead
 
 
@@ -98,7 +99,7 @@ class MonitorService:
         return runtime.get_all_active_thread_counts(job_id)
 
     def get_routine_execution_status(
-        self, job_id: str, routine_id: str, worker_state: "WorkerState | None" = None
+        self, job_id: str, routine_id: str, worker_state: WorkerState | None = None
     ) -> RoutineExecutionStatus:
         """Get execution status for a specific routine.
 
@@ -113,19 +114,20 @@ class MonitorService:
         if worker_state is None:
             # Get job from new storage system
             from routilux.server.dependencies import get_job_storage, get_runtime
-            
+
             job_storage = get_job_storage()
             runtime = get_runtime()
-            
+
             job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
             if not job_context:
                 raise ValueError(f"Job '{job_id}' not found")
-            
+
             # Get routine state from worker
             from routilux.core.registry import WorkerRegistry
+
             worker_registry = WorkerRegistry.get_instance()
             worker_state = worker_registry.get(job_context.worker_id)
-            if worker_state and hasattr(worker_state, 'get_routine_state'):
+            if worker_state and hasattr(worker_state, "get_routine_state"):
                 routine_state = worker_state.get_routine_state(routine_id) or {}
             else:
                 routine_state = {}
@@ -198,14 +200,14 @@ class MonitorService:
         """
         # Get job from new storage system
         from routilux.server.dependencies import get_job_storage, get_runtime
-        
+
         job_storage = get_job_storage()
         runtime = get_runtime()
-        
+
         job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
         if not job_context:
             raise ValueError(f"Job '{job_id}' not found")
-        
+
         # JobContext now contains flow_id directly
         flow_id = job_context.flow_id
         if not flow_id:
@@ -257,9 +259,6 @@ class MonitorService:
 
         routine = flow.routines[routine_id]
 
-        # Get policy information (Routine now has this method)
-        policy_info = routine.get_activation_policy_info()
-
         # Get config (Routine now has get_all_config method)
         config = routine.get_all_config()
 
@@ -267,19 +266,18 @@ class MonitorService:
         slots = list(routine.slots.keys())
         events = list(routine.events.keys())
 
-        # Lazy import to avoid circular dependency
-        from routilux.server.models.monitor import RoutineInfo
+        # Get routine type (class_name)
+        class_name = type(routine).__name__
 
-        # Get routine type
-        routine_type = type(routine).__name__
+        # Import the correct RoutineInfo model from flow
+        from routilux.server.models.flow import RoutineInfo
 
         return RoutineInfo(
             routine_id=routine_id,
-            routine_type=routine_type,
-            activation_policy=policy_info,
-            config=config,
+            class_name=class_name,
             slots=slots,
             events=events,
+            config=config,
         )
 
     def get_routine_monitoring_data(self, job_id: str, routine_id: str) -> RoutineMonitoringData:
@@ -294,15 +292,13 @@ class MonitorService:
         """
         # Try new job storage first
         from routilux.server.dependencies import get_job_storage, get_runtime
-        
+
         job_storage = get_job_storage()
         runtime = get_runtime()
-        
+
         job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
-        if job_context:
-            # Use new JobContext - get flow_id from worker
-            from routilux.core.registry import WorkerRegistry
-            worker_registry = WorkerRegistry.get_instance()
+        if not job_context:
+            raise ValueError(f"Job '{job_id}' not found")
         # JobContext now contains flow_id directly
         flow_id = job_context.flow_id
         if not flow_id:
@@ -338,19 +334,19 @@ class MonitorService:
         """
         # Get job from new storage system
         from routilux.server.dependencies import get_job_storage, get_runtime
-        
+
         job_storage = get_job_storage()
         runtime = get_runtime()
-        
+
         job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
         if not job_context:
             raise ValueError(f"Job '{job_id}' not found")
-        
+
         # JobContext now contains flow_id directly
         flow_id = job_context.flow_id
         if not flow_id:
             raise ValueError(f"Job '{job_id}' has no flow_id")
-        
+
         job_status = job_context.status
         updated_at = job_context.created_at  # JobContext uses created_at
 
@@ -386,15 +382,13 @@ class MonitorService:
         """
         # Try new job storage first
         from routilux.server.dependencies import get_job_storage, get_runtime
-        
+
         job_storage = get_job_storage()
         runtime = get_runtime()
-        
+
         job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
-        if job_context:
-            # Use new JobContext - get flow_id from worker
-            from routilux.core.registry import WorkerRegistry
-            worker_registry = WorkerRegistry.get_instance()
+        if not job_context:
+            raise ValueError(f"Job '{job_id}' not found")
         # JobContext now contains flow_id directly
         flow_id = job_context.flow_id
         if not flow_id:
@@ -424,14 +418,14 @@ class MonitorService:
         """
         # Get job from new storage system
         from routilux.server.dependencies import get_job_storage, get_runtime
-        
+
         job_storage = get_job_storage()
         runtime = get_runtime()
-        
+
         job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
         if not job_context:
             raise ValueError(f"Job '{job_id}' not found")
-        
+
         # JobContext now contains flow_id directly
         flow_id = job_context.flow_id
         if not flow_id:

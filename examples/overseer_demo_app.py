@@ -57,10 +57,15 @@ class DataSource(Routine):
 
         name = self.get_config("name", "DataSource")
 
-        # Get counter from WorkerState
-        routine_state = worker_state.get_routine_state(self._id) or {}
-        counter = routine_state.get("counter", 0) + 1
-        worker_state.update_routine_state(self._id, {"counter": counter})
+        # Get counter from WorkerState using execution context
+        ctx = self.get_execution_context()
+        routine_id = ctx.routine_id if ctx else None
+        if routine_id:
+            routine_state = worker_state.get_routine_state(routine_id) or {}
+            counter = routine_state.get("counter", 0) + 1
+            worker_state.update_routine_state(routine_id, {"counter": counter})
+        else:
+            counter = 1
 
         output_data = data or f"test_data_{counter}"
         index = data_dict.get("index", counter) if isinstance(data_dict, dict) else counter
@@ -136,13 +141,16 @@ class DataValidator(Routine):
                     original_data=data,
                 )
 
-        # Update counts in WorkerState
-        routine_state = worker_state.get_routine_state(self._id) or {}
-        total_valid = routine_state.get("valid_count", 0) + valid_count
-        total_invalid = routine_state.get("invalid_count", 0) + invalid_count
-        worker_state.update_routine_state(
-            self._id, {"valid_count": total_valid, "invalid_count": total_invalid}
-        )
+        # Update counts in WorkerState using execution context
+        ctx = self.get_execution_context()
+        routine_id = ctx.routine_id if ctx else None
+        if routine_id:
+            routine_state = worker_state.get_routine_state(routine_id) or {}
+            total_valid = routine_state.get("valid_count", 0) + valid_count
+            total_invalid = routine_state.get("invalid_count", 0) + invalid_count
+            worker_state.update_routine_state(
+                routine_id, {"valid_count": total_valid, "invalid_count": total_invalid}
+            )
 
         print(
             f"[{name}] ✓ Validated: {valid_count} valid, {invalid_count} invalid (total: {total_valid}/{total_invalid})"
@@ -192,10 +200,13 @@ class DataTransformer(Routine):
         else:
             result = str(data)
 
-        # Update processed count in WorkerState
-        routine_state = worker_state.get_routine_state(self._id) or {}
-        processed_count = routine_state.get("processed_count", 0) + 1
-        worker_state.update_routine_state(self._id, {"processed_count": processed_count})
+        # Update processed count in WorkerState using execution context
+        ctx = self.get_execution_context()
+        routine_id = ctx.routine_id if ctx else None
+        if routine_id:
+            routine_state = worker_state.get_routine_state(routine_id) or {}
+            processed_count = routine_state.get("processed_count", 0) + 1
+            worker_state.update_routine_state(routine_id, {"processed_count": processed_count})
 
         print(f"[{name}] → Result: {result}")
         self.emit(
@@ -236,7 +247,11 @@ class QueuePressureGenerator(Routine):
 
         print(f"[{name}] → {result}")
         self.emit(
-            "output", worker_state=worker_state, result=result, index=index, processed_at=processed_at
+            "output",
+            worker_state=worker_state,
+            result=result,
+            index=index,
+            processed_at=processed_at,
         )
 
 
@@ -265,12 +280,15 @@ class DebugTargetRoutine(Routine):
         computed_value = intermediate_value.upper() + "_PROCESSED"
         step = 3
 
-        # Store in worker_state for debugging
-        routine_state = worker_state.get_routine_state(self._id) or {}
-        routine_state["step"] = step
-        routine_state["intermediate_value"] = intermediate_value
-        routine_state["computed_value"] = computed_value
-        worker_state.update_routine_state(self._id, routine_state)
+        # Store in worker_state for debugging using execution context
+        ctx = self.get_execution_context()
+        routine_id = ctx.routine_id if ctx else None
+        if routine_id:
+            routine_state = worker_state.get_routine_state(routine_id) or {}
+            routine_state["step"] = step
+            routine_state["intermediate_value"] = intermediate_value
+            routine_state["computed_value"] = computed_value
+            worker_state.update_routine_state(routine_id, routine_state)
 
         print(f"[{name}] Step {step}: {intermediate_value} -> {computed_value}")
         self.emit(
@@ -300,18 +318,21 @@ class StateTransitionDemo(Routine):
 
         name = self.get_config("name", "StateTransitionDemo")
 
-        # Update state info
-        routine_state = worker_state.get_routine_state(self._id) or {}
-        routine_state["processing_started"] = datetime.now().isoformat()
-        routine_state["status"] = "processing"
-        worker_state.update_routine_state(self._id, routine_state)
+        # Update state info using execution context
+        ctx = self.get_execution_context()
+        routine_id = ctx.routine_id if ctx else None
+        if routine_id:
+            routine_state = worker_state.get_routine_state(routine_id) or {}
+            routine_state["processing_started"] = datetime.now().isoformat()
+            routine_state["status"] = "processing"
+            worker_state.update_routine_state(routine_id, routine_state)
 
-        print(f"[{name}] Processing: {data} (state: processing)")
-        time.sleep(0.5)
+            print(f"[{name}] Processing: {data} (state: processing)")
+            time.sleep(0.5)
 
-        routine_state["status"] = "completed"
-        routine_state["processing_completed"] = datetime.now().isoformat()
-        worker_state.update_routine_state(self._id, routine_state)
+            routine_state["status"] = "completed"
+            routine_state["processing_completed"] = datetime.now().isoformat()
+            worker_state.update_routine_state(routine_id, routine_state)
 
         state_info = {
             "started": routine_state["processing_started"],
@@ -320,7 +341,9 @@ class StateTransitionDemo(Routine):
         }
 
         print(f"[{name}] → Completed")
-        self.emit("output", worker_state=worker_state, result=f"Processed: {data}", state_info=state_info)
+        self.emit(
+            "output", worker_state=worker_state, result=f"Processed: {data}", state_info=state_info
+        )
 
 
 class DataSink(Routine):
@@ -342,11 +365,15 @@ class DataSink(Routine):
                 if isinstance(data_dict, dict):
                     received_data.update(data_dict)
 
-        routine_state = worker_state.get_routine_state(self._id) or {}
-        received_count = routine_state.get("received_count", 0) + 1
-        worker_state.update_routine_state(
-            self._id, {"received_count": received_count, "final_result": received_data}
-        )
+        # Update state using execution context
+        ctx = self.get_execution_context()
+        routine_id = ctx.routine_id if ctx else None
+        if routine_id:
+            routine_state = worker_state.get_routine_state(routine_id) or {}
+            received_count = routine_state.get("received_count", 0) + 1
+            worker_state.update_routine_state(
+                routine_id, {"received_count": received_count, "final_result": received_data}
+            )
         print(f"[{name}] Receiving data (#{received_count})")
         time.sleep(0.1)
         print(f"[{name}] ✓ Final result: {received_data}")
@@ -475,7 +502,11 @@ class ErrorGenerator(Routine):
                 error_msg = f"Simulated error processing: {data}"
                 print(f"[{name}] ✗ Error: {error_msg}")
                 self.emit(
-                    "error", worker_state=worker_state, error=error_msg, index=index, original_data=data
+                    "error",
+                    worker_state=worker_state,
+                    error=error_msg,
+                    index=index,
+                    original_data=data,
                 )
             else:
                 result = f"Successfully processed: {data}"
@@ -491,9 +522,7 @@ class MultiSlotProcessor(Routine):
         self.set_config(name=name)
         self.primary_slot = self.add_slot("primary")
         self.secondary_slot = self.add_slot("secondary")
-        self.output_event = self.add_event(
-            "output", ["result", "primary_data", "secondary_data"]
-        )
+        self.output_event = self.add_event("output", ["result", "primary_data", "secondary_data"])
         # Process when primary has data (secondary is optional)
         self.set_activation_policy(immediate_policy())
         self.set_logic(self.process)
@@ -539,9 +568,7 @@ class LoopController(Routine):
         super().__init__()
         self.set_config(name=name, max_iterations=max_iterations)
         self.input_slot = self.add_slot("input")
-        self.continue_event = self.add_event(
-            "continue", ["iteration", "data", "should_continue"]
-        )
+        self.continue_event = self.add_event("continue", ["iteration", "data", "should_continue"])
         self.done_event = self.add_event("done", ["final_data", "iterations"])
         self.set_activation_policy(immediate_policy())
         self.set_logic(self.control)
@@ -551,10 +578,16 @@ class LoopController(Routine):
         name = self.get_config("name", "LoopController")
         max_iterations = self.get_config("max_iterations", 5)
 
-        routine_state = worker_state.get_routine_state(self._id) or {}
-        iteration = routine_state.get("iteration", 0) + 1
-        routine_state["iteration"] = iteration
-        worker_state.update_routine_state(self._id, routine_state)
+        # Update state using execution context
+        ctx = self.get_execution_context()
+        routine_id = ctx.routine_id if ctx else None
+        if routine_id:
+            routine_state = worker_state.get_routine_state(routine_id) or {}
+            iteration = routine_state.get("iteration", 0) + 1
+            routine_state["iteration"] = iteration
+            worker_state.update_routine_state(routine_id, routine_state)
+        else:
+            iteration = 1
 
         data_dict = input_data[0] if input_data and isinstance(input_data[0], dict) else {}
         data = data_dict.get("data") if isinstance(data_dict, dict) else None
@@ -898,12 +931,11 @@ def main():
     MonitoringRegistry.enable()
 
     # Import AFTER enabling monitoring
-    from routilux.tools.factory import ObjectFactory, ObjectMetadata
-    from routilux.monitoring.flow_registry import FlowRegistry
-    from routilux.runtime import Runtime
-
+    from routilux import Runtime
+    from routilux.core.registry import FlowRegistry
     from routilux.monitoring.runtime_registry import RuntimeRegistry
     from routilux.monitoring.storage import flow_store
+    from routilux.tools.factory import ObjectFactory, ObjectMetadata
 
     # Register runtimes in RuntimeRegistry
     print("\n[2/6] Registering runtimes in RuntimeRegistry...")

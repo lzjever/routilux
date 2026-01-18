@@ -53,6 +53,7 @@ class TestCompleteResourceCleanup:
 
         # Wait a bit for cleanup
         import time
+
         time.sleep(0.1)
 
         # Verify flow is gone (may still exist in some registries, but should not be accessible)
@@ -97,6 +98,7 @@ class TestCompleteResourceCleanup:
 
         # Wait a bit for cleanup
         import time
+
         time.sleep(0.1)
 
         # Verify worker is gone (may still exist in registry but not in active workers)
@@ -132,6 +134,7 @@ class TestCompleteResourceCleanup:
 
         # Wait a bit for cleanup
         import time
+
         time.sleep(0.1)
 
         # Flow should be deleted (may still exist in some registries)
@@ -178,6 +181,7 @@ class TestCompleteResourceCleanup:
 
         # Wait a bit for cleanup
         import time
+
         time.sleep(0.1)
 
         # Verify all cleaned up (may still exist in some registries)
@@ -230,6 +234,7 @@ class TestStateConsistencyAfterErrors:
 
         # Wait a bit for state to update
         import time
+
         time.sleep(0.2)
 
         # Verify worker state is still consistent

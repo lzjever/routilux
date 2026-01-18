@@ -385,6 +385,7 @@ class MonitorCollector:
             if job_id not in self._metrics:
                 # Get flow_id from JobContext
                 from routilux.server.dependencies import get_job_storage, get_runtime
+
                 job_storage = get_job_storage()
                 runtime = get_runtime()
                 job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)

@@ -55,12 +55,12 @@ def handle_task_error(
         error_msg = f"Cannot handle task error: task.slot is None. Error: {error}"
         logging.getLogger(__name__).error(error_msg)
         # Still update job state if available
-    if task.worker_state:
-        from routilux.core.status import ExecutionStatus
+        if task.worker_state:
+            from routilux.core.status import ExecutionStatus
 
-        task.worker_state.status = ExecutionStatus.FAILED
-        task.worker_state.record_execution("unknown", "error", {"error": error_msg})
-    _stop_execution(task.worker_state, flow)
+            task.worker_state.status = ExecutionStatus.FAILED
+            task.worker_state.record_execution("unknown", "error", {"error": error_msg})
+        _stop_execution(task.worker_state, flow)
         return
 
     routine = task.slot.routine

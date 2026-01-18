@@ -88,7 +88,7 @@ class JobContext:
         **Best Practice for Polling:**
         ```python
         worker_state, job_context = runtime.post(...)
-        
+
         # Polling loop - use runtime.get_job() for latest state
         while True:
             current_job = runtime.get_job(job_context.job_id)

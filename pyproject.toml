@@ -116,6 +116,9 @@ target-version = "py38"
 select = ["E", "F", "I", "N", "W", "UP"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/userstory/test_overseer_demo.py" = ["E402", "N801"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"

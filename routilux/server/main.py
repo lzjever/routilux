@@ -14,13 +14,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 from routilux.server.middleware.auth import RequireAuth
 from routilux.server.routes import (
     breakpoints,
-    debug,
     discovery,
     execute,
     flows,
     health,
     jobs,
-    monitor,
     objects,
     runtimes,
     websocket,
@@ -197,8 +195,6 @@ app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(flows.router, prefix="/api", tags=["flows"])
 app.include_router(flows.router, prefix="/api/v1", tags=["flows"])  # Also under v1
 app.include_router(breakpoints.router, prefix="/api", tags=["breakpoints"])
-app.include_router(debug.router, prefix="/api", tags=["debug"])
-app.include_router(monitor.router, prefix="/api", tags=["monitor"])
 app.include_router(websocket.router, prefix="/api", tags=["websocket"])
 app.include_router(discovery.router, prefix="/api", tags=["discovery"])
 app.include_router(objects.router, prefix="/api/factory", tags=["factory"])

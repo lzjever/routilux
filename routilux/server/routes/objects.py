@@ -20,7 +20,7 @@ async def list_factory_objects(
         description="Optional category filter. Only objects in this category will be returned. "
         "Common categories: 'data_generation', 'validation', 'transformation', 'monitoring', 'debugging', etc. "
         "Leave empty to get all objects regardless of category.",
-        example="data_generation",
+        examples=["data_generation"],
     ),
     object_type: Optional[str] = Query(
         None,
@@ -28,7 +28,7 @@ async def list_factory_objects(
         "Use 'routine' to get only Routines (executable components that can be added to flows). "
         "Use 'flow' to get only Flows (workflow templates that can be cloned). "
         "Leave empty to get all objects regardless of type.",
-        example="routine",
+        examples=["routine"],
     ),
 ):
     """List all available objects registered in the factory.

@@ -17,6 +17,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from routilux.monitoring.event_manager import get_event_manager
 from routilux.monitoring.registry import MonitoringRegistry
 from routilux.monitoring.storage import flow_store
+
 # Note: job_store (old system) removed - use get_job_storage() instead
 
 logger = logging.getLogger(__name__)
@@ -187,6 +188,7 @@ async def job_monitor_websocket(websocket: WebSocket, job_id: str):
         # Verify job exists (with error handling)
         try:
             from routilux.server.dependencies import get_job_storage, get_runtime
+
             job_storage = get_job_storage()
             runtime = get_runtime()
             job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
@@ -298,6 +300,7 @@ async def job_debug_websocket(websocket: WebSocket, job_id: str):
         # Verify job exists
         try:
             from routilux.server.dependencies import get_job_storage, get_runtime
+
             job_storage = get_job_storage()
             runtime = get_runtime()
             job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)
@@ -423,6 +426,7 @@ async def flow_monitor_websocket(websocket: WebSocket, flow_id: str):
         try:
             # Get jobs by flow_id from new storage
             from routilux.server.dependencies import get_job_storage
+
             job_storage = get_job_storage()
             jobs = job_storage.list_jobs(flow_id=flow_id)
         except Exception as e:
@@ -561,6 +565,7 @@ async def generic_websocket(websocket: WebSocket):
                         if job_id not in subscribers:
                             # Verify job exists
                             from routilux.server.dependencies import get_job_storage, get_runtime
+
                             job_storage = get_job_storage()
                             runtime = get_runtime()
                             job_context = job_storage.get_job(job_id) or runtime.get_job(job_id)

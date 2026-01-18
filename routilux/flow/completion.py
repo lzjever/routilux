@@ -51,10 +51,18 @@ def wait_for_event_loop_completion(flow: "Flow", timeout: float | None = None) -
     import time
 
     # CRITICAL fix: Validate required attributes exist
-    required_attrs = ["_execution_thread", "_running", "_execution_lock", "_active_tasks", "_task_queue"]
+    required_attrs = [
+        "_execution_thread",
+        "_running",
+        "_execution_lock",
+        "_active_tasks",
+        "_task_queue",
+    ]
     for attr in required_attrs:
         if not hasattr(flow, attr):
-            raise AttributeError(f"Flow is missing required attribute: {attr}. Ensure Flow.__init__() has been called properly.")
+            raise AttributeError(
+                f"Flow is missing required attribute: {attr}. Ensure Flow.__init__() has been called properly."
+            )
 
     start_time = time.time()
 
@@ -96,8 +104,8 @@ def wait_for_event_loop_completion(flow: "Flow", timeout: float | None = None) -
             # Event loop terminated but flow says it's running - this is inconsistent
             # Log and exit to prevent infinite loop
             logging.getLogger(__name__).warning(
-                f"Event loop terminated but flow._running=True. "
-                f"This may indicate inconsistent state. Exiting wait loop."
+                "Event loop terminated but flow._running=True. "
+                "This may indicate inconsistent state. Exiting wait loop."
             )
             break
 

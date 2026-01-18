@@ -2,7 +2,7 @@
 Object discovery API routes.
 """
 
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -105,7 +105,7 @@ async def list_factory_objects(
     **Object Types**:
     - `type`: Prototype type - "class" (class-based) or "instance" (instance-based)
     - `object_type`: Object type - "routine" (executable component) or "flow" (workflow template)
-    
+
     **Filtering**:
     - Use `category` to filter by functional category (e.g., "data_generation")
     - Use `object_type` to filter by object type (e.g., "routine" or "flow")
@@ -148,7 +148,7 @@ async def list_factory_objects(
     if object_type and object_type not in ("routine", "flow"):
         raise HTTPException(
             status_code=422,
-            detail=f"Invalid object_type: '{object_type}'. Must be 'routine' or 'flow'."
+            detail=f"Invalid object_type: '{object_type}'. Must be 'routine' or 'flow'.",
         )
     factory = ObjectFactory.get_instance()
     objects = factory.list_available(category=category, object_type=object_type)
@@ -160,8 +160,8 @@ async def get_factory_object_metadata(name: str):
     """Get metadata for a specific factory object.
 
     **Overview**:
-    Returns detailed metadata about a registered object in the factory, including description, 
-    category, tags, example configuration, and version. Use this to understand what an object 
+    Returns detailed metadata about a registered object in the factory, including description,
+    category, tags, example configuration, and version. Use this to understand what an object
     does and how to configure it.
 
     **Endpoint**: `GET /api/factory/objects/{name}`
@@ -229,8 +229,8 @@ async def get_factory_object_interface(name: str):
     """Get interface information for a routine (slots, events, activation policy).
 
     **Overview**:
-    Returns detailed interface information for a routine registered in the factory, 
-    including all input slots, output events, activation policy, and configuration. 
+    Returns detailed interface information for a routine registered in the factory,
+    including all input slots, output events, activation policy, and configuration.
     This is essential for understanding how to connect routines in a flow.
 
     **Endpoint**: `GET /api/factory/objects/{name}/interface`

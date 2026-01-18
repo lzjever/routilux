@@ -98,7 +98,7 @@ class RoutineAnalyzer:
             elif isinstance(base, ast.Attribute):
                 # MEDIUM fix: Check if base.attr exists before accessing
                 # Handle cases like "routilux.Routine"
-                if hasattr(base, 'attr') and base.attr == "Routine":
+                if hasattr(base, "attr") and base.attr == "Routine":
                     return True
         return False
 
@@ -263,7 +263,10 @@ class RoutineAnalyzer:
         if len(call_node.args) < 1:
             return None
 
-        event_info: dict[str, Any] = {"name": self._extract_string_value(call_node.args[0]), "output_params": []}
+        event_info: dict[str, Any] = {
+            "name": self._extract_string_value(call_node.args[0]),
+            "output_params": [],
+        }
 
         # Extract output_params from args or kwargs
         if len(call_node.args) > 1:

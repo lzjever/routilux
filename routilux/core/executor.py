@@ -16,21 +16,20 @@ import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, List, Optional, Set
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from routilux.core.flow import Flow
-    from routilux.core.task import EventRoutingTask, SlotActivationTask
+    from routilux.core.task import SlotActivationTask
     from routilux.core.worker import WorkerState
-    from routilux.core.context import JobContext
 
-from routilux.core.status import ExecutionStatus, RoutineStatus
 from routilux.core.context import (
-    _current_worker_state,
     _current_job,
-    set_current_worker_state,
+    _current_worker_state,
     set_current_job,
+    set_current_worker_state,
 )
+from routilux.core.status import ExecutionStatus, RoutineStatus
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +64,10 @@ class WorkerExecutor:
 
     def __init__(
         self,
-        flow: "Flow",
-        worker_state: "WorkerState",
+        flow: Flow,
+        worker_state: WorkerState,
         global_thread_pool: ThreadPoolExecutor,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
     ):
         """Initialize worker executor.
 
@@ -85,13 +84,13 @@ class WorkerExecutor:
 
         # Independent execution context
         self.task_queue: queue.Queue = queue.Queue()
-        self.pending_tasks: List["SlotActivationTask"] = []
-        self.event_loop_thread: Optional[threading.Thread] = None
-        self.active_tasks: Set[Future] = set()
+        self.pending_tasks: list[SlotActivationTask] = []
+        self.event_loop_thread: threading.Thread | None = None
+        self.active_tasks: set[Future] = set()
         self._running = False
         self._paused = False
         self._lock = threading.Lock()
-        self._start_time: Optional[float] = None
+        self._start_time: float | None = None
 
         # Set executor reference in WorkerState
         worker_state._executor = self
@@ -111,9 +110,7 @@ class WorkerExecutor:
         """
         with self._lock:
             if self._running:
-                raise RuntimeError(
-                    f"Worker {self.worker_state.worker_id} is already running"
-                )
+                raise RuntimeError(f"Worker {self.worker_state.worker_id} is already running")
 
         # Update worker state
         self.worker_state.status = ExecutionStatus.RUNNING
@@ -122,9 +119,7 @@ class WorkerExecutor:
 
         # Initialize all routines to IDLE state
         for routine_id in self.flow.routines.keys():
-            self.worker_state.update_routine_state(
-                routine_id, {"status": RoutineStatus.IDLE.value}
-            )
+            self.worker_state.update_routine_state(routine_id, {"status": RoutineStatus.IDLE.value})
 
         # Call hooks if available
         from routilux.core.hooks import get_execution_hooks
@@ -145,9 +140,7 @@ class WorkerExecutor:
         )
         self.event_loop_thread.start()
 
-        logger.debug(
-            f"Started worker {self.worker_state.worker_id}, all routines in IDLE state"
-        )
+        logger.debug(f"Started worker {self.worker_state.worker_id}, all routines in IDLE state")
 
     def _event_loop(self) -> None:
         """Event loop main logic.
@@ -225,7 +218,7 @@ class WorkerExecutor:
         # Cleanup
         self._cleanup()
 
-    def _execute_task(self, task: "SlotActivationTask") -> None:
+    def _execute_task(self, task: SlotActivationTask) -> None:
         """Execute a single task.
 
         This method sets the worker_state and job_context in context variables
@@ -261,10 +254,7 @@ class WorkerExecutor:
                 emitted_from=(
                     "external"
                     if task.connection is None
-                    else (
-                        getattr(task.connection, "_source_routine_id", None)
-                        or "external"
-                    )
+                    else (getattr(task.connection, "_source_routine_id", None) or "external")
                 ),
                 emitted_at=datetime.now(),
             )
@@ -391,9 +381,7 @@ class WorkerExecutor:
             if self._all_routines_idle() and self._is_complete():
                 if self.worker_state.status != ExecutionStatus.IDLE:
                     self.worker_state.status = ExecutionStatus.IDLE
-                    logger.debug(
-                        f"Worker {self.worker_state.worker_id} is now IDLE"
-                    )
+                    logger.debug(f"Worker {self.worker_state.worker_id} is now IDLE")
 
     def _handle_timeout(self) -> None:
         """Handle worker timeout."""
@@ -438,7 +426,7 @@ class WorkerExecutor:
                     pass
             self.active_tasks.clear()
 
-    def pause(self, reason: str = "", checkpoint: Optional[dict] = None) -> None:
+    def pause(self, reason: str = "", checkpoint: dict | None = None) -> None:
         """Pause worker execution.
 
         Args:
@@ -449,7 +437,7 @@ class WorkerExecutor:
             self._paused = True
             self.worker_state._set_paused(reason, checkpoint)
 
-    def resume(self) -> "WorkerState":
+    def resume(self) -> WorkerState:
         """Resume worker execution.
 
         Returns:

@@ -8,9 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type, Uni
 from routilux.tools.factory.metadata import ObjectMetadata
 
 if TYPE_CHECKING:
-    from routilux.core.error import ErrorHandler
     from routilux.core.flow import Flow
-    from routilux.core.routine import Routine
 
 
 class ObjectFactory:
@@ -175,7 +173,9 @@ class ObjectFactory:
         """
         with self._registry_lock:
             if name not in self._registry:
-                raise ValueError(f"Prototype '{name}' not found. Available: {list(self._registry.keys())}")
+                raise ValueError(
+                    f"Prototype '{name}' not found. Available: {list(self._registry.keys())}"
+                )
 
             proto = self._registry[name]
             proto_class = proto["prototype"]
@@ -199,6 +199,7 @@ class ObjectFactory:
                         for slot_name, slot in proto["slots"].items():
                             # Clone slot by redefining it with same parameters
                             from routilux.core.slot import Slot
+
                             cloned_slot = Slot(
                                 slot.name,
                                 instance,
@@ -212,10 +213,13 @@ class ObjectFactory:
                         for event_name, event in proto["events"].items():
                             # Clone event by redefining it with same parameters
                             from routilux.core.event import Event
+
                             cloned_event = Event(
                                 event.name,
                                 instance,
-                                output_params=event.output_params.copy() if event.output_params else None,
+                                output_params=event.output_params.copy()
+                                if event.output_params
+                                else None,
                             )
                             instance._events[event_name] = cloned_event
 
@@ -250,7 +254,7 @@ class ObjectFactory:
 
         Args:
             category: Optional category filter (e.g., 'data_generation', 'transformation').
-            object_type: Optional object type filter. 'routine' or 'flow'. 
+            object_type: Optional object type filter. 'routine' or 'flow'.
                         If None, returns all objects.
 
         Returns:
@@ -261,7 +265,7 @@ class ObjectFactory:
             results = []
             for name, proto in self._registry.items():
                 metadata = proto.get("metadata", ObjectMetadata(name=name))
-                
+
                 # Filter by category
                 if category and metadata.category != category:
                     continue
@@ -374,9 +378,7 @@ class ObjectFactory:
                 # obj is an instance
                 return self._class_to_name.get(obj.__class__)
 
-    def export_flow_to_dsl(
-        self, flow: "Flow", format: str = "dict"
-    ) -> Union[Dict[str, Any], str]:
+    def export_flow_to_dsl(self, flow: "Flow", format: str = "dict") -> Union[Dict[str, Any], str]:
         """Export flow to DSL format using factory names.
 
         This method exports a flow to its DSL representation, using factory names
@@ -543,15 +545,11 @@ class ObjectFactory:
         # Validate and load routines
         routines = dsl_dict.get("routines")
         if not isinstance(routines, dict):
-            raise ValueError(
-                "DSL must contain a 'routines' dictionary with routine definitions"
-            )
+            raise ValueError("DSL must contain a 'routines' dictionary with routine definitions")
 
         for routine_id, routine_spec in routines.items():
             if not isinstance(routine_spec, dict):
-                raise ValueError(
-                    f"Routine '{routine_id}' specification must be a dictionary"
-                )
+                raise ValueError(f"Routine '{routine_id}' specification must be a dictionary")
 
             # Get factory name (required)
             factory_name = routine_spec.get("class")
@@ -652,13 +650,9 @@ class ObjectFactory:
 
             # Validate routine IDs exist
             if source_id not in flow.routines:
-                raise ValueError(
-                    f"Connection source routine '{source_id}' not found in flow"
-                )
+                raise ValueError(f"Connection source routine '{source_id}' not found in flow")
             if target_id not in flow.routines:
-                raise ValueError(
-                    f"Connection target routine '{target_id}' not found in flow"
-                )
+                raise ValueError(f"Connection target routine '{target_id}' not found in flow")
 
             flow.connect(source_id, source_event, target_id, target_slot)
 

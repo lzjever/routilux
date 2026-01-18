@@ -7,7 +7,7 @@ All features are disabled by default and have zero overhead when not enabled.
 Usage:
     >>> from routilux.monitoring import MonitoringRegistry
     >>> MonitoringRegistry.enable()  # Enable monitoring and register hooks
-    >>> 
+    >>>
     >>> # Or use environment variable:
     >>> # ROUTILUX_ENABLE_MONITORING=true
 """
@@ -30,18 +30,18 @@ from routilux.monitoring.debug_session import (  # noqa: E402
     DebugSessionStore,
 )
 from routilux.monitoring.event_manager import JobEventManager, get_event_manager  # noqa: E402
+from routilux.monitoring.execution_hooks import (  # noqa: E402
+    MonitoringExecutionHooks,
+    disable_monitoring_hooks,
+    enable_monitoring_hooks,
+    get_monitoring_hooks,
+)
 from routilux.monitoring.monitor_collector import (  # noqa: E402
     ErrorRecord,
     ExecutionEvent,
     ExecutionMetrics,
     MonitorCollector,
     RoutineMetrics,
-)
-from routilux.monitoring.execution_hooks import (  # noqa: E402
-    MonitoringExecutionHooks,
-    get_monitoring_hooks,
-    enable_monitoring_hooks,
-    disable_monitoring_hooks,
 )
 
 __all__ = [

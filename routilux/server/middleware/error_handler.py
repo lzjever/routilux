@@ -5,13 +5,11 @@ Provides standardized error responses for all exceptions.
 """
 
 import logging
-from datetime import datetime
 
 from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from routilux.server.models.error import ErrorResponse
 from routilux.server.errors import ErrorCode, create_error_response
 
 logger = logging.getLogger(__name__)
@@ -34,7 +32,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             else:
                 serializable_error[key] = value
         serializable_errors.append(serializable_error)
-    
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content=create_error_response(
@@ -62,19 +60,19 @@ async def http_exception_handler(request: Request, exc):
     # If detail is already a structured error dict (from create_error_response), use it
     if isinstance(exc.detail, dict) and "error" in exc.detail:
         error_dict = exc.detail
-        
+
         # Check if it's the new format (error.code, error.message)
         if isinstance(error_dict.get("error"), dict):
             return JSONResponse(
                 status_code=exc.status_code,
                 content=error_dict,
             )
-        
+
         # Old format - convert to new format
         error_code = error_dict.get("error", "http_error")
         message = error_dict.get("message", str(exc.detail))
         details = error_dict.get("details")
-        
+
         return JSONResponse(
             status_code=exc.status_code,
             content=create_error_response(
@@ -83,10 +81,10 @@ async def http_exception_handler(request: Request, exc):
                 details=details,
             ),
         )
-    
+
     # Plain string detail
     message = str(exc.detail) if exc.detail else "An error occurred"
-    
+
     # Map status codes to error codes
     error_code_map = {
         400: ErrorCode.VALIDATION_ERROR,
@@ -98,7 +96,7 @@ async def http_exception_handler(request: Request, exc):
         503: ErrorCode.RUNTIME_SHUTDOWN,
     }
     error_code = error_code_map.get(exc.status_code, ErrorCode.INTERNAL_ERROR)
-    
+
     return JSONResponse(
         status_code=exc.status_code,
         content=create_error_response(error_code, message),

@@ -7,13 +7,10 @@ including routine execution status, queue status, and metadata.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import TYPE_CHECKING, Dict, List, Optional, Set
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from routilux.core.flow import Flow
     from routilux.core.worker import JobState
-    from routilux.core.routine import Routine
 
 # Import models with TYPE_CHECKING to avoid circular import
 from typing import TYPE_CHECKING
@@ -34,6 +31,7 @@ from routilux.monitoring.storage import job_store
 def get_runtime_instance():
     """Get default Runtime instance (compatibility wrapper)."""
     from routilux.monitoring.runtime_registry import RuntimeRegistry
+
     registry = RuntimeRegistry.get_instance()
     return registry.get_or_create_default()
 
@@ -62,7 +60,7 @@ class MonitorService:
             self._runtime = get_runtime_instance()
         return self._runtime
 
-    def get_active_routines(self, job_id: str) -> Set[str]:
+    def get_active_routines(self, job_id: str) -> set[str]:
         """Get set of routine IDs that are currently executing for a job.
 
         Args:
@@ -87,7 +85,7 @@ class MonitorService:
         runtime = self._get_runtime()
         return runtime.get_active_thread_count(job_id, routine_id)
 
-    def get_all_active_thread_counts(self, job_id: str) -> Dict[str, int]:
+    def get_all_active_thread_counts(self, job_id: str) -> dict[str, int]:
         """Get active thread counts for all routines in a job.
 
         Args:
@@ -100,8 +98,8 @@ class MonitorService:
         return runtime.get_all_active_thread_counts(job_id)
 
     def get_routine_execution_status(
-        self, job_id: str, routine_id: str, job_state: Optional[JobState] = None
-    ) -> "RoutineExecutionStatus":
+        self, job_id: str, routine_id: str, job_state: JobState | None = None
+    ) -> RoutineExecutionStatus:
         """Get execution status for a specific routine.
 
         Args:
@@ -119,7 +117,7 @@ class MonitorService:
 
         # Get active thread count (primary source of truth in concurrent model)
         active_thread_count = self.get_active_thread_count(job_id, routine_id)
-        
+
         # Determine is_active based on thread count
         is_active = active_thread_count > 0
 
@@ -173,9 +171,7 @@ class MonitorService:
             active_thread_count=active_thread_count,
         )
 
-    def get_routine_queue_status(
-        self, job_id: str, routine_id: str
-    ) -> List["SlotQueueStatus"]:
+    def get_routine_queue_status(self, job_id: str, routine_id: str) -> list[SlotQueueStatus]:
         """Get queue status for all slots in a routine.
 
         Args:
@@ -215,7 +211,7 @@ class MonitorService:
 
         return queue_statuses
 
-    def get_routine_info(self, flow_id: str, routine_id: str) -> "RoutineInfo":
+    def get_routine_info(self, flow_id: str, routine_id: str) -> RoutineInfo:
         """Get metadata information for a routine.
 
         Args:
@@ -260,9 +256,7 @@ class MonitorService:
             events=events,
         )
 
-    def get_routine_monitoring_data(
-        self, job_id: str, routine_id: str
-    ) -> "RoutineMonitoringData":
+    def get_routine_monitoring_data(self, job_id: str, routine_id: str) -> RoutineMonitoringData:
         """Get complete monitoring data for a routine.
 
         Args:
@@ -295,7 +289,7 @@ class MonitorService:
             info=info,
         )
 
-    def get_job_monitoring_data(self, job_id: str) -> "JobMonitoringData":
+    def get_job_monitoring_data(self, job_id: str) -> JobMonitoringData:
         """Get complete monitoring data for a job.
 
         Args:
@@ -317,7 +311,7 @@ class MonitorService:
         from routilux.server.models.monitor import JobMonitoringData
 
         # Build monitoring data for each routine
-        routines_data: Dict[str, "RoutineMonitoringData"] = {}
+        routines_data: dict[str, RoutineMonitoringData] = {}
         for routine_id in flow.routines.keys():
             routines_data[routine_id] = self.get_routine_monitoring_data(job_id, routine_id)
 
@@ -329,9 +323,7 @@ class MonitorService:
             updated_at=job_state.updated_at,
         )
 
-    def get_all_routines_status(
-        self, job_id: str
-    ) -> Dict[str, "RoutineExecutionStatus"]:
+    def get_all_routines_status(self, job_id: str) -> dict[str, RoutineExecutionStatus]:
         """Get execution status for all routines in a job.
 
         Args:
@@ -349,7 +341,7 @@ class MonitorService:
         if not flow:
             raise ValueError(f"Flow '{job_state.flow_id}' not found")
 
-        routines_status: Dict[str, RoutineExecutionStatus] = {}
+        routines_status: dict[str, RoutineExecutionStatus] = {}
         for routine_id in flow.routines.keys():
             routines_status[routine_id] = self.get_routine_execution_status(
                 job_id, routine_id, job_state
@@ -357,9 +349,7 @@ class MonitorService:
 
         return routines_status
 
-    def get_all_queues_status(
-        self, job_id: str
-    ) -> Dict[str, List["SlotQueueStatus"]]:
+    def get_all_queues_status(self, job_id: str) -> dict[str, list[SlotQueueStatus]]:
         """Get queue status for all routines in a job.
 
         Args:
@@ -377,7 +367,7 @@ class MonitorService:
         if not flow:
             raise ValueError(f"Flow '{job_state.flow_id}' not found")
 
-        all_queues: Dict[str, List[SlotQueueStatus]] = {}
+        all_queues: dict[str, list[SlotQueueStatus]] = {}
         for routine_id in flow.routines.keys():
             all_queues[routine_id] = self.get_routine_queue_status(job_id, routine_id)
 
@@ -385,7 +375,7 @@ class MonitorService:
 
 
 # Global MonitorService instance
-_monitor_service: Optional[MonitorService] = None
+_monitor_service: MonitorService | None = None
 
 
 def get_monitor_service() -> MonitorService:

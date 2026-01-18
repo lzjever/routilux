@@ -8,6 +8,7 @@ from typing import List
 
 from fastapi import APIRouter, HTTPException
 
+from routilux.monitoring.runtime_registry import RuntimeRegistry
 from routilux.server.middleware.auth import RequireAuth
 from routilux.server.models.runtime import (
     RuntimeCreateRequest,
@@ -15,7 +16,6 @@ from routilux.server.models.runtime import (
     RuntimeListResponse,
     RuntimeResponse,
 )
-from routilux.monitoring.runtime_registry import RuntimeRegistry
 
 router = APIRouter()
 
@@ -131,14 +131,10 @@ async def list_runtimes():
             default_runtime_id=default_id,
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to list runtimes: {str(e)}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Failed to list runtimes: {str(e)}") from e
 
 
-@router.get(
-    "/runtimes/{runtime_id}", response_model=RuntimeResponse, dependencies=[RequireAuth]
-)
+@router.get("/runtimes/{runtime_id}", response_model=RuntimeResponse, dependencies=[RequireAuth])
 async def get_runtime(runtime_id: str):
     """Get detailed information about a specific Runtime instance.
 
@@ -194,22 +190,16 @@ async def get_runtime(runtime_id: str):
         registry = RuntimeRegistry.get_instance()
         runtime = registry.get(runtime_id)
         if runtime is None:
-            raise HTTPException(
-                status_code=404, detail=f"Runtime '{runtime_id}' not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Runtime '{runtime_id}' not found")
 
         default_id = registry.get_default_id()
         is_default = runtime_id == default_id
 
-        return RuntimeResponse(
-            runtime=_runtime_to_info(runtime_id, runtime, is_default)
-        )
+        return RuntimeResponse(runtime=_runtime_to_info(runtime_id, runtime, is_default))
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get runtime: {str(e)}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Failed to get runtime: {str(e)}") from e
 
 
 @router.post("/runtimes", response_model=RuntimeResponse, dependencies=[RequireAuth])
@@ -300,15 +290,11 @@ async def create_runtime(request: RuntimeCreateRequest):
         )
 
         return RuntimeResponse(
-            runtime=_runtime_to_info(
-                request.runtime_id, runtime, request.is_default
-            )
+            runtime=_runtime_to_info(request.runtime_id, runtime, request.is_default)
         )
     except HTTPException:
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create runtime: {str(e)}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Failed to create runtime: {str(e)}") from e

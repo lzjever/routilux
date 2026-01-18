@@ -170,7 +170,10 @@ def validate_flow(flow: "Flow") -> List[str]:
         else:
             # CRITICAL fix: Use .get() with proper error handling to prevent KeyError
             source_routine = flow.routines.get(source_routine_id)
-            if source_routine is not None and connection.source_event.name not in source_routine._events:
+            if (
+                source_routine is not None
+                and connection.source_event.name not in source_routine._events
+            ):
                 issues.append(
                     f"Connection references unknown event: {source_routine_id}.{connection.source_event.name}"
                 )
@@ -184,7 +187,10 @@ def validate_flow(flow: "Flow") -> List[str]:
         else:
             # CRITICAL fix: Use .get() with proper error handling to prevent KeyError
             target_routine = flow.routines.get(target_routine_id)
-            if target_routine is not None and connection.target_slot.name not in target_routine._slots:
+            if (
+                target_routine is not None
+                and connection.target_slot.name not in target_routine._slots
+            ):
                 issues.append(
                     f"Connection references unknown slot: {target_routine_id}.{connection.target_slot.name}"
                 )

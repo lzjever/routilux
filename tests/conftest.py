@@ -1,11 +1,10 @@
 """Pytest configuration and fixtures for Routilux tests."""
 
 import pytest
+
 from routilux.core import (
     Flow,
-    FlowRegistry,
     Runtime,
-    WorkerManager,
     get_flow_registry,
     get_worker_manager,
     reset_worker_manager,
@@ -17,13 +16,13 @@ def reset_state():
     """Reset global state before each test."""
     # Reset worker manager
     reset_worker_manager()
-    
+
     # Clear flow registry
     registry = get_flow_registry()
     registry.clear()
-    
+
     yield
-    
+
     # Cleanup after test
     reset_worker_manager()
     registry.clear()

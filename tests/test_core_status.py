@@ -1,6 +1,5 @@
 """Tests for status enums."""
 
-import pytest
 from routilux.core import ExecutionStatus, JobStatus, RoutineStatus
 
 

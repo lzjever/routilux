@@ -43,7 +43,9 @@ def pause_flow(
     required_attrs = ["_paused", "_task_queue", "_pending_tasks", "_active_tasks"]
     for attr in required_attrs:
         if not hasattr(flow, attr):
-            raise AttributeError(f"Flow is missing required attribute: {attr}. Ensure Flow.__init__() has been called properly.")
+            raise AttributeError(
+                f"Flow is missing required attribute: {attr}. Ensure Flow.__init__() has been called properly."
+            )
 
     flow._paused = True
 
@@ -101,7 +103,9 @@ def wait_for_active_tasks(flow: "Flow") -> None:
     """
     # CRITICAL fix: Validate required attributes exist
     if not hasattr(flow, "_execution_lock") or not hasattr(flow, "_active_tasks"):
-        raise AttributeError("Flow is missing required attributes: _execution_lock or _active_tasks. Ensure Flow.__init__() has been called properly.")
+        raise AttributeError(
+            "Flow is missing required attributes: _execution_lock or _active_tasks. Ensure Flow.__init__() has been called properly."
+        )
 
     check_interval = 0.05
     max_wait_time = 5.0
@@ -158,7 +162,9 @@ def serialize_pending_tasks(flow: "Flow", job_state: "JobState") -> None:
     """
     # CRITICAL fix: Validate required attributes exist
     if not hasattr(flow, "_pending_tasks"):
-        raise AttributeError("Flow is missing required attribute: _pending_tasks. Ensure Flow.__init__() has been called properly.")
+        raise AttributeError(
+            "Flow is missing required attribute: _pending_tasks. Ensure Flow.__init__() has been called properly."
+        )
 
     serialized_tasks = []
     for task in flow._pending_tasks:
@@ -202,7 +208,9 @@ def deserialize_pending_tasks(flow: "Flow", job_state: "JobState") -> None:
     """
     # CRITICAL fix: Validate required attributes exist
     if not hasattr(flow, "_pending_tasks"):
-        raise AttributeError("Flow is missing required attribute: _pending_tasks. Ensure Flow.__init__() has been called properly.")
+        raise AttributeError(
+            "Flow is missing required attribute: _pending_tasks. Ensure Flow.__init__() has been called properly."
+        )
 
     if not hasattr(job_state, "pending_tasks") or not job_state.pending_tasks:
         return
@@ -277,10 +285,12 @@ def _recover_slot_tasks(flow: "Flow", job_state: "JobState") -> None:
     """
     # CRITICAL fix: Validate required attributes exist
     if not hasattr(flow, "_enqueue_task"):
-        raise AttributeError("Flow is missing required attribute/method: _enqueue_task. Ensure Flow.__init__() has been called properly.")
+        raise AttributeError(
+            "Flow is missing required attribute/method: _enqueue_task. Ensure Flow.__init__() has been called properly."
+        )
 
-    from routilux.flow.error_handling import get_error_handler_for_routine
     from routilux.core.task import SlotActivationTask, TaskPriority
+    from routilux.flow.error_handling import get_error_handler_for_routine
 
     recovered_count = 0
 
@@ -467,7 +477,9 @@ def resume_flow(flow: "Flow", job_state: "JobState") -> "JobState":
 
     # CRITICAL fix: Validate required attributes exist
     if not hasattr(flow, "_pending_tasks") or not hasattr(flow, "_task_queue"):
-        raise AttributeError("Flow is missing required attributes: _pending_tasks or _task_queue. Ensure Flow.__init__() has been called properly.")
+        raise AttributeError(
+            "Flow is missing required attributes: _pending_tasks or _task_queue. Ensure Flow.__init__() has been called properly."
+        )
 
     # TODO: Update to use JobExecutor instead of Flow runtime state
     # Flow no longer has _pending_tasks, _task_queue, _execution_thread, etc.

@@ -385,6 +385,7 @@ class MonitorCollector:
             if job_id not in self._metrics:
                 # Try to get flow_id from job_state if available
                 from routilux.monitoring.storage import job_store
+
                 job_state = job_store.get(job_id)
                 flow_id = job_state.flow_id if job_state else "unknown"
                 self._metrics[job_id] = ExecutionMetrics(
@@ -394,11 +395,11 @@ class MonitorCollector:
                 )
 
             metrics = self._metrics[job_id]
-            
+
             # Initialize routine metrics if needed
             if routine_id not in metrics.routine_metrics:
                 metrics.routine_metrics[routine_id] = RoutineMetrics(routine_id=routine_id)
-            
+
             # Update aggregate metrics
             routine_metrics = metrics.routine_metrics[routine_id]
             routine_metrics.update(duration, status)

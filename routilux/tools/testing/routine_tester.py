@@ -43,8 +43,8 @@ class RoutineTester:
 
     def _setup_mock_flow(self) -> None:
         """Setup mock flow context for testing."""
-        from routilux.core.worker import JobState
         from routilux.core.routine import _current_job_state
+        from routilux.core.worker import JobState
 
         mock_flow = MagicMock()
         mock_job_state = JobState("test_flow")
@@ -148,7 +148,7 @@ class RoutineTester:
         from routilux.core.routine import _current_job_state
 
         # HIGH fix: Properly reset context variable using the token
-        if hasattr(self, '_original_job_state_token'):
+        if hasattr(self, "_original_job_state_token"):
             _current_job_state.reset(self._original_job_state_token)
         else:
             # Fallback if token not stored (shouldn't happen)

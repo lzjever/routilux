@@ -8,11 +8,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from routilux.monitoring.registry import MonitoringRegistry
+from routilux.monitoring.storage import job_store
 from routilux.server.middleware.auth import RequireAuth
 from routilux.server.models.debug import ExpressionEvalRequest, ExpressionEvalResponse
 from routilux.server.security import SecurityError, TimeoutError, safe_evaluate
-from routilux.monitoring.registry import MonitoringRegistry
-from routilux.monitoring.storage import job_store
 
 router = APIRouter()
 
@@ -145,13 +145,12 @@ async def get_variables(job_id: str, routine_id: str = None):
     if routine_id is not None:
         # Validate routine_id format (alphanumeric, dashes, underscores only)
         if not routine_id or not isinstance(routine_id, str):
-            raise HTTPException(
-                status_code=400, detail="routine_id must be a non-empty string"
-            )
+            raise HTTPException(status_code=400, detail="routine_id must be a non-empty string")
         # Check if routine_id contains valid characters only
-        if not re.match(r'^[a-zA-Z0-9_-]+$', routine_id):
+        if not re.match(r"^[a-zA-Z0-9_-]+$", routine_id):
             raise HTTPException(
-                status_code=400, detail="routine_id must contain only alphanumeric characters, dashes, and underscores"
+                status_code=400,
+                detail="routine_id must contain only alphanumeric characters, dashes, and underscores",
             )
 
     # Fix: Add validation for routine_id when call stack is empty

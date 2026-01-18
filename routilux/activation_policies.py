@@ -12,8 +12,8 @@ import time
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
-    from routilux.core.worker import WorkerState
     from routilux.core.slot import Slot
+    from routilux.core.worker import WorkerState
 
 
 # Thread-safe storage for time_interval_policy
@@ -39,7 +39,7 @@ def time_interval_policy(min_interval_seconds: float):
     """
 
     def policy(
-        slots: dict[str, Slot], worker_state: "WorkerState"
+        slots: dict[str, Slot], worker_state: WorkerState
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """Time interval activation policy.
 
@@ -101,7 +101,7 @@ def batch_size_policy(min_batch_size: int):
     """
 
     def policy(
-        slots: dict[str, Slot], worker_state: "WorkerState"
+        slots: dict[str, Slot], worker_state: WorkerState
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """Batch size activation policy.
 
@@ -156,7 +156,7 @@ def all_slots_ready_policy():
     """
 
     def policy(
-        slots: dict[str, Slot], worker_state: "WorkerState"
+        slots: dict[str, Slot], worker_state: WorkerState
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """All slots ready activation policy.
 
@@ -189,7 +189,7 @@ def all_slots_ready_policy():
     return policy
 
 
-def custom_policy(check_function: Callable[[dict[str, Slot], "WorkerState"], bool]):
+def custom_policy(check_function: Callable[[dict[str, Slot], WorkerState], bool]):
     """Create a custom activation policy from a check function.
 
     The check function should return True if the routine should be activated,
@@ -212,7 +212,7 @@ def custom_policy(check_function: Callable[[dict[str, Slot], "WorkerState"], boo
     """
 
     def policy(
-        slots: dict[str, Slot], worker_state: "WorkerState"
+        slots: dict[str, Slot], worker_state: WorkerState
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """Custom activation policy.
 
@@ -256,7 +256,7 @@ def immediate_policy():
     """
 
     def policy(
-        slots: dict[str, Slot], worker_state: "WorkerState"
+        slots: dict[str, Slot], worker_state: WorkerState
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """Immediate activation policy.
 
@@ -307,7 +307,7 @@ def breakpoint_policy(routine_id: str):
     """
 
     def policy(
-        slots: dict[str, Slot], worker_state: "WorkerState"
+        slots: dict[str, Slot], worker_state: WorkerState
     ) -> tuple[bool, dict[str, list[Any]], Any]:
         """Breakpoint activation policy.
 
@@ -332,7 +332,7 @@ def breakpoint_policy(routine_id: str):
         # Note: In new architecture, debug data should be stored in JobContext
         if not hasattr(worker_state, "debug_data"):
             worker_state.debug_data = {}
-        
+
         worker_state.debug_data[routine_id] = {
             "slot_data": slot_data_dict,
             "timestamp": time.time(),

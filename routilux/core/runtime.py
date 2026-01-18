@@ -13,15 +13,14 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from routilux.core.event import Event
-    from routilux.core.flow import Flow
     from routilux.core.routine import Routine
     from routilux.core.worker import WorkerState
 
-from routilux.core.context import JobContext, set_current_job
+from routilux.core.context import JobContext
 from routilux.core.slot import SlotQueueFullError
 from routilux.core.status import ExecutionStatus
 
@@ -45,14 +44,14 @@ class Runtime:
     Examples:
         >>> runtime = Runtime(thread_pool_size=10)
         >>> worker_state = runtime.exec("my_flow")
-        >>> 
+        >>>
         >>> # Send external data and create a job
         >>> worker_state, job = runtime.post(
         ...     "my_flow", "processor", "input",
         ...     {"data": "test"},
         ...     metadata={"user_id": "123"}
         ... )
-        >>> 
+        >>>
         >>> # Get job output
         >>> from routilux.core import get_job_output
         >>> output = get_job_output(job.job_id)
@@ -71,34 +70,35 @@ class Runtime:
         if thread_pool_size < 0:
             raise ValueError(f"thread_pool_size must be >= 0, got {thread_pool_size}")
         if thread_pool_size > 1000:
-            logger.warning(
-                f"thread_pool_size {thread_pool_size} is unusually large"
-            )
+            logger.warning(f"thread_pool_size {thread_pool_size} is unusually large")
 
         self.thread_pool_size = thread_pool_size
         if thread_pool_size == 0:
-            self.thread_pool: Optional[ThreadPoolExecutor] = None
+            self.thread_pool: ThreadPoolExecutor | None = None
         else:
             self.thread_pool = ThreadPoolExecutor(
                 max_workers=thread_pool_size, thread_name_prefix="RoutiluxWorker"
             )
 
-        self._active_workers: Dict[str, "WorkerState"] = {}
+        self._active_workers: dict[str, WorkerState] = {}
         self._worker_lock = threading.RLock()
         self._shutdown = False
         self._is_shutdown = False
 
         # Track active routines: worker_id -> set[routine_id]
-        self._active_routines: Dict[str, Set[str]] = {}
+        self._active_routines: dict[str, set[str]] = {}
         self._active_routines_lock = threading.RLock()
 
         # Track active jobs by worker: worker_id -> dict[job_id -> JobContext]
-        self._active_jobs: Dict[str, Dict[str, JobContext]] = {}
+        self._active_jobs: dict[str, dict[str, JobContext]] = {}
         self._jobs_lock = threading.RLock()
 
     def __del__(self) -> None:
         """Cleanup thread pool when Runtime is garbage collected."""
-        if not getattr(self, "_is_shutdown", False) and getattr(self, "thread_pool", None) is not None:
+        if (
+            not getattr(self, "_is_shutdown", False)
+            and getattr(self, "thread_pool", None) is not None
+        ):
             try:
                 self.thread_pool.shutdown(wait=False)
             except Exception:
@@ -113,9 +113,7 @@ class Runtime:
         self.shutdown(wait=True)
         return False
 
-    def exec(
-        self, flow_name: str, worker_state: Optional["WorkerState"] = None
-    ) -> "WorkerState":
+    def exec(self, flow_name: str, worker_state: WorkerState | None = None) -> WorkerState:
         """Execute a flow and return immediately.
 
         This method starts flow execution in the background and returns
@@ -152,9 +150,7 @@ class Runtime:
             worker_state = WorkerState(flow_id=flow.flow_id)
         else:
             if worker_state.flow_id != flow.flow_id:
-                raise ValueError(
-                    f"WorkerState flow_id ({worker_state.flow_id}) does not match"
-                )
+                raise ValueError(f"WorkerState flow_id ({worker_state.flow_id}) does not match")
 
         # Set status and runtime reference
         worker_state.status = ExecutionStatus.RUNNING
@@ -187,11 +183,11 @@ class Runtime:
         flow_name: str,
         routine_name: str,
         slot_name: str,
-        data: Dict[str, Any],
-        worker_id: Optional[str] = None,
-        job_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Tuple["WorkerState", JobContext]:
+        data: dict[str, Any],
+        worker_id: str | None = None,
+        job_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[WorkerState, JobContext]:
         """Send external event to a specific routine's slot.
 
         This method allows external systems to inject data into a running worker
@@ -270,16 +266,12 @@ class Runtime:
         routine = flow.routines[routine_name]
         slot = routine.get_slot(slot_name)
         if slot is None:
-            raise ValueError(
-                f"Slot '{slot_name}' not found in routine '{routine_name}'"
-            )
+            raise ValueError(f"Slot '{slot_name}' not found in routine '{routine_name}'")
 
         # Get WorkerExecutor
         worker_executor = getattr(worker_state, "_executor", None)
         if worker_executor is None:
-            raise RuntimeError(
-                f"WorkerExecutor not found for worker {worker_state.worker_id}"
-            )
+            raise RuntimeError(f"WorkerExecutor not found for worker {worker_state.worker_id}")
 
         # Create task and submit with job_context
         from routilux.core.task import SlotActivationTask
@@ -298,9 +290,9 @@ class Runtime:
 
     def handle_event_emit(
         self,
-        event: "Event",
-        event_data: Dict[str, Any],
-        worker_state: "WorkerState",
+        event: Event,
+        event_data: dict[str, Any],
+        worker_state: WorkerState,
     ) -> None:
         """Handle event emission and route to connected slots.
 
@@ -381,15 +373,11 @@ class Runtime:
                     self._check_routine_activation(routine, worker_state)
 
             except SlotQueueFullError as e:
-                logger.warning(
-                    f"Slot queue full, dropping event: {e}"
-                )
+                logger.warning(f"Slot queue full, dropping event: {e}")
             except Exception as e:
                 logger.exception(f"Error routing event to slot: {e}")
 
-    def _check_routine_activation(
-        self, routine: "Routine", worker_state: "WorkerState"
-    ) -> None:
+    def _check_routine_activation(self, routine: Routine, worker_state: WorkerState) -> None:
         """Check if routine should be activated based on its policy.
 
         This method checks the activation policy and if activation is needed,
@@ -436,9 +424,7 @@ class Runtime:
             # Call routine start hook
             hooks = get_execution_hooks()
             if routine_id:
-                should_continue = hooks.on_routine_start(
-                    routine_id, worker_state, job_context
-                )
+                should_continue = hooks.on_routine_start(routine_id, worker_state, job_context)
                 if not should_continue:
                     return
 
@@ -468,29 +454,21 @@ class Runtime:
             except Exception as e:
                 logger.exception(f"Error in routine logic: {e}")
                 if routine_id:
-                    worker_state.record_execution(
-                        routine_id, "logic_error", {"error": str(e)}
-                    )
-                    hooks.on_routine_end(
-                        routine_id, worker_state, job_context, "failed", e
-                    )
+                    worker_state.record_execution(routine_id, "logic_error", {"error": str(e)})
+                    hooks.on_routine_end(routine_id, worker_state, job_context, "failed", e)
 
                 # Handle error via error handler
                 if routine_id and flow:
-                    error_handler = flow._get_error_handler_for_routine(
-                        routine, routine_id
-                    )
+                    error_handler = flow._get_error_handler_for_routine(routine, routine_id)
                     if error_handler:
-                        error_handler.handle_error(
-                            e, routine, routine_id, flow, worker_state
-                        )
+                        error_handler.handle_error(e, routine, routine_id, flow, worker_state)
 
         except Exception as e:
             logger.exception(f"Error checking routine activation: {e}")
 
     def _get_routine_id(
-        self, routine: Optional["Routine"], worker_state: "WorkerState"
-    ) -> Optional[str]:
+        self, routine: Routine | None, worker_state: WorkerState
+    ) -> str | None:
         """Get routine ID from worker's flow.
 
         Args:
@@ -511,7 +489,7 @@ class Runtime:
             return flow._get_routine_id(routine)
         return None
 
-    def get_job(self, job_id: str) -> Optional[JobContext]:
+    def get_job(self, job_id: str) -> JobContext | None:
         """Get job by ID.
 
         Args:
@@ -527,7 +505,7 @@ class Runtime:
         return None
 
     def complete_job(
-        self, job_id: str, status: str = "completed", error: Optional[str] = None
+        self, job_id: str, status: str = "completed", error: str | None = None
     ) -> bool:
         """Mark a job as completed.
 
@@ -558,7 +536,7 @@ class Runtime:
                     return True
         return False
 
-    def list_jobs(self, worker_id: Optional[str] = None) -> list[JobContext]:
+    def list_jobs(self, worker_id: str | None = None) -> list[JobContext]:
         """List active jobs.
 
         Args:

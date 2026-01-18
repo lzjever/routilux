@@ -25,7 +25,7 @@ class RuntimeRegistry:
 
     def __init__(self):
         """Initialize registry (private - use get_instance())."""
-        self._runtimes: Dict[str, "Runtime"] = {}  # runtime_id -> Runtime (strong reference)
+        self._runtimes: Dict[str, Runtime] = {}  # runtime_id -> Runtime (strong reference)
         self._default_runtime_id: Optional[str] = None
         self._lock: threading.RLock = threading.RLock()
 
@@ -42,9 +42,7 @@ class RuntimeRegistry:
                     cls._instance = cls()
         return cls._instance
 
-    def register(
-        self, runtime: "Runtime", runtime_id: str, is_default: bool = False
-    ) -> None:
+    def register(self, runtime: "Runtime", runtime_id: str, is_default: bool = False) -> None:
         """Register a runtime instance.
 
         Args:

@@ -4,7 +4,7 @@ Pydantic models for Runtime API.
 All models include detailed field descriptions and examples for frontend developers.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 

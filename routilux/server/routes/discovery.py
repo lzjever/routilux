@@ -5,22 +5,20 @@ Provides endpoints to discover and register flows/jobs created outside the API.
 """
 
 import logging
-from typing import List
 
 from fastapi import APIRouter, HTTPException
 
+from routilux.server.dependencies import (
+    get_flow_registry,
+    get_job_storage,
+    get_runtime,
+    get_worker_registry,
+)
 from routilux.server.middleware.auth import RequireAuth
 from routilux.server.models.flow import FlowListResponse
-from routilux.server.models.job import JobListResponse, JobResponse
+from routilux.server.models.job import JobListResponse
 from routilux.server.routes.flows import _flow_to_response
 from routilux.server.routes.jobs import _job_to_response
-from routilux.server.dependencies import (
-    get_runtime,
-    get_flow_registry,
-    get_worker_registry,
-    get_job_storage,
-)
-from routilux.core.registry import FlowRegistry, WorkerRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -87,10 +85,10 @@ async def sync_jobs():
         runtime = get_runtime()
         job_storage = get_job_storage()
         worker_registry = get_worker_registry()
-        
+
         # Get all jobs from Runtime
         all_jobs = runtime.list_jobs()
-        
+
         # Sync to storage
         for job in all_jobs:
             # Get flow_id from worker
@@ -101,7 +99,10 @@ async def sync_jobs():
             job_storage.save_job(job, flow_id=flow_id)
 
         return JobListResponse(
-            jobs=[_job_to_response(job, flow_id=job_storage.get_flow_id(job.job_id) or "") for job in all_jobs],
+            jobs=[
+                _job_to_response(job, flow_id=job_storage.get_flow_id(job.job_id) or "")
+                for job in all_jobs
+            ],
             total=len(all_jobs),
             limit=len(all_jobs),
             offset=0,
@@ -124,8 +125,8 @@ async def discover_jobs():
     try:
         runtime = get_runtime()
         worker_registry = get_worker_registry()
-        job_storage = get_job_storage()
-        
+        get_job_storage()
+
         all_jobs = runtime.list_jobs()
 
         responses = []
@@ -159,20 +160,24 @@ async def sync_workers():
     try:
         runtime = get_runtime()
         worker_registry = get_worker_registry()
-        
+
         workers = []
         with runtime._worker_lock:
             for worker_state in runtime._active_workers.values():
                 # Register in WorkerRegistry if not already
                 if worker_registry.get(worker_state.worker_id) is None:
                     worker_registry.register(worker_state)
-                
-                workers.append({
-                    "worker_id": worker_state.worker_id,
-                    "flow_id": worker_state.flow_id,
-                    "status": worker_state.status.value if hasattr(worker_state.status, "value") else str(worker_state.status),
-                })
-        
+
+                workers.append(
+                    {
+                        "worker_id": worker_state.worker_id,
+                        "flow_id": worker_state.flow_id,
+                        "status": worker_state.status.value
+                        if hasattr(worker_state.status, "value")
+                        else str(worker_state.status),
+                    }
+                )
+
         return {
             "workers": workers,
             "total": len(workers),

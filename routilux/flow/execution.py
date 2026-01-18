@@ -77,8 +77,8 @@ def start_flow_execution(
     if entry_routine_id not in flow.routines:
         raise ValueError(f"Entry routine '{entry_routine_id}' not found in flow")
 
-    from routilux.core.worker import JobState
     from routilux.core.status import ExecutionStatus
+    from routilux.core.worker import JobState
 
     # Create or use provided job_state
     if job_state is None:
@@ -115,12 +115,14 @@ def start_flow_execution(
     # Start background thread
     # HIGH fix: Use daemon=False to ensure proper cleanup, but track thread for cleanup
     # Changed from daemon=True to prevent abrupt termination
-    thread = threading.Thread(target=_run_execution, daemon=False, name=f"FlowExecution-{job_state.job_id[:8]}")
+    thread = threading.Thread(
+        target=_run_execution, daemon=False, name=f"FlowExecution-{job_state.job_id[:8]}"
+    )
     thread.start()
 
     # HIGH fix: Store thread reference for cleanup and monitoring
     # This allows proper shutdown instead of abrupt daemon termination
-    if not hasattr(job_state, '_execution_thread'):
+    if not hasattr(job_state, "_execution_thread"):
         job_state._execution_thread = thread
     else:
         # If thread already exists, the previous one should be done
@@ -157,10 +159,10 @@ def execute_flow_unified(
     Returns:
         JobState object.
     """
+    from routilux.core.status import ExecutionStatus
+    from routilux.core.worker import JobState
     from routilux.execution_tracker import ExecutionTracker
     from routilux.flow.error_handling import get_error_handler_for_routine
-    from routilux.core.worker import JobState
-    from routilux.core.status import ExecutionStatus
 
     # Use provided job_state or create new one
     if job_state is None:
@@ -349,5 +351,3 @@ def execute_flow_unified(
         execution_hooks.on_flow_end(flow, job_state, "failed")
 
     return job_state
-
-

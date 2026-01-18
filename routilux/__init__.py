@@ -5,11 +5,33 @@ Provides flexible connection, state management, and workflow orchestration capab
 """
 
 # Core classes from core module
+# Activation policies
+from routilux.activation_policies import (
+    all_slots_ready_policy,
+    batch_size_policy,
+    breakpoint_policy,
+    custom_policy,
+    immediate_policy,
+    time_interval_policy,
+)
 from routilux.core.connection import Connection
 from routilux.core.context import JobContext
 from routilux.core.error import ErrorHandler, ErrorStrategy
 from routilux.core.event import Event
+
+# Worker management (renamed from Job*)
+from routilux.core.executor import WorkerExecutor
 from routilux.core.flow import Flow
+from routilux.core.manager import WorkerManager, get_worker_manager, reset_worker_manager
+
+# Output handling
+from routilux.core.output import (
+    RoutedStdout,
+    clear_job_output,
+    get_job_output,
+    install_routed_stdout,
+    uninstall_routed_stdout,
+)
 from routilux.core.registry import (
     FlowRegistry,
     WorkerRegistry,
@@ -22,31 +44,8 @@ from routilux.core.slot import Slot
 from routilux.core.status import ExecutionStatus, JobStatus, RoutineStatus
 from routilux.core.worker import ExecutionRecord, WorkerState
 
-# Worker management (renamed from Job*)
-from routilux.core.executor import WorkerExecutor
-from routilux.core.manager import WorkerManager, get_worker_manager, reset_worker_manager
-
-# Output handling
-from routilux.core.output import (
-    RoutedStdout,
-    clear_job_output,
-    get_job_output,
-    install_routed_stdout,
-    uninstall_routed_stdout,
-)
-
 # Flow builder (still in flow/ for now)
 from routilux.flow.builder import FlowBuilder
-
-# Activation policies
-from routilux.activation_policies import (
-    all_slots_ready_policy,
-    batch_size_policy,
-    breakpoint_policy,
-    custom_policy,
-    immediate_policy,
-    time_interval_policy,
-)
 
 # Factory
 from routilux.tools.factory import ObjectFactory, ObjectMetadata
@@ -65,6 +64,7 @@ try:
         analyze_routine_file,
         analyze_workflow,
     )
+
     _analysis_available = True
 except ImportError:
     _analysis_available = False
@@ -123,15 +123,17 @@ __all__ = [
 
 # Add analysis tools if available
 if _analysis_available:
-    __all__.extend([
-        "RoutineAnalyzer",
-        "analyze_routine_file",
-        "WorkflowAnalyzer",
-        "analyze_workflow",
-        "BaseFormatter",
-        "RoutineMarkdownFormatter",
-        "WorkflowD2Formatter",
-    ])
+    __all__.extend(
+        [
+            "RoutineAnalyzer",
+            "analyze_routine_file",
+            "WorkflowAnalyzer",
+            "analyze_workflow",
+            "BaseFormatter",
+            "RoutineMarkdownFormatter",
+            "WorkflowD2Formatter",
+        ]
+    )
 
 # Backward compatibility aliases (deprecated, will be removed)
 # These allow existing code to continue working during transition

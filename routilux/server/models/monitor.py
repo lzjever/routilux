@@ -65,7 +65,9 @@ class SlotQueueStatus(BaseModel):
     total_count: int = Field(..., description="Total number of data points in queue")
     max_length: int = Field(..., description="Maximum queue length")
     watermark_threshold: int = Field(..., description="Watermark threshold for auto-shrink")
-    usage_percentage: float = Field(..., ge=0.0, le=1.0, description="Queue usage percentage (0.0-1.0)")
+    usage_percentage: float = Field(
+        ..., ge=0.0, le=1.0, description="Queue usage percentage (0.0-1.0)"
+    )
     pressure_level: str = Field(..., description="Pressure level: low, medium, high, critical")
     is_full: bool = Field(..., description="Whether queue is full")
     is_near_full: bool = Field(..., description="Whether queue is near full (above watermark)")
@@ -80,7 +82,9 @@ class RoutineExecutionStatus(BaseModel):
     last_execution_time: Optional[datetime] = Field(None, description="Last execution timestamp")
     execution_count: int = Field(0, description="Total number of executions")
     error_count: int = Field(0, description="Total number of errors")
-    active_thread_count: int = Field(0, description="Number of active threads executing this routine")
+    active_thread_count: int = Field(
+        0, description="Number of active threads executing this routine"
+    )
 
 
 class RoutineInfo(BaseModel):
@@ -88,7 +92,9 @@ class RoutineInfo(BaseModel):
 
     routine_id: str = Field(..., description="Routine ID")
     routine_type: str = Field(..., description="Routine class name")
-    activation_policy: Dict[str, Any] = Field(..., description="Activation policy type and configuration")
+    activation_policy: Dict[str, Any] = Field(
+        ..., description="Activation policy type and configuration"
+    )
     config: Dict[str, Any] = Field(..., description="Routine configuration (_config)")
     slots: List[str] = Field(..., description="List of slot names")
     events: List[str] = Field(..., description="List of event names")
@@ -109,5 +115,7 @@ class JobMonitoringData(BaseModel):
     job_id: str = Field(..., description="Job ID")
     flow_id: str = Field(..., description="Flow ID")
     job_status: str = Field(..., description="Job execution status")
-    routines: Dict[str, RoutineMonitoringData] = Field(..., description="Monitoring data for all routines")
+    routines: Dict[str, RoutineMonitoringData] = Field(
+        ..., description="Monitoring data for all routines"
+    )
     updated_at: datetime = Field(..., description="Last update timestamp")

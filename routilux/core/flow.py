@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import threading
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any
 
 from serilux import Serializable
 
@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from routilux.core.event import Event
     from routilux.core.routine import Routine
     from routilux.core.slot import Slot
-    from routilux.core.worker import WorkerState
 
 
 class WorkerNotRunningError(ValueError):
@@ -49,8 +48,8 @@ class Flow(Serializable):
 
     def __init__(
         self,
-        flow_id: Optional[str] = None,
-        execution_timeout: Optional[float] = None,
+        flow_id: str | None = None,
+        execution_timeout: float | None = None,
     ):
         """Initialize Flow.
 
@@ -60,9 +59,9 @@ class Flow(Serializable):
         """
         super().__init__()
         self.flow_id: str = flow_id or str(uuid.uuid4())
-        self.routines: Dict[str, "Routine"] = {}
-        self.connections: List["Connection"] = []
-        self.error_handler: Optional["ErrorHandler"] = None
+        self.routines: dict[str, Routine] = {}
+        self.connections: list[Connection] = []
+        self.error_handler: ErrorHandler | None = None
 
         # Thread safety lock for configuration operations
         self._config_lock: threading.RLock = threading.RLock()
@@ -80,7 +79,7 @@ class Flow(Serializable):
         )
 
         # Internal lookup cache
-        self._event_slot_connections: Dict[Tuple["Event", "Slot"], "Connection"] = {}
+        self._event_slot_connections: dict[tuple[Event, Slot], Connection] = {}
 
         # Auto-register with global registry
         try:
@@ -104,7 +103,7 @@ class Flow(Serializable):
         """Return string representation."""
         return f"Flow[{self.flow_id}]"
 
-    def _get_routine_id(self, routine: "Routine") -> Optional[str]:
+    def _get_routine_id(self, routine: Routine) -> str | None:
         """Find the ID of a Routine object within this Flow.
 
         Args:
@@ -118,9 +117,7 @@ class Flow(Serializable):
                 return rid
         return None
 
-    def add_routine(
-        self, routine: "Routine", routine_id: Optional[str] = None
-    ) -> str:
+    def add_routine(self, routine: Routine, routine_id: str | None = None) -> str:
         """Add a routine to the flow.
 
         Args:
@@ -134,13 +131,9 @@ class Flow(Serializable):
             ValueError: If routine_id already exists
         """
         with self._config_lock:
-            rid = routine_id or (
-                getattr(routine, "_id", None) if routine else None
-            )
+            rid = routine_id or (getattr(routine, "_id", None) if routine else None)
             if rid is None:
-                raise ValueError(
-                    "routine_id must be provided or routine must have _id attribute"
-                )
+                raise ValueError("routine_id must be provided or routine must have _id attribute")
             if rid in self.routines:
                 raise ValueError(f"Routine ID '{rid}' already exists in flow")
 
@@ -153,7 +146,7 @@ class Flow(Serializable):
         source_event: str,
         target_routine_id: str,
         target_slot: str,
-    ) -> "Connection":
+    ) -> Connection:
         """Connect two routines by linking a source event to a target slot.
 
         Args:
@@ -170,9 +163,7 @@ class Flow(Serializable):
         """
         with self._config_lock:
             if source_routine_id not in self.routines:
-                raise ValueError(
-                    f"Source routine '{source_routine_id}' not found in flow"
-                )
+                raise ValueError(f"Source routine '{source_routine_id}' not found in flow")
 
             source_routine = self.routines[source_routine_id]
             source_event_obj = source_routine.get_event(source_event)
@@ -182,16 +173,12 @@ class Flow(Serializable):
                 )
 
             if target_routine_id not in self.routines:
-                raise ValueError(
-                    f"Target routine '{target_routine_id}' not found in flow"
-                )
+                raise ValueError(f"Target routine '{target_routine_id}' not found in flow")
 
             target_routine = self.routines[target_routine_id]
             target_slot_obj = target_routine.get_slot(target_slot)
             if target_slot_obj is None:
-                raise ValueError(
-                    f"Slot '{target_slot}' not found in routine '{target_routine_id}'"
-                )
+                raise ValueError(f"Slot '{target_slot}' not found in routine '{target_routine_id}'")
 
             from routilux.core.connection import Connection
 
@@ -203,7 +190,7 @@ class Flow(Serializable):
 
             return connection
 
-    def get_connections_for_event(self, event: "Event") -> List["Connection"]:
+    def get_connections_for_event(self, event: Event) -> list[Connection]:
         """Get all connections for a specific event.
 
         Args:
@@ -215,9 +202,7 @@ class Flow(Serializable):
         with self._config_lock:
             return [conn for conn in self.connections if conn.source_event == event]
 
-    def _find_connection(
-        self, event: "Event", slot: "Slot"
-    ) -> Optional["Connection"]:
+    def _find_connection(self, event: Event, slot: Slot) -> Connection | None:
         """Find Connection from event to slot.
 
         Args:
@@ -230,7 +215,7 @@ class Flow(Serializable):
         key = (event, slot)
         return self._event_slot_connections.get(key)
 
-    def set_error_handler(self, error_handler: "ErrorHandler") -> None:
+    def set_error_handler(self, error_handler: ErrorHandler) -> None:
         """Set error handler for the flow.
 
         Args:
@@ -238,13 +223,11 @@ class Flow(Serializable):
         """
         self.error_handler = error_handler
 
-    def get_error_handler(self) -> Optional["ErrorHandler"]:
+    def get_error_handler(self) -> ErrorHandler | None:
         """Get error handler for the flow."""
         return self.error_handler
 
-    def find_routines_by_type(
-        self, routine_type: Type["Routine"]
-    ) -> List[Tuple[str, "Routine"]]:
+    def find_routines_by_type(self, routine_type: type[Routine]) -> list[tuple[str, Routine]]:
         """Find routines by type.
 
         Args:
@@ -260,8 +243,8 @@ class Flow(Serializable):
         ]
 
     def _get_error_handler_for_routine(
-        self, routine: "Routine", routine_id: str
-    ) -> Optional["ErrorHandler"]:
+        self, routine: Routine, routine_id: str
+    ) -> ErrorHandler | None:
         """Get error handler for a routine.
 
         Priority: routine-level > flow-level
@@ -281,7 +264,7 @@ class Flow(Serializable):
         # Flow-level fallback
         return self.error_handler
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Validate flow structure and return list of issues.
 
         Returns:
@@ -314,15 +297,13 @@ class Flow(Serializable):
 
         return issues
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         """Serialize Flow."""
         data = super().serialize()
 
         # Serialize routines
         if "routines" in data:
-            data["routines"] = {
-                rid: routine.serialize() for rid, routine in self.routines.items()
-            }
+            data["routines"] = {rid: routine.serialize() for rid, routine in self.routines.items()}
 
         # Serialize connections
         if "connections" in data:
@@ -336,18 +317,14 @@ class Flow(Serializable):
                         conn.source_event.routine
                     )
                 if conn.target_slot and conn.target_slot.routine:
-                    conn_data["_target_routine_id"] = self._get_routine_id(
-                        conn.target_slot.routine
-                    )
+                    conn_data["_target_routine_id"] = self._get_routine_id(conn.target_slot.routine)
 
                 serialized_connections.append(conn_data)
             data["connections"] = serialized_connections
 
         return data
 
-    def deserialize(
-        self, data: Dict[str, Any], strict: bool = False, registry: Any = None
-    ) -> None:
+    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any = None) -> None:
         """Deserialize Flow."""
         from routilux.core.connection import Connection
         from routilux.core.routine import Routine
@@ -373,12 +350,7 @@ class Flow(Serializable):
             target_routine_id = conn_data.get("_target_routine_id")
             target_slot_name = conn_data.get("_target_slot_name")
 
-            if (
-                source_routine_id
-                and source_event_name
-                and target_routine_id
-                and target_slot_name
-            ):
+            if source_routine_id and source_event_name and target_routine_id and target_slot_name:
                 source_routine = self.routines.get(source_routine_id)
                 target_routine = self.routines.get(target_routine_id)
 
@@ -392,7 +364,7 @@ class Flow(Serializable):
                         self._event_slot_connections[(source_event, target_slot)] = connection
 
     @classmethod
-    def from_dict(cls, spec: Dict[str, Any]) -> "Flow":
+    def from_dict(cls, spec: dict[str, Any]) -> Flow:
         """Create Flow from specification dictionary.
 
         This method allows creating flows from dictionaries.
@@ -420,7 +392,7 @@ class Flow(Serializable):
             return flow
 
     @classmethod
-    def from_yaml(cls, yaml_str: str) -> "Flow":
+    def from_yaml(cls, yaml_str: str) -> Flow:
         """Create Flow from YAML string.
 
         Args:
@@ -450,7 +422,7 @@ class Flow(Serializable):
 class RoutineConfig:
     """Helper class for routine configuration chaining."""
 
-    def __init__(self, routine: "Routine"):
+    def __init__(self, routine: Routine):
         """Initialize RoutineConfig.
 
         Args:
@@ -458,7 +430,7 @@ class RoutineConfig:
         """
         self._routine = routine
 
-    def config(self, key: str, value: Any) -> "RoutineConfig":
+    def config(self, key: str, value: Any) -> RoutineConfig:
         """Set a configuration value.
 
         Args:
@@ -471,7 +443,7 @@ class RoutineConfig:
         self._routine.set_config(**{key: value})
         return self
 
-    def error_handler(self, handler: "ErrorHandler") -> "RoutineConfig":
+    def error_handler(self, handler: ErrorHandler) -> RoutineConfig:
         """Set error handler.
 
         Args:

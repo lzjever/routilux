@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import time
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 from serilux import Serializable
 
@@ -54,7 +54,7 @@ class ErrorHandler(Serializable):
     Examples:
         >>> handler = ErrorHandler(strategy=ErrorStrategy.CONTINUE)
         >>> flow.set_error_handler(handler)
-        
+
         >>> handler = ErrorHandler(
         ...     strategy=ErrorStrategy.RETRY,
         ...     max_retries=5,
@@ -70,7 +70,7 @@ class ErrorHandler(Serializable):
         max_retries: int = 3,
         retry_delay: float = 1.0,
         retry_backoff: float = 2.0,
-        retryable_exceptions: Optional[Tuple[type, ...]] = None,
+        retryable_exceptions: tuple[type, ...] | None = None,
         is_critical: bool = False,
     ):
         """Initialize ErrorHandler.
@@ -84,16 +84,14 @@ class ErrorHandler(Serializable):
             is_critical: If True, flow fails when all retries fail
         """
         super().__init__()
-        
+
         # Validate and convert strategy
         if isinstance(strategy, str):
             self.strategy: ErrorStrategy = ErrorStrategy(strategy)
         elif isinstance(strategy, ErrorStrategy):
             self.strategy = strategy
         else:
-            raise TypeError(
-                f"strategy must be str or ErrorStrategy, got {type(strategy).__name__}"
-            )
+            raise TypeError(f"strategy must be str or ErrorStrategy, got {type(strategy).__name__}")
 
         # Validate retry parameters
         if max_retries < 0:
@@ -106,7 +104,7 @@ class ErrorHandler(Serializable):
         self.max_retries: int = max_retries
         self.retry_delay: float = retry_delay
         self.retry_backoff: float = retry_backoff
-        self.retryable_exceptions: Tuple[type, ...] = retryable_exceptions or (Exception,)
+        self.retryable_exceptions: tuple[type, ...] = retryable_exceptions or (Exception,)
         self.retry_count: int = 0
         self.is_critical: bool = is_critical
 
@@ -125,11 +123,11 @@ class ErrorHandler(Serializable):
     def handle_error(
         self,
         error: Exception,
-        routine: "Routine",
+        routine: Routine,
         routine_id: str,
-        flow: "Flow",
-        worker_state: Optional["WorkerState"] = None,
-        context: Optional[dict[str, Any]] = None,
+        flow: Flow,
+        worker_state: WorkerState | None = None,
+        context: dict[str, Any] | None = None,
     ) -> bool:
         """Handle an error according to the configured strategy.
 
@@ -151,9 +149,7 @@ class ErrorHandler(Serializable):
             return False
 
         elif self.strategy == ErrorStrategy.CONTINUE:
-            logger.warning(
-                f"Error in routine {routine_id}: {error}. Continuing execution."
-            )
+            logger.warning(f"Error in routine {routine_id}: {error}. Continuing execution.")
             if worker_state:
                 worker_state.record_execution(
                     routine_id,

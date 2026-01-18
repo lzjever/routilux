@@ -4,6 +4,9 @@ Breakpoint management API routes.
 
 from fastapi import APIRouter, HTTPException
 
+from routilux.monitoring.breakpoint_manager import Breakpoint
+from routilux.monitoring.registry import MonitoringRegistry
+from routilux.monitoring.storage import job_store
 from routilux.server.middleware.auth import RequireAuth
 from routilux.server.models.breakpoint import (
     BreakpointCreateRequest,
@@ -11,9 +14,6 @@ from routilux.server.models.breakpoint import (
     BreakpointResponse,
     BreakpointUpdateRequest,
 )
-from routilux.monitoring.breakpoint_manager import Breakpoint
-from routilux.monitoring.registry import MonitoringRegistry
-from routilux.monitoring.storage import job_store
 
 router = APIRouter()
 
@@ -60,30 +60,29 @@ async def create_breakpoint(job_id: str, request: BreakpointCreateRequest):
     if request.type == "routine" and request.routine_id:
         # Get flow and routine to save original policy
         from routilux.core.registry import FlowRegistry
-        
+
         flow_registry = FlowRegistry.get_instance()
         flow = flow_registry.get(job_state.flow_id)
-        
+
         if not flow:
             raise HTTPException(status_code=404, detail=f"Flow '{job_state.flow_id}' not found")
-        
+
         if request.routine_id not in flow.routines:
             raise HTTPException(
-                status_code=404,
-                detail=f"Routine '{request.routine_id}' not found in flow"
+                status_code=404, detail=f"Routine '{request.routine_id}' not found in flow"
             )
-        
+
         routine = flow.routines[request.routine_id]
-        
+
         # Save original policy (if exists)
         original_policy = routine._activation_policy
-        
+
         # Create breakpoint policy and set as job-specific policy
         from routilux.activation_policies import breakpoint_policy
-        
+
         bp_policy = breakpoint_policy(request.routine_id)
         job_state.set_routine_activation_policy(request.routine_id, bp_policy)
-        
+
         # Store original policy in breakpoint for restoration
         # Note: We'll store it in a way that can be retrieved later
         # Since Callable can't be serialized, we'll handle this in remove_breakpoint
@@ -157,26 +156,27 @@ async def delete_breakpoint(job_id: str, breakpoint_id: str):
     # Get breakpoint to check if it's a routine-level breakpoint
     breakpoints = breakpoint_mgr.get_breakpoints(job_id)
     breakpoint = next((bp for bp in breakpoints if bp.breakpoint_id == breakpoint_id), None)
-    
+
     if breakpoint and breakpoint.type == "routine" and breakpoint.routine_id:
         # Restore original policy
         from routilux.core.registry import FlowRegistry
-        from routilux.activation_policies import immediate_policy
-        
+
         flow_registry = FlowRegistry.get_instance()
         flow = flow_registry.get(job_state.flow_id)
-        
+
         if flow and breakpoint.routine_id in flow.routines:
             routine = flow.routines[breakpoint.routine_id]
             # Get original policy from breakpoint or routine
             original_policy = getattr(breakpoint, "_original_policy", None)
-            
+
             if original_policy:
                 # Restore original policy
                 job_state.set_routine_activation_policy(breakpoint.routine_id, original_policy)
             elif routine._activation_policy:
                 # Use routine's current policy
-                job_state.set_routine_activation_policy(breakpoint.routine_id, routine._activation_policy)
+                job_state.set_routine_activation_policy(
+                    breakpoint.routine_id, routine._activation_policy
+                )
             else:
                 # Remove job-specific policy to use routine's default (immediate activation)
                 job_state.remove_routine_activation_policy(breakpoint.routine_id)

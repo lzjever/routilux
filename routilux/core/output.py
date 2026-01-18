@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 import threading
 from collections import defaultdict, deque
-from typing import Deque, Dict, List, Optional, TextIO
+from typing import TextIO
 
 from routilux.core.context import _current_job
 
@@ -31,10 +31,10 @@ class RoutedStdout:
     Example:
         >>> # Install at program startup
         >>> routed_stdout = install_routed_stdout()
-        >>> 
+        >>>
         >>> # In routine logic (job context is automatically set)
         >>> print("Processing data...")  # Output routed to current job
-        >>> 
+        >>>
         >>> # External retrieval
         >>> chunks = routed_stdout.pop_chunks("job-001")  # Incremental
         >>> buffer = routed_stdout.get_buffer("job-001")  # Full history
@@ -42,14 +42,14 @@ class RoutedStdout:
 
     def __init__(
         self,
-        real_stdout: Optional[TextIO] = None,
+        real_stdout: TextIO | None = None,
         keep_default: bool = True,
         max_buffer_chars: int = 200_000,
     ):
         """Initialize RoutedStdout.
 
         Args:
-            real_stdout: Real stdout to use for unboud output. 
+            real_stdout: Real stdout to use for unboud output.
                 Defaults to sys.__stdout__.
             keep_default: If True, output without job binding goes to real stdout.
                 If False, such output is discarded.
@@ -61,8 +61,8 @@ class RoutedStdout:
         self.max_buffer_chars = max_buffer_chars
 
         self._lock = threading.RLock()
-        self._queues: Dict[str, Deque[str]] = defaultdict(deque)
-        self._buffers: Dict[str, str] = defaultdict(str)
+        self._queues: dict[str, deque[str]] = defaultdict(deque)
+        self._buffers: dict[str, str] = defaultdict(str)
 
     def write(self, s: str) -> int:
         """Write string to stdout.
@@ -115,7 +115,7 @@ class RoutedStdout:
         """Return False (not a tty)."""
         return False
 
-    def pop_chunks(self, job_id: str) -> List[str]:
+    def pop_chunks(self, job_id: str) -> list[str]:
         """Pop and return incremental output chunks for a job.
 
         This is a consuming operation - chunks are removed after retrieval.
@@ -168,7 +168,7 @@ class RoutedStdout:
             self._queues.pop(job_id, None)
             self._buffers.pop(job_id, None)
 
-    def list_jobs(self) -> List[str]:
+    def list_jobs(self) -> list[str]:
         """List all job IDs with output data.
 
         Returns:
@@ -177,7 +177,7 @@ class RoutedStdout:
         with self._lock:
             return list(set(self._queues.keys()) | set(self._buffers.keys()))
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get statistics about current output buffers.
 
         Returns:
@@ -192,8 +192,8 @@ class RoutedStdout:
 
 
 # Global instance
-_routed_stdout: Optional[RoutedStdout] = None
-_original_stdout: Optional[TextIO] = None
+_routed_stdout: RoutedStdout | None = None
+_original_stdout: TextIO | None = None
 
 
 def install_routed_stdout(
@@ -214,15 +214,13 @@ def install_routed_stdout(
         >>> # At program entry point
         >>> from routilux.core import install_routed_stdout
         >>> install_routed_stdout()
-        >>> 
+        >>>
         >>> # Now all print() calls in routines are captured by job
     """
     global _routed_stdout, _original_stdout
     if _routed_stdout is None:
         _original_stdout = sys.stdout
-        _routed_stdout = RoutedStdout(
-            keep_default=keep_default, max_buffer_chars=max_buffer_chars
-        )
+        _routed_stdout = RoutedStdout(keep_default=keep_default, max_buffer_chars=max_buffer_chars)
         sys.stdout = _routed_stdout
     return _routed_stdout
 
@@ -241,7 +239,7 @@ def uninstall_routed_stdout() -> None:
         _original_stdout = None
 
 
-def get_routed_stdout() -> Optional[RoutedStdout]:
+def get_routed_stdout() -> RoutedStdout | None:
     """Get the global RoutedStdout instance.
 
     Returns:
@@ -266,7 +264,7 @@ def get_job_output(job_id: str, incremental: bool = True) -> str:
     Example:
         >>> # Get incremental output (new since last call)
         >>> new_output = get_job_output("job-001", incremental=True)
-        >>> 
+        >>>
         >>> # Get full history
         >>> full_output = get_job_output("job-001", incremental=False)
     """

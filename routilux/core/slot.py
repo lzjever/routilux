@@ -9,7 +9,7 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from routilux.core.event import Event
@@ -31,7 +31,7 @@ class SlotDataPoint:
     data: Any
     emitted_at: datetime
     enqueued_at: datetime
-    consumed_at: Optional[datetime] = None
+    consumed_at: datetime | None = None
     emitted_from: str = ""
 
 
@@ -62,7 +62,7 @@ class Slot(Serializable):
     def __init__(
         self,
         name: str = "",
-        routine: Optional["Routine"] = None,
+        routine: Routine | None = None,
         max_queue_length: int = 1000,
         watermark: float = 0.8,
     ):
@@ -81,14 +81,14 @@ class Slot(Serializable):
 
         super().__init__()
         self.name: str = name
-        self.routine: Optional["Routine"] = routine
+        self.routine: Routine | None = routine
         self.max_queue_length: int = max_queue_length
         self.watermark: float = watermark
         self.watermark_threshold: int = int(max_queue_length * watermark)
-        self.connected_events: List["Event"] = []
+        self.connected_events: list[Event] = []
 
         # Queue management
-        self._queue: List[SlotDataPoint] = []
+        self._queue: list[SlotDataPoint] = []
         self._last_consumed_index: int = -1
         self._lock = threading.RLock()
         self._connection_lock: threading.RLock = threading.RLock()
@@ -102,7 +102,7 @@ class Slot(Serializable):
             return f"Slot[{getattr(self.routine, '_id', 'unknown')}.{self.name}]"
         return f"Slot[{self.name}]"
 
-    def connect(self, event: "Event") -> None:
+    def connect(self, event: Event) -> None:
         """Connect to an event (thread-safe)."""
         lock1, lock2 = sorted((self._connection_lock, event._connection_lock), key=id)
         with lock1, lock2:
@@ -111,7 +111,7 @@ class Slot(Serializable):
                 if self not in event.connected_slots:
                     event.connected_slots.append(self)
 
-    def disconnect(self, event: "Event") -> None:
+    def disconnect(self, event: Event) -> None:
         """Disconnect from an event (thread-safe)."""
         lock1, lock2 = sorted((self._connection_lock, event._connection_lock), key=id)
         with lock1, lock2:
@@ -148,7 +148,7 @@ class Slot(Serializable):
             )
             self._queue.append(data_point)
 
-    def consume_all_new(self) -> List[Any]:
+    def consume_all_new(self) -> list[Any]:
         """Consume all new data since last consumed."""
         with self._lock:
             start_index = self._last_consumed_index + 1
@@ -164,7 +164,7 @@ class Slot(Serializable):
             self._last_consumed_index = end_index - 1
             return data
 
-    def consume_one_new(self) -> Optional[Any]:
+    def consume_one_new(self) -> Any | None:
         """Consume one new data point."""
         with self._lock:
             next_index = self._last_consumed_index + 1
@@ -176,7 +176,7 @@ class Slot(Serializable):
             self._last_consumed_index = next_index
             return data_point.data
 
-    def consume_all(self) -> List[Any]:
+    def consume_all(self) -> list[Any]:
         """Consume all data (new + old)."""
         with self._lock:
             data = [dp.data for dp in self._queue]
@@ -187,7 +187,7 @@ class Slot(Serializable):
             self._last_consumed_index = len(self._queue) - 1
             return data
 
-    def consume_latest_and_mark_all_consumed(self) -> Optional[Any]:
+    def consume_latest_and_mark_all_consumed(self) -> Any | None:
         """Consume latest item and mark all previous as consumed."""
         with self._lock:
             if len(self._queue) == 0:
@@ -203,13 +203,13 @@ class Slot(Serializable):
             self._last_consumed_index = len(self._queue) - 1
             return latest.data
 
-    def peek_all_new(self) -> List[Any]:
+    def peek_all_new(self) -> list[Any]:
         """Peek at all new data without consuming."""
         with self._lock:
             start_index = self._last_consumed_index + 1
             return [dp.data for dp in self._queue[start_index:]]
 
-    def peek_one_new(self) -> Optional[Any]:
+    def peek_one_new(self) -> Any | None:
         """Peek at next unconsumed data point."""
         with self._lock:
             next_index = self._last_consumed_index + 1
@@ -217,7 +217,7 @@ class Slot(Serializable):
                 return None
             return self._queue[next_index].data
 
-    def peek_latest(self) -> Optional[Any]:
+    def peek_latest(self) -> Any | None:
         """Peek at latest data point."""
         with self._lock:
             if len(self._queue) == 0:
@@ -250,9 +250,7 @@ class Slot(Serializable):
                 "consumed_count": self._last_consumed_index + 1,
                 "max_length": self.max_queue_length,
                 "watermark_threshold": self.watermark_threshold,
-                "oldest_unconsumed": oldest_unconsumed.isoformat()
-                if oldest_unconsumed
-                else None,
+                "oldest_unconsumed": oldest_unconsumed.isoformat() if oldest_unconsumed else None,
             }
 
     def get_queue_status(self) -> dict[str, Any]:

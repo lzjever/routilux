@@ -11,18 +11,16 @@ import uuid
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from routilux.core.worker import WorkerState
 
 # Context Variables for thread-safe access
-_current_worker_state: ContextVar[Optional["WorkerState"]] = ContextVar(
+_current_worker_state: ContextVar[WorkerState | None] = ContextVar(
     "_current_worker_state", default=None
 )
-_current_job: ContextVar[Optional["JobContext"]] = ContextVar(
-    "_current_job", default=None
-)
+_current_job: ContextVar[JobContext | None] = ContextVar("_current_job", default=None)
 
 
 @dataclass
@@ -56,7 +54,7 @@ class JobContext:
 
     Examples:
         >>> from routilux.core import get_current_job
-        >>> 
+        >>>
         >>> # Inside a routine's logic
         >>> job = get_current_job()
         >>> if job:
@@ -68,16 +66,14 @@ class JobContext:
     job_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     worker_id: str = ""
     created_at: datetime = field(default_factory=datetime.now)
-    completed_at: Optional[datetime] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    data: Dict[str, Any] = field(default_factory=dict)
-    trace_log: List[Dict[str, Any]] = field(default_factory=list)
+    completed_at: datetime | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
+    trace_log: list[dict[str, Any]] = field(default_factory=list)
     status: str = "pending"  # pending, running, completed, failed
-    error: Optional[str] = None
+    error: str | None = None
 
-    def trace(
-        self, routine_id: str, action: str, details: Optional[Dict[str, Any]] = None
-    ) -> None:
+    def trace(self, routine_id: str, action: str, details: dict[str, Any] | None = None) -> None:
         """Record a trace entry for this job.
 
         Args:
@@ -121,7 +117,7 @@ class JobContext:
         """Mark job as running."""
         self.status = "running"
 
-    def complete(self, status: str = "completed", error: Optional[str] = None) -> None:
+    def complete(self, status: str = "completed", error: str | None = None) -> None:
         """Mark job as completed.
 
         Args:
@@ -132,7 +128,7 @@ class JobContext:
         self.error = error
         self.completed_at = datetime.now()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization/API response.
 
         Returns:
@@ -151,7 +147,7 @@ class JobContext:
         }
 
 
-def get_current_job() -> Optional[JobContext]:
+def get_current_job() -> JobContext | None:
     """Get the current job context.
 
     Returns:
@@ -166,7 +162,7 @@ def get_current_job() -> Optional[JobContext]:
     return _current_job.get(None)
 
 
-def get_current_job_id() -> Optional[str]:
+def get_current_job_id() -> str | None:
     """Get the current job ID (convenience function).
 
     Returns:
@@ -182,7 +178,7 @@ def get_current_job_id() -> Optional[str]:
     return job.job_id if job else None
 
 
-def get_current_worker_state() -> Optional["WorkerState"]:
+def get_current_worker_state() -> WorkerState | None:
     """Get the current worker state.
 
     Returns:
@@ -197,7 +193,7 @@ def get_current_worker_state() -> Optional["WorkerState"]:
     return _current_worker_state.get(None)
 
 
-def set_current_job(job: Optional[JobContext]) -> None:
+def set_current_job(job: JobContext | None) -> None:
     """Set the current job context (internal use).
 
     Args:
@@ -206,7 +202,7 @@ def set_current_job(job: Optional[JobContext]) -> None:
     _current_job.set(job)
 
 
-def set_current_worker_state(worker: Optional["WorkerState"]) -> None:
+def set_current_worker_state(worker: WorkerState | None) -> None:
     """Set the current worker state (internal use).
 
     Args:

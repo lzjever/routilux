@@ -179,7 +179,7 @@ async def job_monitor_websocket(websocket: WebSocket, job_id: str):
             await websocket.close(code=1008, reason="Invalid job_id format")
             return
         # job_id should be a UUID format (alphanumeric with dashes)
-        if not re.match(r'^[a-zA-Z0-9_-]+$', job_id):
+        if not re.match(r"^[a-zA-Z0-9_-]+$", job_id):
             await websocket.close(code=1008, reason="Invalid job_id format")
             return
 
@@ -287,7 +287,7 @@ async def job_debug_websocket(websocket: WebSocket, job_id: str):
             await websocket.close(code=1008, reason="Invalid job_id format")
             return
         # job_id should be a UUID format (alphanumeric with dashes)
-        if not re.match(r'^[a-zA-Z0-9_-]+$', job_id):
+        if not re.match(r"^[a-zA-Z0-9_-]+$", job_id):
             await websocket.close(code=1008, reason="Invalid job_id format")
             return
 
@@ -389,7 +389,7 @@ async def flow_monitor_websocket(websocket: WebSocket, flow_id: str):
         if not flow_id or not isinstance(flow_id, str):
             await websocket.close(code=1008, reason="Invalid flow_id format")
             return
-        if not re.match(r'^[a-zA-Z0-9_-]+$', flow_id):
+        if not re.match(r"^[a-zA-Z0-9_-]+$", flow_id):
             await websocket.close(code=1008, reason="Invalid flow_id format")
             return
 
@@ -515,7 +515,6 @@ async def generic_websocket(websocket: WebSocket):
     """
     event_manager = get_event_manager()
     subscribers: Dict[str, str] = {}  # job_id -> subscriber_id
-    subscriptions: Dict[str, bool] = {}
 
     try:
         if not await _check_websocket_auth(websocket):
@@ -646,9 +645,7 @@ async def generic_websocket(websocket: WebSocket):
         # Track event handler tasks
         event_tasks: Dict[str, asyncio.Task] = {}  # job_id -> task
 
-        async def _handle_job_events(
-            websocket: WebSocket, job_id: str, subscriber_id: str
-        ):
+        async def _handle_job_events(websocket: WebSocket, job_id: str, subscriber_id: str):
             """Handle events for a specific job."""
             try:
                 async for event in event_manager.iter_events(subscriber_id):
@@ -656,9 +653,7 @@ async def generic_websocket(websocket: WebSocket):
                     if "job_id" not in event:
                         event["job_id"] = job_id
 
-                    success = await safe_send_json(
-                        websocket, event, f"event for job {job_id}"
-                    )
+                    success = await safe_send_json(websocket, event, f"event for job {job_id}")
                     if not success:
                         logger.warning(
                             f"Failed to send event, removing subscription for job {job_id}"
@@ -714,9 +709,7 @@ async def generic_websocket(websocket: WebSocket):
             for task in event_tasks.values():
                 task.cancel()
             # Wait for cancellation
-            await asyncio.gather(
-                monitor_task, *event_tasks.values(), return_exceptions=True
-            )
+            await asyncio.gather(monitor_task, *event_tasks.values(), return_exceptions=True)
 
     except WebSocketDisconnect as e:
         logger.debug(f"Generic WebSocket disconnected: code={e.code}")
@@ -731,8 +724,6 @@ async def generic_websocket(websocket: WebSocket):
         for job_id, subscriber_id in subscribers.items():
             try:
                 await event_manager.unsubscribe(subscriber_id)
-                logger.info(
-                    f"Generic WebSocket unsubscribed from job {job_id} ({subscriber_id})"
-                )
+                logger.info(f"Generic WebSocket unsubscribed from job {job_id} ({subscriber_id})")
             except Exception as e:
                 logger.error(f"Error unsubscribing from job {job_id}: {e}")

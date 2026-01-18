@@ -7,6 +7,9 @@ from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
+from routilux.monitoring.monitor_service import get_monitor_service
+from routilux.monitoring.registry import MonitoringRegistry
+from routilux.monitoring.storage import flow_store, job_store
 from routilux.server.middleware.auth import RequireAuth
 from routilux.server.models.monitor import (
     ExecutionEventResponse,
@@ -16,12 +19,8 @@ from routilux.server.models.monitor import (
     RoutineExecutionStatus,
     RoutineInfo,
     RoutineMetricsResponse,
-    RoutineMonitoringData,
     SlotQueueStatus,
 )
-from routilux.monitoring.monitor_service import get_monitor_service
-from routilux.monitoring.registry import MonitoringRegistry
-from routilux.monitoring.storage import flow_store, job_store
 
 router = APIRouter()
 

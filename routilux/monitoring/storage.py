@@ -143,7 +143,7 @@ class JobStore:
             # Fall back to Runtime jobs
             try:
                 from routilux.monitoring.runtime_registry import RuntimeRegistry
-                
+
                 runtime_registry = RuntimeRegistry.get_instance()
                 for runtime in runtime_registry.get_all().values():
                     job = runtime.get_job(job_id)
@@ -214,14 +214,14 @@ class JobStore:
 
             # Also get from Runtime
             try:
-                from routilux.monitoring.runtime_registry import RuntimeRegistry
                 from routilux.core.registry import WorkerRegistry
-                
+                from routilux.monitoring.runtime_registry import RuntimeRegistry
+
                 runtime_registry = RuntimeRegistry.get_instance()
                 worker_registry = WorkerRegistry.get_instance()
-                
+
                 job_ids = {j.job_id for j in local_jobs}
-                
+
                 for runtime in runtime_registry.get_all().values():
                     # Get workers for this flow
                     for worker in worker_registry.list_all():
@@ -251,10 +251,10 @@ class JobStore:
             # Also get jobs from Runtime
             try:
                 from routilux.monitoring.runtime_registry import RuntimeRegistry
-                
+
                 runtime_registry = RuntimeRegistry.get_instance()
                 job_ids = {j.job_id for j in local_jobs}
-                
+
                 for runtime in runtime_registry.get_all().values():
                     for job in runtime.list_jobs():
                         if job.job_id not in job_ids:

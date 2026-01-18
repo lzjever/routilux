@@ -13,7 +13,7 @@ import threading
 import time
 import weakref
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from routilux.core.flow import Flow
@@ -34,17 +34,17 @@ class FlowRegistry:
         >>> flow = registry.get_by_name("my_flow")
     """
 
-    _instance: Optional["FlowRegistry"] = None
+    _instance: FlowRegistry | None = None
     _lock = threading.Lock()
 
     def __init__(self):
         """Initialize registry (private - use get_instance())."""
-        self._flows: Dict[str, weakref.ref] = {}  # flow_id -> weakref
-        self._named_flows: Dict[str, "Flow"] = {}  # name -> Flow (strong reference)
+        self._flows: dict[str, weakref.ref] = {}  # flow_id -> weakref
+        self._named_flows: dict[str, Flow] = {}  # name -> Flow (strong reference)
         self._lock: threading.RLock = threading.RLock()
 
     @classmethod
-    def get_instance(cls) -> "FlowRegistry":
+    def get_instance(cls) -> FlowRegistry:
         """Get singleton instance."""
         if cls._instance is None:
             with cls._lock:
@@ -52,7 +52,7 @@ class FlowRegistry:
                     cls._instance = cls()
         return cls._instance
 
-    def register(self, flow: "Flow") -> None:
+    def register(self, flow: Flow) -> None:
         """Register a flow instance (weak reference).
 
         Args:
@@ -76,7 +76,7 @@ class FlowRegistry:
 
             self._flows[flow.flow_id] = weakref.ref(flow, cleanup_callback)
 
-    def get(self, flow_id: str) -> Optional["Flow"]:
+    def get(self, flow_id: str) -> Flow | None:
         """Get flow by ID.
 
         Args:
@@ -94,7 +94,7 @@ class FlowRegistry:
                 self._flows.pop(flow_id, None)
             return flow
 
-    def list_all(self) -> List["Flow"]:
+    def list_all(self) -> list[Flow]:
         """List all registered flows (alive ones only)."""
         with self._lock:
             flows = []
@@ -112,7 +112,7 @@ class FlowRegistry:
 
             return flows
 
-    def register_by_name(self, name: str, flow: "Flow") -> None:
+    def register_by_name(self, name: str, flow: Flow) -> None:
         """Register a flow by name (strong reference).
 
         This creates a strong reference, so the flow won't be
@@ -136,7 +136,7 @@ class FlowRegistry:
             self._named_flows[name] = flow
             self.register(flow)
 
-    def get_by_name(self, name: str) -> Optional["Flow"]:
+    def get_by_name(self, name: str) -> Flow | None:
         """Get flow by name.
 
         Args:
@@ -182,27 +182,27 @@ class WorkerRegistry:
         >>> workers = registry.get_by_flow("my_flow")
     """
 
-    _instance: Optional["WorkerRegistry"] = None
+    _instance: WorkerRegistry | None = None
     _lock = threading.Lock()
 
     def __init__(self):
         """Initialize registry (private - use get_instance())."""
-        self._workers: Dict[str, weakref.ref] = {}  # worker_id -> weakref
-        self._flow_workers: Dict[str, List[str]] = {}  # flow_id -> [worker_id, ...]
+        self._workers: dict[str, weakref.ref] = {}  # worker_id -> weakref
+        self._flow_workers: dict[str, list[str]] = {}  # flow_id -> [worker_id, ...]
         self._lock: threading.RLock = threading.RLock()
         self._gc_cleanup_lock: threading.Lock = threading.Lock()
-        self._cleanup_queue: List[str] = []
+        self._cleanup_queue: list[str] = []
         self._cleanup_queue_lock: threading.Lock = threading.Lock()
 
         # Completed workers tracking for automatic cleanup
-        self._completed_workers: Dict[str, datetime] = {}  # worker_id -> completed_at
+        self._completed_workers: dict[str, datetime] = {}  # worker_id -> completed_at
         self._cleanup_interval: float = 600.0  # 10 minutes
-        self._cleanup_thread: Optional[threading.Thread] = None
+        self._cleanup_thread: threading.Thread | None = None
         self._cleanup_running: bool = False
         self._cleanup_thread_lock: threading.Lock = threading.Lock()
 
     @classmethod
-    def get_instance(cls) -> "WorkerRegistry":
+    def get_instance(cls) -> WorkerRegistry:
         """Get singleton instance."""
         if cls._instance is None:
             with cls._lock:
@@ -210,18 +210,14 @@ class WorkerRegistry:
                     cls._instance = cls()
         return cls._instance
 
-    def register(self, worker_state: "WorkerState") -> None:
+    def register(self, worker_state: WorkerState) -> None:
         """Register a worker state instance.
 
         Args:
             worker_state: WorkerState instance
         """
-        if not hasattr(worker_state, "worker_id") or not hasattr(
-            worker_state, "flow_id"
-        ):
-            raise TypeError(
-                "worker_state must have worker_id and flow_id attributes"
-            )
+        if not hasattr(worker_state, "worker_id") or not hasattr(worker_state, "flow_id"):
+            raise TypeError("worker_state must have worker_id and flow_id attributes")
 
         with self._lock:
 
@@ -238,9 +234,7 @@ class WorkerRegistry:
                         self._cleanup_queue.append(worker_id)
                     self._process_cleanup_queue()
 
-            self._workers[worker_state.worker_id] = weakref.ref(
-                worker_state, cleanup_callback
-            )
+            self._workers[worker_state.worker_id] = weakref.ref(worker_state, cleanup_callback)
 
             flow_id = worker_state.flow_id
             if flow_id not in self._flow_workers:
@@ -268,7 +262,7 @@ class WorkerRegistry:
             finally:
                 self._gc_cleanup_lock.release()
 
-    def get(self, worker_id: str) -> Optional["WorkerState"]:
+    def get(self, worker_id: str) -> WorkerState | None:
         """Get worker by ID."""
         with self._lock:
             ref = self._workers.get(worker_id)
@@ -279,7 +273,7 @@ class WorkerRegistry:
                 self._workers.pop(worker_id, None)
             return worker
 
-    def get_by_flow(self, flow_id: str) -> List["WorkerState"]:
+    def get_by_flow(self, flow_id: str) -> list[WorkerState]:
         """Get all workers for a flow."""
         with self._lock:
             worker_ids = self._flow_workers.get(flow_id, [])
@@ -309,7 +303,7 @@ class WorkerRegistry:
 
             return workers
 
-    def list_all(self) -> List["WorkerState"]:
+    def list_all(self) -> list[WorkerState]:
         """List all registered workers."""
         with self._lock:
             workers = []
@@ -369,9 +363,7 @@ class WorkerRegistry:
             for worker_id, completed_at in self._completed_workers.items():
                 try:
                     if not isinstance(completed_at, datetime):
-                        logger.warning(
-                            f"Invalid completed_at for worker {worker_id}, removing"
-                        )
+                        logger.warning(f"Invalid completed_at for worker {worker_id}, removing")
                         workers_to_remove.append(worker_id)
                         continue
                     if completed_at < cutoff_time:

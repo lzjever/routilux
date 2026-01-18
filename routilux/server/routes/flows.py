@@ -2,10 +2,12 @@
 Flow management API routes.
 """
 
-from typing import Any, Dict, List
+from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException, Query
 
+from routilux.flow import Flow
+from routilux.monitoring.storage import flow_store
 from routilux.server.middleware.auth import RequireAuth
 from routilux.server.models.flow import (
     AddConnectionRequest,
@@ -21,8 +23,6 @@ from routilux.server.validators import (
     validate_routine_id_conflict,
     validate_routine_instance,
 )
-from routilux.flow import Flow
-from routilux.monitoring.storage import flow_store
 
 router = APIRouter()
 
@@ -591,7 +591,9 @@ async def validate_flow(flow_id: str):
     }
 
 
-@router.get("/flows/{flow_id}/routines", response_model=Dict[str, RoutineInfo], dependencies=[RequireAuth])
+@router.get(
+    "/flows/{flow_id}/routines", response_model=Dict[str, RoutineInfo], dependencies=[RequireAuth]
+)
 async def list_flow_routines(flow_id: str):
     """List all routines in a flow with their interface information.
 
@@ -697,7 +699,9 @@ async def list_flow_routines(flow_id: str):
     return routines
 
 
-@router.get("/flows/{flow_id}/connections", response_model=List[ConnectionInfo], dependencies=[RequireAuth])
+@router.get(
+    "/flows/{flow_id}/connections", response_model=List[ConnectionInfo], dependencies=[RequireAuth]
+)
 async def list_flow_connections(flow_id: str):
     """List all connections in a flow.
 
@@ -875,7 +879,7 @@ async def add_routine_to_flow(flow_id: str, request: AddRoutineRequest):
     # Try factory first
     factory = ObjectFactory.get_instance()
     metadata = factory.get_metadata(request.object_name)
-    
+
     if metadata is not None:
         # Use factory to create
         routine = factory.create(request.object_name, config=request.config)

@@ -14,7 +14,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from serilux import Serializable
 
@@ -35,13 +35,13 @@ class ExecutionRecord:
 
     routine_id: str = ""
     event_name: str = ""
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.now)
 
     def __repr__(self) -> str:
         return f"ExecutionRecord[{self.routine_id}.{self.event_name}@{self.timestamp}]"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "routine_id": self.routine_id,
@@ -51,7 +51,7 @@ class ExecutionRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ExecutionRecord":
+    def from_dict(cls, data: dict[str, Any]) -> ExecutionRecord:
         """Create from dictionary."""
         timestamp = data.get("timestamp")
         if isinstance(timestamp, str):
@@ -115,11 +115,11 @@ class WorkerState(Serializable):
         super().__init__()
         self.flow_id: str = flow_id
         self.worker_id: str = str(uuid.uuid4())
-        self.status: Union[str, ExecutionStatus] = ExecutionStatus.PENDING
+        self.status: str | ExecutionStatus = ExecutionStatus.PENDING
 
         # Worker-level state tracking
-        self.routine_states: Dict[str, Dict[str, Any]] = {}
-        self.execution_history: List[ExecutionRecord] = []
+        self.routine_states: dict[str, dict[str, Any]] = {}
+        self.execution_history: list[ExecutionRecord] = []
         self._max_execution_history: int = 1000
 
         # Statistics
@@ -129,17 +129,17 @@ class WorkerState(Serializable):
         # Timestamps
         self.created_at: datetime = datetime.now()
         self.updated_at: datetime = datetime.now()
-        self.started_at: Optional[datetime] = None
-        self.completed_at: Optional[datetime] = None
+        self.started_at: datetime | None = None
+        self.completed_at: datetime | None = None
 
         # Error information (worker-level fatal errors)
-        self.error: Optional[str] = None
-        self.error_traceback: Optional[str] = None
+        self.error: str | None = None
+        self.error_traceback: str | None = None
 
         # Pause/resume support
-        self.pause_points: List[Dict[str, Any]] = []
-        self.deferred_events: List[Dict[str, Any]] = []
-        self.pending_tasks: List[Dict[str, Any]] = []
+        self.pause_points: list[dict[str, Any]] = []
+        self.deferred_events: list[dict[str, Any]] = []
+        self.pending_tasks: list[dict[str, Any]] = []
 
         # Thread-safe locks (not serialized)
         self._routine_states_lock: threading.RLock = threading.RLock()
@@ -149,8 +149,8 @@ class WorkerState(Serializable):
         self._pending_tasks_lock: threading.RLock = threading.RLock()
 
         # Runtime references (not serialized)
-        self._executor: Optional[Any] = None  # WorkerExecutor
-        self._runtime: Optional[Any] = None  # Runtime
+        self._executor: Any | None = None  # WorkerExecutor
+        self._runtime: Any | None = None  # Runtime
 
         # Register serializable fields
         self.add_serializable_fields(
@@ -197,7 +197,7 @@ class WorkerState(Serializable):
                 if excess > 0:
                     self.execution_history = self.execution_history[excess:]
 
-    def update_routine_state(self, routine_id: str, state: Dict[str, Any]) -> None:
+    def update_routine_state(self, routine_id: str, state: dict[str, Any]) -> None:
         """Update state for a specific routine (thread-safe).
 
         Args:
@@ -211,7 +211,7 @@ class WorkerState(Serializable):
             self.routine_states[routine_id] = state.copy()
             self.updated_at = datetime.now()
 
-    def get_routine_state(self, routine_id: str) -> Optional[Dict[str, Any]]:
+    def get_routine_state(self, routine_id: str) -> dict[str, Any] | None:
         """Get state for a specific routine (thread-safe).
 
         Args:
@@ -223,9 +223,7 @@ class WorkerState(Serializable):
         with self._routine_states_lock:
             return self.routine_states.get(routine_id)
 
-    def record_execution(
-        self, routine_id: str, event_name: str, data: Dict[str, Any]
-    ) -> None:
+    def record_execution(self, routine_id: str, event_name: str, data: dict[str, Any]) -> None:
         """Record an execution event (thread-safe).
 
         Args:
@@ -242,9 +240,7 @@ class WorkerState(Serializable):
                 del self.execution_history[:excess]
             self.updated_at = datetime.now()
 
-    def get_execution_history(
-        self, routine_id: Optional[str] = None
-    ) -> List[ExecutionRecord]:
+    def get_execution_history(self, routine_id: str | None = None) -> list[ExecutionRecord]:
         """Get execution history (thread-safe).
 
         Args:
@@ -257,9 +253,7 @@ class WorkerState(Serializable):
             if routine_id is None:
                 history = self.execution_history.copy()
             else:
-                history = [
-                    r for r in self.execution_history if r.routine_id == routine_id
-                ]
+                history = [r for r in self.execution_history if r.routine_id == routine_id]
 
         return sorted(history, key=lambda x: x.timestamp)
 
@@ -275,9 +269,7 @@ class WorkerState(Serializable):
                 self.jobs_failed += 1
             self.updated_at = datetime.now()
 
-    def _set_paused(
-        self, reason: str = "", checkpoint: Optional[Dict[str, Any]] = None
-    ) -> None:
+    def _set_paused(self, reason: str = "", checkpoint: dict[str, Any] | None = None) -> None:
         """Set paused state (internal).
 
         Args:
@@ -316,9 +308,7 @@ class WorkerState(Serializable):
             with self._routine_states_lock:
                 self.routine_states.setdefault("_cancellation", {})["reason"] = reason
 
-    def add_deferred_event(
-        self, routine_id: str, event_name: str, data: Dict[str, Any]
-    ) -> None:
+    def add_deferred_event(self, routine_id: str, event_name: str, data: dict[str, Any]) -> None:
         """Add a deferred event for resume (thread-safe).
 
         Args:
@@ -345,9 +335,7 @@ class WorkerState(Serializable):
         """
         import os
 
-        os.makedirs(
-            os.path.dirname(filepath) if os.path.dirname(filepath) else ".", exist_ok=True
-        )
+        os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else ".", exist_ok=True)
 
         data = self.serialize()
         try:
@@ -358,7 +346,7 @@ class WorkerState(Serializable):
             raise
 
     @classmethod
-    def load(cls, filepath: str) -> "WorkerState":
+    def load(cls, filepath: str) -> WorkerState:
         """Load state from file.
 
         Args:
@@ -383,7 +371,7 @@ class WorkerState(Serializable):
         worker_state.deserialize(data)
         return worker_state
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         """Serialize WorkerState."""
         data = super().serialize()
 
@@ -405,9 +393,7 @@ class WorkerState(Serializable):
 
         return data
 
-    def deserialize(
-        self, data: Dict[str, Any], strict: bool = False, registry: Any = None
-    ) -> None:
+    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any = None) -> None:
         """Deserialize WorkerState."""
         # Handle datetime
         for field in ["created_at", "updated_at", "started_at", "completed_at"]:
@@ -435,9 +421,9 @@ class WorkerState(Serializable):
 
     @staticmethod
     def wait_for_completion(
-        flow: "Flow",
-        worker_state: "WorkerState",
-        timeout: Optional[float] = None,
+        flow: Flow,
+        worker_state: WorkerState,
+        timeout: float | None = None,
         check_interval: float = 0.1,
     ) -> bool:
         """Wait for worker execution to complete.

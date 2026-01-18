@@ -1,6 +1,5 @@
 """Tests for WorkerState class."""
 
-import pytest
 from routilux.core import ExecutionRecord, ExecutionStatus, Flow, WorkerState
 
 
@@ -11,7 +10,7 @@ class TestWorkerState:
         """Test creating a WorkerState."""
         flow = Flow()
         worker_state = WorkerState(flow_id=flow.flow_id)
-        
+
         assert worker_state.flow_id == flow.flow_id
         assert worker_state.worker_id is not None
         assert worker_state.status == ExecutionStatus.PENDING
@@ -24,9 +23,9 @@ class TestWorkerState:
         """Test updating routine state."""
         flow = Flow()
         worker_state = WorkerState(flow_id=flow.flow_id)
-        
+
         worker_state.update_routine_state("routine1", {"status": "active", "count": 5})
-        
+
         state = worker_state.get_routine_state("routine1")
         assert state is not None
         assert state["status"] == "active"
@@ -36,13 +35,11 @@ class TestWorkerState:
         """Test recording execution."""
         flow = Flow()
         worker_state = WorkerState(flow_id=flow.flow_id)
-        
+
         worker_state.record_execution(
-            routine_id="routine1",
-            event_name="output",
-            data={"value": 42}
+            routine_id="routine1", event_name="output", data={"value": 42}
         )
-        
+
         assert len(worker_state.execution_history) == 1
         record = worker_state.execution_history[0]
         assert isinstance(record, ExecutionRecord)
@@ -56,9 +53,9 @@ class TestWorkerState:
         worker_state = WorkerState(flow_id=flow.flow_id)
         worker_state.update_routine_state("routine1", {"status": "active"})
         worker_state.record_execution("routine1", "output", {"test": "data"})
-        
+
         data = worker_state.serialize()
-        
+
         assert data["flow_id"] == flow.flow_id
         assert data["worker_id"] == worker_state.worker_id
         assert "routine_states" in data
@@ -69,11 +66,11 @@ class TestWorkerState:
         flow = Flow()
         worker_state = WorkerState(flow_id=flow.flow_id)
         worker_state.update_routine_state("routine1", {"status": "active"})
-        
+
         data = worker_state.serialize()
         restored = WorkerState()
         restored.deserialize(data)
-        
+
         assert restored.flow_id == worker_state.flow_id
         assert restored.worker_id == worker_state.worker_id
         restored_state = restored.get_routine_state("routine1")
@@ -86,12 +83,8 @@ class TestExecutionRecord:
 
     def test_execution_record_creation(self):
         """Test creating an ExecutionRecord."""
-        record = ExecutionRecord(
-            routine_id="routine1",
-            event_name="output",
-            data={"value": 42}
-        )
-        
+        record = ExecutionRecord(routine_id="routine1", event_name="output", data={"value": 42})
+
         assert record.routine_id == "routine1"
         assert record.event_name == "output"
         assert record.data == {"value": 42}
@@ -99,14 +92,10 @@ class TestExecutionRecord:
 
     def test_execution_record_serialization(self):
         """Test ExecutionRecord serialization."""
-        record = ExecutionRecord(
-            routine_id="routine1",
-            event_name="output",
-            data={"value": 42}
-        )
-        
+        record = ExecutionRecord(routine_id="routine1", event_name="output", data={"value": 42})
+
         data = record.to_dict()
-        
+
         assert data["routine_id"] == "routine1"
         assert data["event_name"] == "output"
         assert data["data"] == {"value": 42}

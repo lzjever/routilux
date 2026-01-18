@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI):
 
     # Initialize default runtime in registry
     from routilux.monitoring.runtime_registry import RuntimeRegistry
+
     runtime_registry = RuntimeRegistry.get_instance()
     # Create default runtime if it doesn't exist
     runtime_registry.get_or_create_default(thread_pool_size=0)
@@ -86,7 +87,7 @@ async def register_debugger_flows():
     from routilux.server.dependencies import get_flow_registry
 
     flow_registry = get_flow_registry()
-    
+
     # Monitoring already enabled in lifespan()
     # Create and register flows
     linear_flow, _ = create_linear_flow()
@@ -164,8 +165,8 @@ from routilux.server.middleware.rate_limit import setup_rate_limiting  # noqa: E
 setup_rate_limiting(app)
 
 # Register exception handlers
-from starlette.exceptions import HTTPException  # noqa: E402
 from fastapi.exceptions import RequestValidationError  # noqa: E402
+from starlette.exceptions import HTTPException  # noqa: E402
 
 from routilux.server.middleware.error_handler import (  # noqa: E402
     general_exception_handler,
@@ -220,21 +221,21 @@ def root():
             "v1": "/api/v1",
             "health": "/api/v1/health/live",
             "docs": "/docs",
-        }
+        },
     }
 
 
 @app.get("/api/health", dependencies=[RequireAuth])
 def legacy_health():
     """Legacy health check endpoint.
-    
+
     For the new health endpoints, use:
     - GET /api/v1/health/live (liveness)
     - GET /api/v1/health/ready (readiness)
     - GET /api/v1/health/stats (detailed stats)
     """
     from routilux.monitoring.registry import MonitoringRegistry
-    from routilux.server.dependencies import get_runtime, get_flow_registry, get_job_storage
+    from routilux.server.dependencies import get_flow_registry, get_runtime
 
     # Check monitoring status
     monitoring_enabled = MonitoringRegistry.is_enabled()
@@ -243,11 +244,11 @@ def legacy_health():
     try:
         flow_registry = get_flow_registry()
         flow_count = len(flow_registry.list_all())
-        
+
         runtime = get_runtime()
         with runtime._jobs_lock:
             job_count = sum(len(jobs) for jobs in runtime._active_jobs.values())
-        
+
         stores_accessible = True
     except Exception:
         flow_count = None

@@ -13,8 +13,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from routilux.core.flow import Flow
     from routilux.core.executor import JobExecutor
+    from routilux.core.flow import Flow
     from routilux.core.worker import JobState
 
 logger = logging.getLogger(__name__)

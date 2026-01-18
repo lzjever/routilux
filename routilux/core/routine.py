@@ -8,22 +8,22 @@ from __future__ import annotations
 
 import threading
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, NamedTuple, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, NamedTuple, TypeVar
 
 from serilux import Serializable
 
 if TYPE_CHECKING:
-    from routilux.core.error import ErrorHandler, ErrorStrategy
+    from routilux.core.context import JobContext
+    from routilux.core.error import ErrorHandler
     from routilux.core.event import Event
     from routilux.core.flow import Flow
     from routilux.core.slot import Slot
     from routilux.core.worker import WorkerState
-    from routilux.core.context import JobContext
 
 T = TypeVar("T")
 
 # Context variable for thread-safe worker_state access
-_current_worker_state: ContextVar[Optional["WorkerState"]] = ContextVar(
+_current_worker_state: ContextVar[WorkerState | None] = ContextVar(
     "_current_worker_state", default=None
 )
 
@@ -41,10 +41,10 @@ class ExecutionContext(NamedTuple):
         job_context: Optional JobContext for the current job
     """
 
-    flow: "Flow"
-    worker_state: "WorkerState"
+    flow: Flow
+    worker_state: WorkerState
     routine_id: str
-    job_context: Optional["JobContext"] = None
+    job_context: JobContext | None = None
 
 
 # Note: Not using @register_serializable to avoid conflict with legacy module
@@ -77,7 +77,7 @@ class Routine(Serializable):
         ...         self.add_slot("input")
         ...         self.add_event("output")
         ...         self.set_config(name="processor", timeout=30)
-        ...     
+        ...
         ...     def logic(self, input_data, **kwargs):
         ...         # Get job context for job-specific data
         ...         from routilux.core import get_current_job
@@ -97,19 +97,19 @@ class Routine(Serializable):
         """
         super().__init__()
         self._id: str = hex(id(self))
-        self._slots: Dict[str, "Slot"] = {}
-        self._events: Dict[str, "Event"] = {}
+        self._slots: dict[str, Slot] = {}
+        self._events: dict[str, Event] = {}
 
         # Configuration dictionary for storing routine-specific settings
-        self._config: Dict[str, Any] = {}
+        self._config: dict[str, Any] = {}
         self._config_lock: threading.RLock = threading.RLock()
 
         # Error handler for this routine (optional)
-        self._error_handler: Optional["ErrorHandler"] = None
+        self._error_handler: ErrorHandler | None = None
 
         # Activation policy and logic
-        self._activation_policy: Optional[Callable] = None
-        self._logic: Optional[Callable] = None
+        self._activation_policy: Callable | None = None
+        self._logic: Callable | None = None
 
         # Register serializable fields
         self.add_serializable_fields(
@@ -128,9 +128,7 @@ class Routine(Serializable):
         """Return string representation."""
         return f"{self.__class__.__name__}[{self._id}]"
 
-    def add_slot(
-        self, name: str, max_queue_length: int = 1000, watermark: float = 0.8
-    ) -> "Slot":
+    def add_slot(self, name: str, max_queue_length: int = 1000, watermark: float = 0.8) -> Slot:
         """Add an input slot for receiving data.
 
         Args:
@@ -159,7 +157,7 @@ class Routine(Serializable):
             self._slots[name] = slot
             return slot
 
-    def add_event(self, name: str, output_params: Optional[List[str]] = None) -> "Event":
+    def add_event(self, name: str, output_params: list[str] | None = None) -> Event:
         """Add an output event for transmitting data.
 
         Args:
@@ -185,8 +183,8 @@ class Routine(Serializable):
     def emit(
         self,
         event_name: str,
-        runtime: Optional[Any] = None,
-        worker_state: Optional["WorkerState"] = None,
+        runtime: Any | None = None,
+        worker_state: WorkerState | None = None,
         **kwargs: Any,
     ) -> None:
         """Emit an event and send data to connected slots.
@@ -219,27 +217,26 @@ class Routine(Serializable):
             worker_state = _current_worker_state.get(None)
             if worker_state is None:
                 raise RuntimeError(
-                    "WorkerState is required for emit(). "
-                    "Provide worker_state parameter."
+                    "WorkerState is required for emit(). Provide worker_state parameter."
                 )
 
         event.emit(runtime=runtime, worker_state=worker_state, **kwargs)
 
-    def get_slot(self, name: str) -> Optional["Slot"]:
+    def get_slot(self, name: str) -> Slot | None:
         """Get specified slot."""
         return self._slots.get(name)
 
-    def get_event(self, name: str) -> Optional["Event"]:
+    def get_event(self, name: str) -> Event | None:
         """Get specified event."""
         return self._events.get(name)
 
     @property
-    def slots(self) -> Dict[str, "Slot"]:
+    def slots(self) -> dict[str, Slot]:
         """Get all slots."""
         return self._slots
 
     @property
-    def events(self) -> Dict[str, "Event"]:
+    def events(self) -> dict[str, Event]:
         """Get all events."""
         return self._events
 
@@ -263,20 +260,20 @@ class Routine(Serializable):
         with self._config_lock:
             return self._config.get(key, default)
 
-    def config(self) -> Dict[str, Any]:
+    def config(self) -> dict[str, Any]:
         """Get a copy of the configuration dictionary."""
         with self._config_lock:
             return self._config.copy()
 
-    def set_error_handler(self, error_handler: "ErrorHandler") -> None:
+    def set_error_handler(self, error_handler: ErrorHandler) -> None:
         """Set error handler for this routine."""
         self._error_handler = error_handler
 
-    def get_error_handler(self) -> Optional["ErrorHandler"]:
+    def get_error_handler(self) -> ErrorHandler | None:
         """Get error handler for this routine."""
         return self._error_handler
 
-    def set_activation_policy(self, policy: Callable) -> "Routine":
+    def set_activation_policy(self, policy: Callable) -> Routine:
         """Set activation policy for this routine.
 
         The activation policy determines when the routine's logic should be executed.
@@ -291,7 +288,7 @@ class Routine(Serializable):
         self._activation_policy = policy
         return self
 
-    def set_logic(self, logic: Callable) -> "Routine":
+    def set_logic(self, logic: Callable) -> Routine:
         """Set logic function for this routine.
 
         The logic function processes data from slots.
@@ -305,7 +302,7 @@ class Routine(Serializable):
         self._logic = logic
         return self
 
-    def get_execution_context(self) -> Optional[ExecutionContext]:
+    def get_execution_context(self) -> ExecutionContext | None:
         """Get execution context (flow, worker_state, routine_id, job_context).
 
         Returns:
@@ -336,7 +333,7 @@ class Routine(Serializable):
         )
 
     def get_state(
-        self, worker_state: "WorkerState", key: Optional[str] = None, default: Any = None
+        self, worker_state: WorkerState, key: str | None = None, default: Any = None
     ) -> Any:
         """Get routine-specific state from worker_state.
 
@@ -361,7 +358,7 @@ class Routine(Serializable):
             return state
         return state.get(key, default)
 
-    def set_state(self, worker_state: "WorkerState", key: str, value: Any) -> None:
+    def set_state(self, worker_state: WorkerState, key: str, value: Any) -> None:
         """Set routine-specific state in worker_state.
 
         Args:
@@ -378,7 +375,7 @@ class Routine(Serializable):
         current_state[key] = value
         worker_state.update_routine_state(routine_id, current_state)
 
-    def update_state(self, worker_state: "WorkerState", updates: Dict[str, Any]) -> None:
+    def update_state(self, worker_state: WorkerState, updates: dict[str, Any]) -> None:
         """Update multiple routine-specific state keys at once.
 
         Args:
@@ -403,23 +400,17 @@ class Routine(Serializable):
         """
         pass
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         """Serialize the Routine."""
         data = super().serialize()
         # Handle slots and events serialization
         if "_slots" in data:
-            data["_slots"] = {
-                name: slot.serialize() for name, slot in self._slots.items()
-            }
+            data["_slots"] = {name: slot.serialize() for name, slot in self._slots.items()}
         if "_events" in data:
-            data["_events"] = {
-                name: event.serialize() for name, event in self._events.items()
-            }
+            data["_events"] = {name: event.serialize() for name, event in self._events.items()}
         return data
 
-    def deserialize(
-        self, data: Dict[str, Any], strict: bool = False, registry: Any = None
-    ) -> None:
+    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any = None) -> None:
         """Deserialize the Routine."""
         # Handle slots
         if "_slots" in data and isinstance(data["_slots"], dict):
@@ -447,11 +438,11 @@ class Routine(Serializable):
 
 
 # Convenience function
-def get_current_worker_state() -> Optional["WorkerState"]:
+def get_current_worker_state() -> WorkerState | None:
     """Get the current worker state from context."""
     return _current_worker_state.get(None)
 
 
-def set_current_worker_state(worker_state: Optional["WorkerState"]) -> None:
+def set_current_worker_state(worker_state: WorkerState | None) -> None:
     """Set the current worker state in context (internal use)."""
     _current_worker_state.set(worker_state)

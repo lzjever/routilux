@@ -257,8 +257,9 @@ class JobEventManager:
         # CRITICAL fix: Add synchronous lock for thread-safe access in sync methods
         # Since this is a sync method that can be called from non-async contexts,
         # we need a separate lock for thread safety
-        if not hasattr(self, '_sync_lock'):
+        if not hasattr(self, "_sync_lock"):
             import threading
+
             self._sync_lock = threading.RLock()
 
         with self._sync_lock:

@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from routilux.core.connection import Connection
@@ -48,15 +48,15 @@ class SlotActivationTask:
         created_at: When the task was created
     """
 
-    slot: "Slot"
+    slot: Slot
     data: dict[str, Any]
-    worker_state: Optional["WorkerState"] = None
-    job_context: Optional["JobContext"] = None
-    connection: Optional["Connection"] = None
+    worker_state: WorkerState | None = None
+    job_context: JobContext | None = None
+    connection: Connection | None = None
     priority: TaskPriority = TaskPriority.NORMAL
     retry_count: int = 0
     max_retries: int = 0
-    created_at: Optional[datetime] = field(default=None)
+    created_at: datetime | None = field(default=None)
 
     def __post_init__(self):
         if self.created_at is None:
@@ -86,13 +86,13 @@ class EventRoutingTask:
         created_at: When the task was created
     """
 
-    event: "Event"
+    event: Event
     event_data: dict[str, Any]
-    worker_state: "WorkerState"
-    runtime: "Runtime"
-    job_context: Optional["JobContext"] = None
+    worker_state: WorkerState
+    runtime: Runtime
+    job_context: JobContext | None = None
     priority: TaskPriority = TaskPriority.NORMAL
-    created_at: Optional[datetime] = field(default=None)
+    created_at: datetime | None = field(default=None)
 
     def __post_init__(self):
         if self.created_at is None:

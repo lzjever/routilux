@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import threading
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from routilux.core.routine import Routine
@@ -35,7 +35,7 @@ class Event(Serializable):
         >>> class MyRoutine(Routine):
         ...     def setup(self):
         ...         self.add_event("output")
-        ...     
+        ...
         ...     def logic(self, *args, **kwargs):
         ...         self.emit("output", result="success")
     """
@@ -43,8 +43,8 @@ class Event(Serializable):
     def __init__(
         self,
         name: str = "",
-        routine: Optional["Routine"] = None,
-        output_params: Optional[List[str]] = None,
+        routine: Routine | None = None,
+        output_params: list[str] | None = None,
     ):
         """Initialize an Event.
 
@@ -55,9 +55,9 @@ class Event(Serializable):
         """
         super().__init__()
         self.name: str = name
-        self.routine: Optional["Routine"] = routine
-        self.output_params: List[str] = output_params or []
-        self.connected_slots: List["Slot"] = []
+        self.routine: Routine | None = routine
+        self.output_params: list[str] = output_params or []
+        self.connected_slots: list[Slot] = []
         self._connection_lock: threading.RLock = threading.RLock()
 
         # Register serializable fields
@@ -69,7 +69,7 @@ class Event(Serializable):
             return f"Event[{getattr(self.routine, '_id', 'unknown')}.{self.name}]"
         return f"Event[{self.name}]"
 
-    def connect(self, slot: "Slot") -> None:
+    def connect(self, slot: Slot) -> None:
         """Connect to a slot (thread-safe)."""
         lock1, lock2 = sorted((self._connection_lock, slot._connection_lock), key=id)
         with lock1, lock2:
@@ -78,7 +78,7 @@ class Event(Serializable):
                 if self not in slot.connected_events:
                     slot.connected_events.append(self)
 
-    def disconnect(self, slot: "Slot") -> None:
+    def disconnect(self, slot: Slot) -> None:
         """Disconnect from a slot (thread-safe)."""
         lock1, lock2 = sorted((self._connection_lock, slot._connection_lock), key=id)
         with lock1, lock2:
@@ -87,9 +87,7 @@ class Event(Serializable):
                 if self in slot.connected_events:
                     slot.connected_events.remove(self)
 
-    def emit(
-        self, runtime: "Runtime", worker_state: "WorkerState", **kwargs: Any
-    ) -> None:
+    def emit(self, runtime: Runtime, worker_state: WorkerState, **kwargs: Any) -> None:
         """Emit the event and route data to connected slots.
 
         This method packs data with metadata and creates an EventRoutingTask
@@ -106,9 +104,7 @@ class Event(Serializable):
         # Pack data with metadata
         emitted_from = "unknown"
         if self.routine:
-            emitted_from = (
-                getattr(self.routine, "_id", None) or self.routine.__class__.__name__
-            )
+            emitted_from = getattr(self.routine, "_id", None) or self.routine.__class__.__name__
 
         event_data = {
             "data": kwargs,
@@ -123,8 +119,7 @@ class Event(Serializable):
         worker_executor = getattr(worker_state, "_executor", None)
         if worker_executor is None:
             raise RuntimeError(
-                "WorkerExecutor not found in worker_state. "
-                "Event routing requires a WorkerExecutor."
+                "WorkerExecutor not found in worker_state. Event routing requires a WorkerExecutor."
             )
 
         # Get current job context for propagation

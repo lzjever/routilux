@@ -29,7 +29,7 @@ def parse_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
 
     Raises:
         ValueError: If specification is invalid.
-        
+
     .. deprecated::
         Use ObjectFactory.load_flow_from_dsl() instead, which enforces
         factory-only component usage.
@@ -98,7 +98,7 @@ def _load_class(class_spec: Union[str, Type]) -> Type:
 
     **DEPRECATED**: This function is a security risk and should not be used.
     It uses dynamic class loading which can execute arbitrary code.
-    
+
     All DSL loading now goes through ObjectFactory which enforces factory-only
     component usage. Use ObjectFactory.load_flow_from_dsl() instead.
 
@@ -116,8 +116,8 @@ def _load_class(class_spec: Union[str, Type]) -> Type:
     Raises:
         ValueError: If class_spec is invalid or loaded class is not a Routine subclass.
         ImportError: If module cannot be imported.
-        
-    .. deprecated:: 
+
+    .. deprecated::
         Use ObjectFactory.load_flow_from_dsl() instead, which enforces
         factory-only component usage and eliminates security risks.
     """

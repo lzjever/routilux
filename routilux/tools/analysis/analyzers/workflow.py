@@ -12,9 +12,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from routilux.tools.analysis.analyzers.routine import RoutineAnalyzer
-from routilux.flow import Flow
 from routilux.core.routine import Routine
+from routilux.flow import Flow
+from routilux.tools.analysis.analyzers.routine import RoutineAnalyzer
 
 
 class WorkflowAnalyzer:
@@ -55,17 +55,17 @@ class WorkflowAnalyzer:
             TypeError: If flow is not a Flow instance or missing required attributes.
         """
         # MEDIUM fix: Add input validation
-        if not hasattr(flow, 'routines'):
+        if not hasattr(flow, "routines"):
             raise TypeError(
                 f"Expected Flow object with 'routines' attribute, got {type(flow).__name__}"
             )
 
-        if not hasattr(flow, 'connections'):
+        if not hasattr(flow, "connections"):
             raise TypeError(
                 f"Expected Flow object with 'connections' attribute, got {type(flow).__name__}"
             )
 
-        if not hasattr(flow, 'flow_id'):
+        if not hasattr(flow, "flow_id"):
             raise TypeError(
                 f"Expected Flow object with 'flow_id' attribute, got {type(flow).__name__}"
             )
@@ -855,9 +855,9 @@ class WorkflowAnalyzer:
                 # Handle circular dependencies
                 # MEDIUM fix: Add warning when circular dependencies detected
                 import logging
+
                 logging.getLogger(__name__).warning(
-                    f"Circular dependencies detected in workflow. "
-                    f"Remaining routines: {remaining}"
+                    f"Circular dependencies detected in workflow. Remaining routines: {remaining}"
                 )
                 for routine_id in remaining:
                     levels.setdefault(level, []).append(routine_id)
@@ -869,6 +869,7 @@ class WorkflowAnalyzer:
         # MEDIUM fix: Check if we hit max iterations
         if iteration_count >= max_iterations and remaining:
             import logging
+
             logging.getLogger(__name__).error(
                 f"Failed to resolve dependency levels after {max_iterations} iterations. "
                 f"Remaining routines: {remaining}"

@@ -7,8 +7,8 @@ Provides:
 - Protocol definitions for custom backends
 """
 
-from routilux.server.storage.base import JobStorageBackend, IdempotencyBackend
-from routilux.server.storage.memory import MemoryJobStorage, MemoryIdempotencyBackend
+from routilux.server.storage.base import IdempotencyBackend, JobStorageBackend
+from routilux.server.storage.memory import MemoryIdempotencyBackend, MemoryJobStorage
 
 __all__ = [
     "JobStorageBackend",

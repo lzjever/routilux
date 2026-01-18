@@ -13,47 +13,27 @@ from pydantic import BaseModel, Field, field_validator
 
 class ExecuteRequest(BaseModel):
     """One-shot execution request.
-    
+
     This endpoint creates a Worker, submits a Job, and optionally
     waits for completion before returning.
     """
-    
-    flow_id: str = Field(
-        ..., 
-        description="Flow to execute"
-    )
-    routine_id: str = Field(
-        ..., 
-        description="Initial routine to trigger"
-    )
-    slot_name: str = Field(
-        ..., 
-        description="Initial slot to send data"
-    )
-    data: Dict[str, Any] = Field(
-        default_factory=dict, 
-        description="Initial data to send"
-    )
-    
-    wait: bool = Field(
-        False,
-        description="If true, wait for job completion before returning"
-    )
+
+    flow_id: str = Field(..., description="Flow to execute")
+    routine_id: str = Field(..., description="Initial routine to trigger")
+    slot_name: str = Field(..., description="Initial slot to send data")
+    data: Dict[str, Any] = Field(default_factory=dict, description="Initial data to send")
+
+    wait: bool = Field(False, description="If true, wait for job completion before returning")
     timeout: float = Field(
-        60.0,
-        ge=1.0,
-        le=3600.0,
-        description="Timeout in seconds (only used if wait=true)"
+        60.0, ge=1.0, le=3600.0, description="Timeout in seconds (only used if wait=true)"
     )
     metadata: Optional[Dict[str, Any]] = Field(
-        None, 
-        description="Job metadata (user_id, source, etc.)"
+        None, description="Job metadata (user_id, source, etc.)"
     )
     idempotency_key: Optional[str] = Field(
-        None, 
-        description="Idempotency key to prevent duplicate executions"
+        None, description="Idempotency key to prevent duplicate executions"
     )
-    
+
     @field_validator("data")
     @classmethod
     def validate_data_size(cls, v: Dict[str, Any]) -> Dict[str, Any]:
@@ -71,7 +51,7 @@ class ExecuteRequest(BaseModel):
                 raise
             raise ValueError(f"Invalid data format: {str(e)}")
         return v
-    
+
     @field_validator("metadata")
     @classmethod
     def validate_metadata(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -91,7 +71,7 @@ class ExecuteRequest(BaseModel):
                 raise
             raise ValueError(f"Invalid metadata format: {str(e)}")
         return v
-    
+
     model_config = {
         "json_schema_extra": {
             "examples": [
@@ -100,7 +80,7 @@ class ExecuteRequest(BaseModel):
                     "routine_id": "data_source",
                     "slot_name": "input",
                     "data": {"value": 42},
-                    "wait": False
+                    "wait": False,
                 },
                 {
                     "flow_id": "data_processing_flow",
@@ -108,8 +88,8 @@ class ExecuteRequest(BaseModel):
                     "slot_name": "input",
                     "data": {"value": 42},
                     "wait": True,
-                    "timeout": 30.0
-                }
+                    "timeout": 30.0,
+                },
             ]
         }
     }
@@ -117,52 +97,29 @@ class ExecuteRequest(BaseModel):
 
 class ExecuteResponse(BaseModel):
     """One-shot execution response."""
-    
-    job_id: str = Field(
-        ...,
-        description="Job identifier"
-    )
-    worker_id: str = Field(
-        ...,
-        description="Worker identifier"
-    )
-    status: str = Field(
-        ...,
-        description="Job status"
-    )
-    output: Optional[str] = Field(
-        None, 
-        description="Captured stdout output (only if wait=true)"
-    )
+
+    job_id: str = Field(..., description="Job identifier")
+    worker_id: str = Field(..., description="Worker identifier")
+    status: str = Field(..., description="Job status")
+    output: Optional[str] = Field(None, description="Captured stdout output (only if wait=true)")
     result: Optional[Dict[str, Any]] = Field(
-        None, 
-        description="Job result data (only if wait=true and completed)"
+        None, description="Job result data (only if wait=true and completed)"
     )
-    error: Optional[str] = Field(
-        None, 
-        description="Error message (only if wait=true and failed)"
-    )
-    elapsed_seconds: Optional[float] = Field(
-        None, 
-        description="Execution time (only if wait=true)"
-    )
-    
+    error: Optional[str] = Field(None, description="Error message (only if wait=true and failed)")
+    elapsed_seconds: Optional[float] = Field(None, description="Execution time (only if wait=true)")
+
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {
-                    "job_id": "job-abc-123",
-                    "worker_id": "worker-xyz-789",
-                    "status": "running"
-                },
+                {"job_id": "job-abc-123", "worker_id": "worker-xyz-789", "status": "running"},
                 {
                     "job_id": "job-abc-123",
                     "worker_id": "worker-xyz-789",
                     "status": "completed",
                     "output": "Processing complete\n",
                     "result": {"count": 10},
-                    "elapsed_seconds": 2.5
-                }
+                    "elapsed_seconds": 2.5,
+                },
             ]
         }
     }

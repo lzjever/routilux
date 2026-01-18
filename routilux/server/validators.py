@@ -133,7 +133,7 @@ def validate_routine_instance(obj: Any, context: str = "") -> None:
             error_detail["message"] = (
                 "Flow instances cannot be used as routines. "
                 "Only Routine instances can be added to flows. "
-                f"Got Flow instance instead."
+                "Got Flow instance instead."
             )
 
         raise HTTPException(status_code=400, detail=error_detail)

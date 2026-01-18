@@ -14,10 +14,9 @@ Example:
 """
 
 # Factory
-from routilux.tools.factory import ObjectFactory, ObjectMetadata
-
 # DSL
 from routilux.tools.dsl import load_flow_from_spec, parse_spec
+from routilux.tools.factory import ObjectFactory, ObjectMetadata
 
 # Testing
 from routilux.tools.testing import RoutineTester
@@ -25,11 +24,12 @@ from routilux.tools.testing import RoutineTester
 # Analysis (optional - may have extra dependencies)
 try:
     from routilux.tools.analysis import (
+        D2Exporter,
+        MarkdownExporter,
         RoutineAnalyzer,
         WorkflowAnalyzer,
-        MarkdownExporter,
-        D2Exporter,
     )
+
     _analysis_available = True
 except ImportError:
     _analysis_available = False
@@ -47,9 +47,11 @@ __all__ = [
 
 # Add analysis exports if available
 if _analysis_available:
-    __all__.extend([
-        "RoutineAnalyzer",
-        "WorkflowAnalyzer",
-        "MarkdownExporter",
-        "D2Exporter",
-    ])
+    __all__.extend(
+        [
+            "RoutineAnalyzer",
+            "WorkflowAnalyzer",
+            "MarkdownExporter",
+            "D2Exporter",
+        ]
+    )

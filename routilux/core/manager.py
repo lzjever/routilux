@@ -14,7 +14,7 @@ import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from routilux.core.executor import WorkerExecutor
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Global instance
-_global_worker_manager: Optional["WorkerManager"] = None
+_global_worker_manager: WorkerManager | None = None
 _global_worker_manager_lock = threading.Lock()
 
 
@@ -64,16 +64,16 @@ class WorkerManager:
         self.global_thread_pool = ThreadPoolExecutor(
             max_workers=max_workers, thread_name_prefix="RoutiluxWorker"
         )
-        self.running_workers: Dict[str, "WorkerExecutor"] = {}
+        self.running_workers: dict[str, WorkerExecutor] = {}
         self._lock = threading.Lock()
         self._shutdown = False
 
     def start_worker(
         self,
-        flow: "Flow",
-        timeout: Optional[float] = None,
-        worker_state: Optional["WorkerState"] = None,
-    ) -> "WorkerState":
+        flow: Flow,
+        timeout: float | None = None,
+        worker_state: WorkerState | None = None,
+    ) -> WorkerState:
         """Start a new worker execution.
 
         This method creates a WorkerExecutor and starts execution in the background.
@@ -129,7 +129,7 @@ class WorkerManager:
 
         return worker_state
 
-    def get_worker(self, worker_id: str) -> Optional["WorkerExecutor"]:
+    def get_worker(self, worker_id: str) -> WorkerExecutor | None:
         """Get worker executor by worker_id.
 
         Args:

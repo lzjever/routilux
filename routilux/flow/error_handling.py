@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from routilux.core.error import ErrorHandler
     from routilux.core.flow import Flow
-    from routilux.core.task import SlotActivationTask
     from routilux.core.routine import Routine
+    from routilux.core.task import SlotActivationTask
 
 
 def get_error_handler_for_routine(
@@ -106,7 +106,9 @@ def handle_task_error(
                     if not _enqueue_to_executor(retry_task, task.job_state):
                         # CRITICAL fix: Validate required method exists before calling
                         if not hasattr(flow, "_enqueue_task"):
-                            raise AttributeError("Flow is missing required method: _enqueue_task. Ensure Flow.__init__() has been called properly.")
+                            raise AttributeError(
+                                "Flow is missing required method: _enqueue_task. Ensure Flow.__init__() has been called properly."
+                            )
                         flow._enqueue_task(retry_task)
                     return
             # Max retries reached or non-retryable exception, fall through to default
@@ -182,7 +184,7 @@ def _stop_execution(job_state, flow: "Flow") -> None:
 
         if executor is not None:
             # CRITICAL fix: Acquire lock before modifying _running flag
-            if hasattr(executor, '_lock'):
+            if hasattr(executor, "_lock"):
                 with executor._lock:
                     executor._running = False
             else:

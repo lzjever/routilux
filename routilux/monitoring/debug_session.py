@@ -113,21 +113,21 @@ class DebugSession:
             True if execution should continue, False if should pause.
         """
         # Use getattr for thread-safe access without lock (simple reads are atomic in CPython)
-        current_status = getattr(self, 'status', 'paused')
+        current_status = getattr(self, "status", "paused")
         if current_status == "running":
             return True
 
         if current_status == "stepping":
             # Atomically read and decrement step_count
-            current_step_count = getattr(self, 'step_count', 0)
+            current_step_count = getattr(self, "step_count", 0)
             if current_step_count > 0:
-                object.__setattr__(self, 'step_count', current_step_count - 1)
+                object.__setattr__(self, "step_count", current_step_count - 1)
                 if current_step_count - 1 == 0:
-                    object.__setattr__(self, 'status', 'paused')
+                    object.__setattr__(self, "status", "paused")
                     return False
                 return True
             else:
-                object.__setattr__(self, 'status', 'paused')
+                object.__setattr__(self, "status", "paused")
                 return False
 
         # Paused

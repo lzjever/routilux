@@ -54,7 +54,7 @@ class DataSource(Routine):
         trigger_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
         data_dict = trigger_data[0] if trigger_data else {}
         data = data_dict.get("data") if isinstance(data_dict, dict) else None
-        
+
         name = self.get_config("name", "DataSource")
 
         # Get counter from JobState
@@ -71,7 +71,14 @@ class DataSource(Routine):
         }
 
         print(f"[{name}] Emitting: {output_data} (#{index}) at {timestamp}")
-        self.emit("output", job_state=job_state, data=output_data, index=index, timestamp=timestamp, metadata=metadata)
+        self.emit(
+            "output",
+            job_state=job_state,
+            data=output_data,
+            index=index,
+            timestamp=timestamp,
+            metadata=metadata,
+        )
 
 
 class DataValidator(Routine):
@@ -89,22 +96,22 @@ class DataValidator(Routine):
 
     def validate(self, *slot_data_lists, policy_message, job_state):
         input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
-        
+
         name = self.get_config("name", "Validator")
         print(f"[{name}] Validating batch of {len(input_data)} items...")
         time.sleep(0.3)  # Simulate processing time
 
         valid_count = 0
         invalid_count = 0
-        
+
         for data_dict in input_data[:3]:  # Process batch
             if not isinstance(data_dict, dict):
                 continue
             data = data_dict.get("data")
             index = data_dict.get("index", 0)
-            
+
             is_valid = self._validate_data(data)
-            
+
             if is_valid:
                 valid_count += 1
                 validation_details = {
@@ -112,18 +119,34 @@ class DataValidator(Routine):
                     "validator": name,
                     "data_length": len(str(data)),
                 }
-                self.emit("valid", job_state=job_state, data=data, index=index, validation_details=validation_details)
+                self.emit(
+                    "valid",
+                    job_state=job_state,
+                    data=data,
+                    index=index,
+                    validation_details=validation_details,
+                )
             else:
                 invalid_count += 1
-                self.emit("invalid", job_state=job_state, error="Validation failed", index=index, original_data=data)
+                self.emit(
+                    "invalid",
+                    job_state=job_state,
+                    error="Validation failed",
+                    index=index,
+                    original_data=data,
+                )
 
         # Update counts in JobState
         routine_state = job_state.get_routine_state(self._id) or {}
         total_valid = routine_state.get("valid_count", 0) + valid_count
         total_invalid = routine_state.get("invalid_count", 0) + invalid_count
-        job_state.update_routine_state(self._id, {"valid_count": total_valid, "invalid_count": total_invalid})
-        
-        print(f"[{name}] ✓ Validated: {valid_count} valid, {invalid_count} invalid (total: {total_valid}/{total_invalid})")
+        job_state.update_routine_state(
+            self._id, {"valid_count": total_valid, "invalid_count": total_invalid}
+        )
+
+        print(
+            f"[{name}] ✓ Validated: {valid_count} valid, {invalid_count} invalid (total: {total_valid}/{total_invalid})"
+        )
 
     def _validate_data(self, data):
         """Custom validation logic"""
@@ -150,7 +173,7 @@ class DataTransformer(Routine):
         data_dict = input_data[0] if input_data else {}
         data = data_dict.get("data") if isinstance(data_dict, dict) else None
         index = data_dict.get("index", 0) if isinstance(data_dict, dict) else 0
-        
+
         name = self.get_config("name", "Transformer")
         transformation = self.get_config("transformation", "uppercase")
 
@@ -175,7 +198,13 @@ class DataTransformer(Routine):
         job_state.update_routine_state(self._id, {"processed_count": processed_count})
 
         print(f"[{name}] → Result: {result}")
-        self.emit("output", job_state=job_state, result=result, index=index, transformation_type=transformation)
+        self.emit(
+            "output",
+            job_state=job_state,
+            result=result,
+            index=index,
+            transformation_type=transformation,
+        )
 
 
 class QueuePressureGenerator(Routine):
@@ -195,7 +224,7 @@ class QueuePressureGenerator(Routine):
         data_dict = input_data[0] if input_data else {}
         data = data_dict.get("data") if isinstance(data_dict, dict) else None
         index = data_dict.get("index", 0) if isinstance(data_dict, dict) else 0
-        
+
         name = self.get_config("name", "QueuePressureGenerator")
         delay = self.get_config("processing_delay", 0.5)
 
@@ -204,9 +233,11 @@ class QueuePressureGenerator(Routine):
 
         result = f"Processed: {data}"
         processed_at = datetime.now().isoformat()
-        
+
         print(f"[{name}] → {result}")
-        self.emit("output", job_state=job_state, result=result, index=index, processed_at=processed_at)
+        self.emit(
+            "output", job_state=job_state, result=result, index=index, processed_at=processed_at
+        )
 
 
 class DebugTargetRoutine(Routine):
@@ -224,16 +255,16 @@ class DebugTargetRoutine(Routine):
         input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
         data_dict = input_data[0] if input_data else {}
         data = data_dict.get("data") if isinstance(data_dict, dict) else None
-        
+
         name = self.get_config("name", "DebugTarget")
-        
+
         # These variables will be visible in debug session
         step = 1
         intermediate_value = str(data) if data else "default"
         step = 2
         computed_value = intermediate_value.upper() + "_PROCESSED"
         step = 3
-        
+
         # Store in job_state for debugging
         routine_state = job_state.get_routine_state(self._id) or {}
         routine_state["step"] = step
@@ -242,7 +273,13 @@ class DebugTargetRoutine(Routine):
         job_state.update_routine_state(self._id, routine_state)
 
         print(f"[{name}] Step {step}: {intermediate_value} -> {computed_value}")
-        self.emit("output", job_state=job_state, result=f"Debug result: {computed_value}", computed_value=computed_value, step=step)
+        self.emit(
+            "output",
+            job_state=job_state,
+            result=f"Debug result: {computed_value}",
+            computed_value=computed_value,
+            step=step,
+        )
 
 
 class StateTransitionDemo(Routine):
@@ -260,28 +297,28 @@ class StateTransitionDemo(Routine):
         input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
         data_dict = input_data[0] if input_data else {}
         data = data_dict.get("data") if isinstance(data_dict, dict) else None
-        
+
         name = self.get_config("name", "StateTransitionDemo")
-        
+
         # Update state info
         routine_state = job_state.get_routine_state(self._id) or {}
         routine_state["processing_started"] = datetime.now().isoformat()
         routine_state["status"] = "processing"
         job_state.update_routine_state(self._id, routine_state)
-        
+
         print(f"[{name}] Processing: {data} (state: processing)")
         time.sleep(0.5)
-        
+
         routine_state["status"] = "completed"
         routine_state["processing_completed"] = datetime.now().isoformat()
         job_state.update_routine_state(self._id, routine_state)
-        
+
         state_info = {
             "started": routine_state["processing_started"],
             "completed": routine_state["processing_completed"],
-            "status": "completed"
+            "status": "completed",
         }
-        
+
         print(f"[{name}] → Completed")
         self.emit("output", job_state=job_state, result=f"Processed: {data}", state_info=state_info)
 
@@ -329,21 +366,27 @@ class RateLimitedProcessor(Routine):
     def process(self, *slot_data_lists, policy_message, job_state):
         input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
         name = self.get_config("name", "RateLimitedProcessor")
-        
+
         print(f"[{name}] Processing {len(input_data)} items (rate-limited)...")
-        
+
         # Process all items in the batch
         for data_dict in input_data:
             if not isinstance(data_dict, dict):
                 continue
             data = data_dict.get("data")
             index = data_dict.get("index", 0)
-            
+
             result = f"Rate-limited: {data}"
             rate_limited_at = datetime.now().isoformat()
-            
-            self.emit("output", job_state=job_state, result=result, index=index, rate_limited_at=rate_limited_at)
-        
+
+            self.emit(
+                "output",
+                job_state=job_state,
+                result=result,
+                index=index,
+                rate_limited_at=rate_limited_at,
+            )
+
         print(f"[{name}] ✓ Processed {len(input_data)} items")
 
 
@@ -361,31 +404,45 @@ class DataAggregator(Routine):
         self.set_logic(self.aggregate)
 
     def aggregate(self, *slot_data_lists, policy_message, job_state):
-        input1_data = slot_data_lists[0] if slot_data_lists and len(slot_data_lists) > 0 and slot_data_lists[0] else []
-        input2_data = slot_data_lists[1] if slot_data_lists and len(slot_data_lists) > 1 and slot_data_lists[1] else []
-        
+        input1_data = (
+            slot_data_lists[0]
+            if slot_data_lists and len(slot_data_lists) > 0 and slot_data_lists[0]
+            else []
+        )
+        input2_data = (
+            slot_data_lists[1]
+            if slot_data_lists and len(slot_data_lists) > 1 and slot_data_lists[1]
+            else []
+        )
+
         name = self.get_config("name", "Aggregator")
-        
+
         # Extract data from both inputs
         data1 = input1_data[0] if input1_data and isinstance(input1_data[0], dict) else {}
         data2 = input2_data[0] if input2_data and isinstance(input2_data[0], dict) else {}
-        
+
         # Aggregate
         aggregated = {
             "from_input1": data1.get("data") if isinstance(data1, dict) else None,
             "from_input2": data2.get("data") if isinstance(data2, dict) else None,
             "timestamp": datetime.now().isoformat(),
         }
-        
+
         sources = []
         if data1:
             sources.append("input1")
         if data2:
             sources.append("input2")
-        
+
         print(f"[{name}] Aggregating from {len(sources)} sources: {aggregated}")
-        
-        self.emit("output", job_state=job_state, aggregated_data=aggregated, sources=sources, count=len(sources))
+
+        self.emit(
+            "output",
+            job_state=job_state,
+            aggregated_data=aggregated,
+            sources=sources,
+            count=len(sources),
+        )
 
 
 class ErrorGenerator(Routine):
@@ -404,20 +461,22 @@ class ErrorGenerator(Routine):
         input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
         name = self.get_config("name", "ErrorGenerator")
         error_rate = self.get_config("error_rate", 0.3)
-        
+
         import random
-        
+
         for data_dict in input_data:
             if not isinstance(data_dict, dict):
                 continue
             data = data_dict.get("data")
             index = data_dict.get("index", 0)
-            
+
             # Randomly generate errors based on error_rate
             if random.random() < error_rate:
                 error_msg = f"Simulated error processing: {data}"
                 print(f"[{name}] ✗ Error: {error_msg}")
-                self.emit("error", job_state=job_state, error=error_msg, index=index, original_data=data)
+                self.emit(
+                    "error", job_state=job_state, error=error_msg, index=index, original_data=data
+                )
             else:
                 result = f"Successfully processed: {data}"
                 print(f"[{name}] ✓ {result}")
@@ -432,27 +491,45 @@ class MultiSlotProcessor(Routine):
         self.set_config(name=name)
         self.primary_slot = self.define_slot("primary")
         self.secondary_slot = self.define_slot("secondary")
-        self.output_event = self.define_event("output", ["result", "primary_data", "secondary_data"])
+        self.output_event = self.define_event(
+            "output", ["result", "primary_data", "secondary_data"]
+        )
         # Process when primary has data (secondary is optional)
         self.set_activation_policy(immediate_policy())
         self.set_logic(self.process)
 
     def process(self, *slot_data_lists, policy_message, job_state):
-        primary_data = slot_data_lists[0] if slot_data_lists and len(slot_data_lists) > 0 and slot_data_lists[0] else []
-        secondary_data = slot_data_lists[1] if slot_data_lists and len(slot_data_lists) > 1 and slot_data_lists[1] else []
-        
+        primary_data = (
+            slot_data_lists[0]
+            if slot_data_lists and len(slot_data_lists) > 0 and slot_data_lists[0]
+            else []
+        )
+        secondary_data = (
+            slot_data_lists[1]
+            if slot_data_lists and len(slot_data_lists) > 1 and slot_data_lists[1]
+            else []
+        )
+
         name = self.get_config("name", "MultiSlotProcessor")
-        
+
         primary = primary_data[0] if primary_data and isinstance(primary_data[0], dict) else {}
-        secondary = secondary_data[0] if secondary_data and isinstance(secondary_data[0], dict) else {}
-        
+        secondary = (
+            secondary_data[0] if secondary_data and isinstance(secondary_data[0], dict) else {}
+        )
+
         primary_value = primary.get("data") if isinstance(primary, dict) else None
         secondary_value = secondary.get("data") if isinstance(secondary, dict) else None
-        
+
         result = f"Processed primary: {primary_value}, secondary: {secondary_value}"
         print(f"[{name}] {result}")
-        
-        self.emit("output", job_state=job_state, result=result, primary_data=primary_value, secondary_data=secondary_value)
+
+        self.emit(
+            "output",
+            job_state=job_state,
+            result=result,
+            primary_data=primary_value,
+            secondary_data=secondary_value,
+        )
 
 
 class LoopController(Routine):
@@ -462,7 +539,9 @@ class LoopController(Routine):
         super().__init__()
         self.set_config(name=name, max_iterations=max_iterations)
         self.input_slot = self.define_slot("input")
-        self.continue_event = self.define_event("continue", ["iteration", "data", "should_continue"])
+        self.continue_event = self.define_event(
+            "continue", ["iteration", "data", "should_continue"]
+        )
         self.done_event = self.define_event("done", ["final_data", "iterations"])
         self.set_activation_policy(immediate_policy())
         self.set_logic(self.control)
@@ -471,19 +550,25 @@ class LoopController(Routine):
         input_data = slot_data_lists[0] if slot_data_lists and slot_data_lists[0] else []
         name = self.get_config("name", "LoopController")
         max_iterations = self.get_config("max_iterations", 5)
-        
+
         routine_state = job_state.get_routine_state(self._id) or {}
         iteration = routine_state.get("iteration", 0) + 1
         routine_state["iteration"] = iteration
         job_state.update_routine_state(self._id, routine_state)
-        
+
         data_dict = input_data[0] if input_data and isinstance(input_data[0], dict) else {}
         data = data_dict.get("data") if isinstance(data_dict, dict) else None
-        
+
         if iteration < max_iterations:
             should_continue = True
             print(f"[{name}] Iteration {iteration}/{max_iterations}: Continuing loop with {data}")
-            self.emit("continue", job_state=job_state, iteration=iteration, data=data, should_continue=should_continue)
+            self.emit(
+                "continue",
+                job_state=job_state,
+                iteration=iteration,
+                data=data,
+                should_continue=should_continue,
+            )
         else:
             should_continue = False
             print(f"[{name}] Iteration {iteration}/{max_iterations}: Loop complete")
@@ -527,7 +612,9 @@ def create_queue_pressure_flow():
     # Validator uses batch policy - will create queue pressure
     validator = factory.create("data_validator", config={"name": "BatchValidator"})
     # Slow processor creates more pressure
-    processor = factory.create("queue_pressure_generator", config={"name": "SlowProcessor", "processing_delay": 0.8})
+    processor = factory.create(
+        "queue_pressure_generator", config={"name": "SlowProcessor", "processing_delay": 0.8}
+    )
     sink = factory.create("data_sink", config={"name": "Sink"})
 
     src_id = flow.add_routine(source, "source")
@@ -551,7 +638,9 @@ def create_debug_demo_flow():
 
     # Use factory to create routines (required for DSL export)
     source = factory.create("data_source", config={"name": "Source"})
-    transformer = factory.create("data_transformer", config={"name": "Transformer", "transformation": "uppercase"})
+    transformer = factory.create(
+        "data_transformer", config={"name": "Transformer", "transformation": "uppercase"}
+    )
     debug_target = factory.create("debug_target", config={"name": "DebugTarget"})
     sink = factory.create("data_sink", config={"name": "Sink"})
 
@@ -578,8 +667,12 @@ def create_comprehensive_demo_flow():
     source1 = factory.create("data_source", config={"name": "Source1"})
     source2 = factory.create("data_source", config={"name": "Source2"})
     validator = factory.create("data_validator", config={"name": "Validator"})
-    transformer = factory.create("data_transformer", config={"name": "Transformer", "transformation": "uppercase"})
-    queue_processor = factory.create("queue_pressure_generator", config={"name": "QueueProcessor", "processing_delay": 0.3})
+    transformer = factory.create(
+        "data_transformer", config={"name": "Transformer", "transformation": "uppercase"}
+    )
+    queue_processor = factory.create(
+        "queue_pressure_generator", config={"name": "QueueProcessor", "processing_delay": 0.3}
+    )
     debug_target = factory.create("debug_target", config={"name": "DebugTarget"})
     sink = factory.create("data_sink", config={"name": "Sink"})
 
@@ -638,9 +731,15 @@ def create_branching_flow():
 
     # Use factory to create routines (required for DSL export)
     source = factory.create("data_source", config={"name": "Source"})
-    transformer1 = factory.create("data_transformer", config={"name": "Transformer1", "transformation": "uppercase"})
-    transformer2 = factory.create("data_transformer", config={"name": "Transformer2", "transformation": "lowercase"})
-    transformer3 = factory.create("data_transformer", config={"name": "Transformer3", "transformation": "reverse"})
+    transformer1 = factory.create(
+        "data_transformer", config={"name": "Transformer1", "transformation": "uppercase"}
+    )
+    transformer2 = factory.create(
+        "data_transformer", config={"name": "Transformer2", "transformation": "lowercase"}
+    )
+    transformer3 = factory.create(
+        "data_transformer", config={"name": "Transformer3", "transformation": "reverse"}
+    )
     aggregator = factory.create("data_aggregator", config={"name": "FinalAggregator"})
     sink = factory.create("data_sink", config={"name": "Sink"})
 
@@ -673,7 +772,9 @@ def create_rate_limited_flow():
 
     # Use factory to create routines (required for DSL export)
     source = factory.create("data_source", config={"name": "FastSource"})
-    rate_limited = factory.create("rate_limited_processor", config={"name": "RateLimited", "interval_seconds": 2.0})
+    rate_limited = factory.create(
+        "rate_limited_processor", config={"name": "RateLimited", "interval_seconds": 2.0}
+    )
     sink = factory.create("data_sink", config={"name": "Sink"})
 
     src_id = flow.add_routine(source, "source")
@@ -695,8 +796,12 @@ def create_error_handling_flow():
 
     # Use factory to create routines (required for DSL export)
     source = factory.create("data_source", config={"name": "Source"})
-    error_gen = factory.create("error_generator", config={"name": "ErrorGenerator", "error_rate": 0.4})
-    transformer = factory.create("data_transformer", config={"name": "Transformer", "transformation": "uppercase"})
+    error_gen = factory.create(
+        "error_generator", config={"name": "ErrorGenerator", "error_rate": 0.4}
+    )
+    transformer = factory.create(
+        "data_transformer", config={"name": "Transformer", "transformation": "uppercase"}
+    )
     sink = factory.create("data_sink", config={"name": "Sink"})
 
     src_id = flow.add_routine(source, "source")
@@ -723,8 +828,12 @@ def create_loop_flow():
 
     # Use factory to create routines (required for DSL export)
     source = factory.create("data_source", config={"name": "Source"})
-    loop_controller = factory.create("loop_controller", config={"name": "LoopController", "max_iterations": 5})
-    processor = factory.create("data_transformer", config={"name": "Processor", "transformation": "uppercase"})
+    loop_controller = factory.create(
+        "loop_controller", config={"name": "LoopController", "max_iterations": 5}
+    )
+    processor = factory.create(
+        "data_transformer", config={"name": "Processor", "transformation": "uppercase"}
+    )
     sink = factory.create("data_sink", config={"name": "Sink"})
 
     src_id = flow.add_routine(source, "source")
@@ -792,21 +901,22 @@ def main():
     from routilux.factory.factory import ObjectFactory
     from routilux.factory.metadata import ObjectMetadata
     from routilux.monitoring.flow_registry import FlowRegistry
+    from routilux.runtime import Runtime
+
     from routilux.monitoring.runtime_registry import RuntimeRegistry
     from routilux.monitoring.storage import flow_store
-    from routilux.runtime import Runtime
 
     # Register runtimes in RuntimeRegistry
     print("\n[2/6] Registering runtimes in RuntimeRegistry...")
     runtime_registry = RuntimeRegistry.get_instance()
-    
+
     # Create and register three runtimes for testing
     runtimes_to_create = [
         ("production", 0, True, "Production runtime using shared thread pool (recommended)"),
         ("development", 5, False, "Development runtime with small independent thread pool"),
         ("testing", 2, False, "Testing runtime with minimal thread pool for isolation"),
     ]
-    
+
     for runtime_id, thread_pool_size, is_default, description in runtimes_to_create:
         runtime = Runtime(thread_pool_size=thread_pool_size)
         runtime_registry.register(runtime, runtime_id, is_default=is_default)
@@ -818,22 +928,88 @@ def main():
     # Register routines in factory
     print("\n[3/6] Registering routines in factory...")
     factory = ObjectFactory.get_instance()
-    
+
     routine_registrations = [
-        ("data_source", DataSource, "Generates sample data with metadata", "data_generation", ["source", "generator"]),
-        ("data_validator", DataValidator, "Validates input data with batch processing", "validation", ["validator", "batch"]),
-        ("data_transformer", DataTransformer, "Transforms data with various transformations", "transformation", ["transformer", "processor"]),
-        ("queue_pressure_generator", QueuePressureGenerator, "Generates queue pressure for monitoring", "monitoring", ["queue", "pressure"]),
-        ("debug_target", DebugTargetRoutine, "Routine designed for debugging demonstrations", "debugging", ["debug", "inspection"]),
-        ("state_transition_demo", StateTransitionDemo, "Demonstrates job state transitions", "state_management", ["state", "transition"]),
+        (
+            "data_source",
+            DataSource,
+            "Generates sample data with metadata",
+            "data_generation",
+            ["source", "generator"],
+        ),
+        (
+            "data_validator",
+            DataValidator,
+            "Validates input data with batch processing",
+            "validation",
+            ["validator", "batch"],
+        ),
+        (
+            "data_transformer",
+            DataTransformer,
+            "Transforms data with various transformations",
+            "transformation",
+            ["transformer", "processor"],
+        ),
+        (
+            "queue_pressure_generator",
+            QueuePressureGenerator,
+            "Generates queue pressure for monitoring",
+            "monitoring",
+            ["queue", "pressure"],
+        ),
+        (
+            "debug_target",
+            DebugTargetRoutine,
+            "Routine designed for debugging demonstrations",
+            "debugging",
+            ["debug", "inspection"],
+        ),
+        (
+            "state_transition_demo",
+            StateTransitionDemo,
+            "Demonstrates job state transitions",
+            "state_management",
+            ["state", "transition"],
+        ),
         ("data_sink", DataSink, "Receives and stores final results", "sink", ["sink", "collector"]),
-        ("rate_limited_processor", RateLimitedProcessor, "Processes data with rate limiting", "rate_limiting", ["rate_limit", "throttle"]),
-        ("data_aggregator", DataAggregator, "Aggregates data from multiple sources", "aggregation", ["aggregator", "merge"]),
-        ("error_generator", ErrorGenerator, "Generates errors for testing error handling", "error_handling", ["error", "testing"]),
-        ("multi_slot_processor", MultiSlotProcessor, "Processes data from multiple slots", "multi_slot", ["multi_slot", "parallel"]),
-        ("loop_controller", LoopController, "Controls loop execution in flows", "control_flow", ["loop", "control"]),
+        (
+            "rate_limited_processor",
+            RateLimitedProcessor,
+            "Processes data with rate limiting",
+            "rate_limiting",
+            ["rate_limit", "throttle"],
+        ),
+        (
+            "data_aggregator",
+            DataAggregator,
+            "Aggregates data from multiple sources",
+            "aggregation",
+            ["aggregator", "merge"],
+        ),
+        (
+            "error_generator",
+            ErrorGenerator,
+            "Generates errors for testing error handling",
+            "error_handling",
+            ["error", "testing"],
+        ),
+        (
+            "multi_slot_processor",
+            MultiSlotProcessor,
+            "Processes data from multiple slots",
+            "multi_slot",
+            ["multi_slot", "parallel"],
+        ),
+        (
+            "loop_controller",
+            LoopController,
+            "Controls loop execution in flows",
+            "control_flow",
+            ["loop", "control"],
+        ),
     ]
-    
+
     for name, routine_class, description, category, tags in routine_registrations:
         metadata = ObjectMetadata(
             name=name,
@@ -841,7 +1017,7 @@ def main():
             category=category,
             tags=tags,
             example_config={"name": f"Example{name.title()}"},
-            version="1.0.0"
+            version="1.0.0",
         )
         factory.register(name, routine_class, metadata=metadata)
         print(f"  ✓ Registered: {name} ({category})")
@@ -870,7 +1046,7 @@ def main():
         flow_store.add(flow)
         FlowRegistry.get_instance().register(flow)
         flows.append((name, flow, entry))
-        
+
         # Register flow in factory for API discovery
         flow_metadata = ObjectMetadata(
             name=flow.flow_id,
@@ -878,15 +1054,15 @@ def main():
             category="demo",
             tags=["demo", "flow", flow.flow_id.split("_")[0]],
             example_config={},
-            version="1.0.0"
+            version="1.0.0",
         )
         factory.register(flow.flow_id, flow, metadata=flow_metadata)
-        
+
         print(f"     ✓ Flow ID: {flow.flow_id}")
         print(f"     ✓ Routines: {len(flow.routines)} ({', '.join(flow.routines.keys())})")
         print(f"     ✓ Connections: {len(flow.connections)}")
         print(f"     ✓ Entry Point: {entry}")
-        print(f"     ✓ Registered in factory")
+        print("     ✓ Registered in factory")
 
     print("\n" + "=" * 80)
     print("[6/6] All flows created successfully!")
@@ -965,8 +1141,10 @@ def main():
     print("   Interface: GET /api/factory/objects/{name}/interface")
     print("   Filter by category: GET /api/factory/objects?category=data_generation")
     print("   Filter by type: GET /api/factory/objects?object_type=routine")
-    print("   Combined filter: GET /api/factory/objects?category=data_generation&object_type=routine")
-    
+    print(
+        "   Combined filter: GET /api/factory/objects?category=data_generation&object_type=routine"
+    )
+
     print("\n⚙️  Runtime Management - Registered runtimes")
     print("   List: GET /api/runtimes")
     print("   Details: GET /api/runtimes/{runtime_id}")

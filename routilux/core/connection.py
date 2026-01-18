@@ -4,7 +4,7 @@ Connection class representing a link from an event to a slot.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from routilux.core.event import Event
@@ -34,8 +34,8 @@ class Connection(Serializable):
 
     def __init__(
         self,
-        source_event: Optional["Event"] = None,
-        target_slot: Optional["Slot"] = None,
+        source_event: Event | None = None,
+        target_slot: Slot | None = None,
     ):
         """Initialize a Connection.
 
@@ -44,8 +44,8 @@ class Connection(Serializable):
             target_slot: Target Slot that will receive data
         """
         super().__init__()
-        self.source_event: Optional["Event"] = source_event
-        self.target_slot: Optional["Slot"] = target_slot
+        self.source_event: Event | None = source_event
+        self.target_slot: Slot | None = target_slot
 
         # Establish connection if both are provided
         if source_event is not None and target_slot is not None:
@@ -56,16 +56,8 @@ class Connection(Serializable):
 
     def __repr__(self) -> str:
         """Return string representation."""
-        source = (
-            f"{getattr(self.source_event, 'name', 'unknown')}"
-            if self.source_event
-            else "None"
-        )
-        target = (
-            f"{getattr(self.target_slot, 'name', 'unknown')}"
-            if self.target_slot
-            else "None"
-        )
+        source = f"{getattr(self.source_event, 'name', 'unknown')}" if self.source_event else "None"
+        target = f"{getattr(self.target_slot, 'name', 'unknown')}" if self.target_slot else "None"
         return f"Connection[{source} -> {target}]"
 
     def disconnect(self) -> None:

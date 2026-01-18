@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
 from routilux.core.hooks import ExecutionHooksInterface
 
@@ -60,7 +60,7 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
     ensuring zero overhead when monitoring is disabled.
     """
 
-    def on_worker_start(self, flow: "Flow", worker_state: "WorkerState") -> None:
+    def on_worker_start(self, flow: Flow, worker_state: WorkerState) -> None:
         """Called when a worker starts execution.
 
         Args:
@@ -87,9 +87,7 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
                 },
             )
 
-    def on_worker_stop(
-        self, flow: "Flow", worker_state: "WorkerState", status: str
-    ) -> None:
+    def on_worker_stop(self, flow: Flow, worker_state: WorkerState, status: str) -> None:
         """Called when a worker stops execution.
 
         Args:
@@ -121,9 +119,7 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
                             "start_time": metrics.start_time.isoformat()
                             if metrics.start_time
                             else None,
-                            "end_time": metrics.end_time.isoformat()
-                            if metrics.end_time
-                            else None,
+                            "end_time": metrics.end_time.isoformat() if metrics.end_time else None,
                             "duration": metrics.duration,
                             "total_events": metrics.total_events,
                             "total_slot_calls": metrics.total_slot_calls,
@@ -132,9 +128,7 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
                     },
                 )
 
-    def on_job_start(
-        self, job_context: "JobContext", worker_state: "WorkerState"
-    ) -> None:
+    def on_job_start(self, job_context: JobContext, worker_state: WorkerState) -> None:
         """Called when a job starts processing.
 
         Args:
@@ -158,10 +152,10 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
 
     def on_job_end(
         self,
-        job_context: "JobContext",
-        worker_state: "WorkerState",
+        job_context: JobContext,
+        worker_state: WorkerState,
         status: str = "completed",
-        error: Optional[Exception] = None,
+        error: Exception | None = None,
     ) -> None:
         """Called when a job finishes processing.
 
@@ -191,8 +185,8 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
     def on_routine_start(
         self,
         routine_id: str,
-        worker_state: "WorkerState",
-        job_context: Optional["JobContext"] = None,
+        worker_state: WorkerState,
+        job_context: JobContext | None = None,
     ) -> bool:
         """Called when a routine starts execution.
 
@@ -255,10 +249,10 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
     def on_routine_end(
         self,
         routine_id: str,
-        worker_state: "WorkerState",
-        job_context: Optional["JobContext"] = None,
+        worker_state: WorkerState,
+        job_context: JobContext | None = None,
         status: str = "completed",
-        error: Optional[Exception] = None,
+        error: Exception | None = None,
     ) -> None:
         """Called when a routine finishes execution.
 
@@ -289,11 +283,11 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
 
     def on_event_emit(
         self,
-        event: "Event",
+        event: Event,
         source_routine_id: str,
-        worker_state: "WorkerState",
-        job_context: Optional["JobContext"] = None,
-        data: Optional[Dict[str, Any]] = None,
+        worker_state: WorkerState,
+        job_context: JobContext | None = None,
+        data: dict[str, Any] | None = None,
     ) -> bool:
         """Called when an event is emitted.
 
@@ -317,9 +311,7 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
         # Record event emission
         collector = registry.monitor_collector
         if collector:
-            collector.record_event_emit(
-                event.name, source_routine_id, worker_state.worker_id, data
-            )
+            collector.record_event_emit(event.name, source_routine_id, worker_state.worker_id, data)
 
         # Publish event
         _publish_event_via_manager(
@@ -371,7 +363,7 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
 
 
 # Singleton instance
-_monitoring_hooks: Optional[MonitoringExecutionHooks] = None
+_monitoring_hooks: MonitoringExecutionHooks | None = None
 
 
 def get_monitoring_hooks() -> MonitoringExecutionHooks:

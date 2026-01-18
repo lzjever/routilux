@@ -94,8 +94,8 @@ from routilux.core.flow import Flow, RoutineConfig, WorkerNotRunningError
 from routilux.core.executor import WorkerExecutor
 from routilux.core.manager import WorkerManager, get_worker_manager, reset_worker_manager
 
-# Note: The following will be added as they are created:
-# from routilux.core.runtime import Runtime
+# Runtime
+from routilux.core.runtime import Runtime
 
 __all__ = [
     # Status enums
@@ -155,6 +155,6 @@ __all__ = [
     "WorkerManager",
     "get_worker_manager",
     "reset_worker_manager",
-    # TODO: Add when created
-    # "Runtime",
+    # Runtime
+    "Runtime",
 ]

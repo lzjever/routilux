@@ -2,9 +2,9 @@
 Pydantic models for Breakpoint API.
 """
 
-from typing import List, Literal, Optional
+from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class BreakpointUpdateRequest(BaseModel):
@@ -14,38 +14,27 @@ class BreakpointUpdateRequest(BaseModel):
 
 
 class BreakpointCreateRequest(BaseModel):
-    """Request model for creating a breakpoint."""
+    """Request model for creating a slot-level breakpoint."""
 
-    type: Literal["routine", "slot", "event", "connection"]
-    routine_id: Optional[str] = None
-    slot_name: Optional[str] = None
-    event_name: Optional[str] = None
-    # Connection breakpoint fields
-    source_routine_id: Optional[str] = None
-    source_event_name: Optional[str] = None
-    target_routine_id: Optional[str] = None
-    target_slot_name: Optional[str] = None
-    condition: Optional[str] = None
-    enabled: bool = True
+    routine_id: str = Field(..., description="Routine ID where the slot is located")
+    slot_name: str = Field(..., description="Slot name where breakpoint is set")
+    condition: Optional[str] = Field(
+        None,
+        description="Optional Python expression to evaluate (e.g., \"data.get('value') > 10\")"
+    )
+    enabled: bool = Field(True, description="Whether breakpoint is active")
 
 
 class BreakpointResponse(BaseModel):
     """Response model for breakpoint details."""
 
-    breakpoint_id: str
-    job_id: str
-    type: str
-    routine_id: Optional[str]
-    slot_name: Optional[str]
-    event_name: Optional[str]
-    # Connection breakpoint fields
-    source_routine_id: Optional[str] = None
-    source_event_name: Optional[str] = None
-    target_routine_id: Optional[str] = None
-    target_slot_name: Optional[str] = None
-    condition: Optional[str]
-    enabled: bool
-    hit_count: int
+    breakpoint_id: str = Field(..., description="Unique breakpoint identifier")
+    job_id: str = Field(..., description="Job ID this breakpoint applies to")
+    routine_id: str = Field(..., description="Routine ID where the slot is located")
+    slot_name: str = Field(..., description="Slot name where breakpoint is set")
+    condition: Optional[str] = Field(None, description="Optional condition expression")
+    enabled: bool = Field(..., description="Whether breakpoint is active")
+    hit_count: int = Field(..., description="Number of times breakpoint has been hit")
 
 
 class BreakpointListResponse(BaseModel):

@@ -71,10 +71,19 @@ def evaluate_condition(
             if key in ("__builtins__", "__import__", "__name__", "__file__"):
                 raise ValueError(f"Cannot override protected variable: {key}")
             # Ensure value is safe (no callables that could escape sandbox)
+            # BUT: Allow callables that are methods on built-in types (like dict.get)
+            # We only block custom callables
             if callable(value) and key not in safe_builtins:
-                # Allow only whitelisted callables
-                raise ValueError(f"Custom callables not allowed in conditions: {key}")
-            eval_context[key] = value
+                # Check if it's a method on a built-in type (like dict.get, list.append)
+                # These are safe because they operate on the object itself
+                if hasattr(value, '__self__') and isinstance(value.__self__, (dict, list, tuple, str, int, float)):
+                    # It's a method on a built-in type - allow it
+                    eval_context[key] = value
+                else:
+                    # It's a custom callable - block it
+                    raise ValueError(f"Custom callables not allowed in conditions: {key}")
+            else:
+                eval_context[key] = value
 
     # Add context variables
     if context:

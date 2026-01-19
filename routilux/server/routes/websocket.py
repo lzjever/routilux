@@ -52,6 +52,80 @@ async def _check_websocket_auth(websocket: WebSocket) -> bool:
     return True
 
 
+def normalize_event_for_frontend(event: dict, job_id: str) -> dict:
+    """Normalize event format for frontend consumption.
+    
+    Converts backend event format to frontend-expected format:
+    - Maps `event_type` -> `type` with proper type name conversion
+    - Ensures `job_id`, `timestamp`, `data` fields exist
+    - Handles special cases (routine_end -> routine_completed/routine_failed)
+    
+    Args:
+        event: Backend event dictionary
+        job_id: Job ID (fallback if not in event)
+    
+    Returns:
+        Normalized event dictionary matching frontend expectations
+    """
+    from datetime import datetime
+    
+    # Extract event type (backend uses "event_type" or "type")
+    event_type = event.get("event_type") or event.get("type", "unknown")
+    
+    # Event type mapping: backend -> frontend
+    type_mapping = {
+        "routine_start": "routine_started",
+        "slot_call": "slot_called",
+        "event_emit": "event_emitted",
+        "job_start": "job_started",
+        "job_end": "job_completed",  # Will be overridden by status check
+    }
+    
+    # Determine normalized type
+    normalized_type = type_mapping.get(event_type, event_type)
+    
+    # Handle routine_end special case
+    if event_type == "routine_end":
+        status = event.get("status", "completed")
+        if status == "failed":
+            normalized_type = "routine_failed"
+        else:
+            normalized_type = "routine_completed"
+    
+    # Handle job_end special case
+    if event_type == "job_end":
+        status = event.get("status", "completed")
+        if status == "failed":
+            normalized_type = "job_failed"
+        else:
+            normalized_type = "job_completed"
+    
+    # Build normalized event structure
+    normalized = {
+        "type": normalized_type,
+        "job_id": event.get("job_id", job_id),
+        "timestamp": event.get("timestamp") or datetime.now().isoformat(),
+        "data": {
+            "event_id": event.get("event_id"),
+            "routine_id": event.get("routine_id"),
+            **(event.get("data", {})),
+        }
+    }
+    
+    # Add duration and status for routine_end events
+    if event_type == "routine_end":
+        if "duration" in event:
+            normalized["data"]["duration"] = event["duration"]
+        if "status" in event:
+            normalized["data"]["status"] = event["status"]
+    
+    # Add error information if present
+    if "error" in event:
+        normalized["data"]["error"] = event["error"]
+    
+    return normalized
+
+
 async def safe_send_json(
     websocket: WebSocket,
     data: dict,
@@ -322,8 +396,11 @@ async def job_monitor_websocket(websocket: WebSocket, job_id: str):
 
         # Event-driven loop: receive events as they occur
         async for event in event_manager.iter_events(subscriber_id):
+            # Normalize event format for frontend
+            normalized_event = normalize_event_for_frontend(event, job_id)
+            
             # Send event to WebSocket client
-            success = await safe_send_json(websocket, event, f"event for job {job_id}")
+            success = await safe_send_json(websocket, normalized_event, f"event for job {job_id}")
             if not success:
                 logger.warning(f"Failed to send event, closing connection for job {job_id}")
                 break
@@ -735,17 +812,22 @@ async def flow_monitor_websocket(websocket: WebSocket, flow_id: str):
                 logger.error(f"Error unsubscribing from job {job_id}: {e}")
 
 
-@router.websocket("/ws")
-async def generic_websocket(websocket: WebSocket):
+@router.websocket("/websocket")
+async def websocket_v1(websocket: WebSocket):
     """
-    Generic WebSocket endpoint for subscribing to multiple jobs/flows.
+    WebSocket endpoint at /api/v1/websocket.
 
     **Overview**:
     Establishes a generic WebSocket connection that allows clients to dynamically
     subscribe and unsubscribe to multiple jobs. This provides flexibility for
     clients that need to monitor multiple jobs or dynamically change subscriptions.
 
-    **Endpoint**: `WS /api/ws`
+    **Endpoint**: `WS /api/v1/websocket`
+    
+    This is the primary WebSocket endpoint for subscribing to job events.
+    The old /api/v1/ws endpoint has been removed.
+
+    **Protocol**: Same as the previous /api/v1/ws endpoint
 
     **Use Cases**:
     - Multi-job monitoring dashboards
@@ -791,7 +873,7 @@ async def generic_websocket(websocket: WebSocket):
 
     **Example Usage** (JavaScript):
     ```javascript
-    const ws = new WebSocket('ws://localhost:20555/api/ws?api_key=your_key');
+    const ws = new WebSocket('ws://localhost:20555/api/v1/websocket?api_key=your_key');
     
     ws.onopen = () => {
       // Subscribe to jobs
@@ -817,8 +899,8 @@ async def generic_websocket(websocket: WebSocket):
     5. Respond to pings with pong
 
     **Related Endpoints**:
-    - WS /api/ws/jobs/{job_id}/monitor - Single job monitoring (simpler)
-    - WS /api/ws/flows/{flow_id}/monitor - Flow-level monitoring
+    - WS /api/v1/ws/jobs/{job_id}/monitor - Single job monitoring (simpler)
+    - WS /api/v1/ws/flows/{flow_id}/monitor - Flow-level monitoring
     - GET /api/v1/jobs - List jobs to subscribe to
 
     Args:
@@ -888,6 +970,15 @@ async def generic_websocket(websocket: WebSocket):
                                 logger.info(
                                     f"Generic WebSocket subscribed to job {job_id} as {subscriber_id}"
                                 )
+                                
+                                # Immediately start event handler for this subscription
+                                if job_id not in event_tasks:
+                                    task = asyncio.create_task(
+                                        _handle_job_events(websocket, job_id, subscriber_id)
+                                    )
+                                    event_tasks[job_id] = task
+                                    logger.debug(f"Started event handler for job {job_id}")
+                                
                                 await safe_send_json(
                                     websocket,
                                     {
@@ -967,21 +1058,26 @@ async def generic_websocket(websocket: WebSocket):
         async def _handle_job_events(websocket: WebSocket, job_id: str, subscriber_id: str):
             """Handle events for a specific job."""
             try:
+                logger.debug(f"Event handler started for job {job_id}, subscriber {subscriber_id}")
+                event_count = 0
                 async for event in event_manager.iter_events(subscriber_id):
-                    # Add job_id to event if not present
-                    if "job_id" not in event:
-                        event["job_id"] = job_id
-
-                    success = await safe_send_json(websocket, event, f"event for job {job_id}")
+                    event_count += 1
+                    logger.debug(f"Event handler received event {event_count} for job {job_id}: {event.get('type')}")
+                    # Normalize event format for frontend
+                    normalized_event = normalize_event_for_frontend(event, job_id)
+                    logger.debug(f"Normalized event for job {job_id}: {normalized_event.get('type')}")
+                    
+                    success = await safe_send_json(websocket, normalized_event, f"event for job {job_id}")
                     if not success:
                         logger.warning(
                             f"Failed to send event, removing subscription for job {job_id}"
                         )
                         break
+                logger.debug(f"Event handler finished for job {job_id}, processed {event_count} events")
             except asyncio.CancelledError:
                 logger.debug(f"Event handler cancelled for job {job_id}")
             except Exception as e:
-                logger.error(f"Error in event handler for job {job_id}: {e}")
+                logger.error(f"Error in event handler for job {job_id}: {e}", exc_info=True)
 
         # Start message handler
         message_task = asyncio.create_task(message_handler())
@@ -1046,3 +1142,14 @@ async def generic_websocket(websocket: WebSocket):
                 logger.info(f"Generic WebSocket unsubscribed from job {job_id} ({subscriber_id})")
             except Exception as e:
                 logger.error(f"Error unsubscribing from job {job_id}: {e}")
+
+
+# DEPRECATED: Alias for backward compatibility (will be removed in future)
+@router.websocket("/ws")
+async def generic_websocket(websocket: WebSocket):
+    """
+    DEPRECATED: Use /api/v1/websocket instead.
+    
+    This endpoint is kept temporarily for backward compatibility but will be removed.
+    """
+    return await websocket_v1(websocket)

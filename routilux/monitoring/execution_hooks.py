@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from typing import TYPE_CHECKING, Any
 
 from routilux.core.hooks import ExecutionHooksInterface
@@ -23,8 +24,77 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# Global event publisher for sync-to-async bridge
+# This is initialized once and reused, avoiding thread creation overhead
+_event_publisher_loop: asyncio.AbstractEventLoop | None = None
+_event_publisher_thread: threading.Thread | None = None
+_event_publisher_queue: asyncio.Queue | None = None
+_event_publisher_lock = threading.Lock()
+
+
+def _ensure_event_publisher():
+    """Ensure global event publisher is running.
+    
+    Creates a single background thread with event loop that processes
+    events from sync contexts. This is more efficient than creating
+    a new thread for each event.
+    """
+    global _event_publisher_loop, _event_publisher_thread, _event_publisher_queue
+    
+    with _event_publisher_lock:
+        if _event_publisher_thread is not None and _event_publisher_thread.is_alive():
+            return  # Already running
+        
+        def run_event_loop():
+            """Background thread that runs event loop for sync-to-async bridge."""
+            global _event_publisher_loop, _event_publisher_queue
+            
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            _event_publisher_loop = new_loop
+            queue = asyncio.Queue()
+            _event_publisher_queue = queue
+            
+            async def publisher():
+                """Async task that processes events from queue."""
+                from routilux.monitoring.event_manager import get_event_manager
+                event_manager = get_event_manager()
+                
+                while True:
+                    try:
+                        # Wait for event with timeout to allow checking if we should continue
+                        job_id, event = await asyncio.wait_for(
+                            queue.get(), timeout=1.0
+                        )
+                        try:
+                            await event_manager.publish(job_id, event)
+                        except Exception as e:
+                            logger.error(f"Error publishing event {event.get('type')} for job {job_id}: {e}", exc_info=True)
+                    except asyncio.TimeoutError:
+                        # No events for 1 second, but keep running (queue might get events later)
+                        continue
+                    except Exception as e:
+                        logger.error(f"Error in event publisher loop: {e}", exc_info=True)
+            
+            # Create and run publisher task
+            task = new_loop.create_task(publisher())
+            new_loop.run_forever()
+        
+        _event_publisher_thread = threading.Thread(
+            target=run_event_loop, daemon=True, name="EventPublisher"
+        )
+        _event_publisher_thread.start()
+        
+        # Give thread time to initialize
+        import time
+        time.sleep(0.1)
+
+
 def _publish_event_via_manager(job_id: str, event: dict) -> None:
     """Publish event via event manager with error handling (fire-and-forget).
+
+    Supports both async and sync contexts. In sync contexts, uses a global
+    background event loop thread to publish events efficiently.
 
     Args:
         job_id: Job identifier
@@ -36,11 +106,26 @@ def _publish_event_via_manager(job_id: str, event: dict) -> None:
         event_manager = get_event_manager()
 
         try:
-            asyncio.get_running_loop()
+            loop = asyncio.get_running_loop()
+            # In async context, create task without waiting
             asyncio.create_task(event_manager.publish(job_id, event))
         except RuntimeError:
-            # No running event loop - skip publishing
-            return
+            # No running event loop - use global background publisher
+            _ensure_event_publisher()
+            
+            if _event_publisher_loop is not None and _event_publisher_queue is not None:
+                # Schedule event in the background loop using call_soon_threadsafe
+                # This is more efficient than using a thread queue
+                def put_event():
+                    try:
+                        _event_publisher_queue.put_nowait((job_id, event))
+                    except Exception as e:
+                        logger.error(f"Failed to queue event for job {job_id}: {e}")
+                
+                _event_publisher_loop.call_soon_threadsafe(put_event)
+            else:
+                # Fallback: log warning but don't fail
+                logger.warning(f"Event publisher not available, dropping event for job {job_id}")
     except (RuntimeError, AttributeError):
         pass
     except Exception as e:
@@ -136,19 +221,27 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
             worker_state: Worker state
         """
         from routilux.monitoring.registry import MonitoringRegistry
+        from datetime import datetime
 
         if not MonitoringRegistry.is_enabled():
             return
 
+        # Publish job_started event with frontend-expected format
+        logger.debug(f"Publishing job_started event for job {job_context.job_id}")
         _publish_event_via_manager(
-            worker_state.worker_id,
+            job_context.job_id,  # Use job_id instead of worker_id
             {
-                "type": "job_start",
-                "worker_id": worker_state.worker_id,
+                "type": "job_started",  # Frontend expects "job_started"
                 "job_id": job_context.job_id,
-                "metadata": job_context.metadata,
+                "timestamp": datetime.now().isoformat(),
+                "data": {
+                    "flow_id": worker_state.flow_id,
+                    "worker_id": worker_state.worker_id,
+                    "metadata": job_context.metadata,
+                }
             },
         )
+        logger.debug(f"Published job_started event for job {job_context.job_id}")
 
     def on_job_end(
         self,
@@ -166,19 +259,28 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
             error: Error if failed
         """
         from routilux.monitoring.registry import MonitoringRegistry
+        from datetime import datetime
 
         if not MonitoringRegistry.is_enabled():
             return
 
+        # Determine event type based on status
+        event_type = "job_completed" if status == "completed" else "job_failed"
+
+        # Publish job event with frontend-expected format
         _publish_event_via_manager(
-            worker_state.worker_id,
+            job_context.job_id,  # Use job_id instead of worker_id
             {
-                "type": "job_end",
-                "worker_id": worker_state.worker_id,
+                "type": event_type,  # Frontend expects "job_completed" or "job_failed"
                 "job_id": job_context.job_id,
-                "status": status,
-                "error": str(error) if error else None,
-                "trace_log": job_context.trace_log,
+                "timestamp": datetime.now().isoformat(),
+                "data": {
+                    "flow_id": worker_state.flow_id,
+                    "worker_id": worker_state.worker_id,
+                    "status": status,
+                    "error": str(error) if error else None,
+                    "trace_log": job_context.trace_log,
+                }
             },
         )
 
@@ -199,50 +301,27 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
             True to continue execution, False to pause (e.g., breakpoint)
         """
         from routilux.monitoring.registry import MonitoringRegistry
+        from datetime import datetime
 
         if not MonitoringRegistry.is_enabled():
             return True
 
-        # Publish routine status change event
+        # Publish routine_started event (not routine_status_change)
         _publish_event_via_manager(
-            worker_state.worker_id,
+            job_context.job_id if job_context else worker_state.worker_id,
             {
-                "type": "routine_status_change",
-                "worker_id": worker_state.worker_id,
+                "type": "routine_started",  # Frontend expects "routine_started"
                 "job_id": job_context.job_id if job_context else None,
-                "routine_id": routine_id,
-                "status": "running",
-                "is_active": True,
+                "timestamp": datetime.now().isoformat(),
+                "data": {
+                    "routine_id": routine_id,
+                    "worker_id": worker_state.worker_id,
+                }
             },
         )
 
-        # Check breakpoint
-        registry = MonitoringRegistry.get_instance()
-        breakpoint_mgr = registry.breakpoint_manager
-        if breakpoint_mgr:
-            breakpoint = breakpoint_mgr.check_breakpoint(
-                worker_state.worker_id,
-                routine_id,
-                "routine_start",
-            )
-            if breakpoint:
-                debug_store = registry.debug_session_store
-                if debug_store:
-                    session = debug_store.get_or_create(worker_state.worker_id)
-                    session.pause(None, reason=f"Breakpoint at routine start: {routine_id}")
-                    _publish_event_via_manager(
-                        worker_state.worker_id,
-                        {
-                            "type": "breakpoint_hit",
-                            "worker_id": worker_state.worker_id,
-                            "breakpoint": {
-                                "breakpoint_id": breakpoint.breakpoint_id,
-                                "type": breakpoint.type,
-                                "routine_id": routine_id,
-                            },
-                        },
-                    )
-                    return False
+        # Note: Breakpoints are now checked during event routing in Runtime.handle_event_emit
+        # No breakpoint check needed here for routine start
 
         return True
 
@@ -264,20 +343,27 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
             error: Error if failed
         """
         from routilux.monitoring.registry import MonitoringRegistry
+        from datetime import datetime
 
         if not MonitoringRegistry.is_enabled():
             return
 
+        # Determine event type based on status
+        event_type = "routine_completed" if status == "completed" else "routine_failed"
+
+        # Publish routine event
         _publish_event_via_manager(
-            worker_state.worker_id,
+            job_context.job_id if job_context else worker_state.worker_id,
             {
-                "type": "routine_status_change",
-                "worker_id": worker_state.worker_id,
+                "type": event_type,  # Frontend expects "routine_completed" or "routine_failed"
                 "job_id": job_context.job_id if job_context else None,
-                "routine_id": routine_id,
-                "status": status,
-                "is_active": False,
-                "error": str(error) if error else None,
+                "timestamp": datetime.now().isoformat(),
+                "data": {
+                    "routine_id": routine_id,
+                    "worker_id": worker_state.worker_id,
+                    "status": status,
+                    "error": str(error) if error else None,
+                }
             },
         )
 
@@ -326,38 +412,8 @@ class MonitoringExecutionHooks(ExecutionHooksInterface):
             },
         )
 
-        # Check breakpoint
-        breakpoint_mgr = registry.breakpoint_manager
-        if breakpoint_mgr:
-            breakpoint = breakpoint_mgr.check_breakpoint(
-                worker_state.worker_id,
-                source_routine_id,
-                "event",
-                event_name=event.name,
-                variables=data,
-            )
-            if breakpoint:
-                debug_store = registry.debug_session_store
-                if debug_store:
-                    session = debug_store.get_or_create(worker_state.worker_id)
-                    session.pause(
-                        None,
-                        reason=f"Breakpoint at event emit: {source_routine_id}.{event.name}",
-                    )
-                    _publish_event_via_manager(
-                        worker_state.worker_id,
-                        {
-                            "type": "breakpoint_hit",
-                            "worker_id": worker_state.worker_id,
-                            "breakpoint": {
-                                "breakpoint_id": breakpoint.breakpoint_id,
-                                "type": breakpoint.type,
-                                "routine_id": source_routine_id,
-                                "event_name": event.name,
-                            },
-                        },
-                    )
-                    return False
+        # Note: Breakpoints are now checked during event routing in Runtime.handle_event_emit
+        # when data is about to be enqueued to slots. No breakpoint check needed here for event emit.
 
         return True
 

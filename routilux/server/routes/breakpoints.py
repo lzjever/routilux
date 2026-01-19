@@ -23,14 +23,8 @@ def _breakpoint_to_response(bp: Breakpoint) -> BreakpointResponse:
     return BreakpointResponse(
         breakpoint_id=bp.breakpoint_id,
         job_id=bp.job_id,
-        type=bp.type,
         routine_id=bp.routine_id,
         slot_name=bp.slot_name,
-        event_name=bp.event_name,
-        source_routine_id=bp.source_routine_id,
-        source_event_name=bp.source_event_name,
-        target_routine_id=bp.target_routine_id,
-        target_slot_name=bp.target_slot_name,
         condition=bp.condition,
         enabled=bp.enabled,
         hit_count=bp.hit_count,
@@ -45,33 +39,27 @@ def _breakpoint_to_response(bp: Breakpoint) -> BreakpointResponse:
 )
 async def create_breakpoint(job_id: str, request: BreakpointCreateRequest):
     """
-    Create a breakpoint for a job.
+    Create a slot-level breakpoint for a job.
 
     **Overview**:
-    Creates a breakpoint that pauses job execution at a specific point in the flow.
-    Breakpoints allow you to inspect state, debug issues, and control execution flow.
-    When a breakpoint is hit, execution pauses until you resume or remove the breakpoint.
+    Creates a breakpoint that pauses job execution when data is about to be
+    enqueued to a specific slot. When a breakpoint is hit, the enqueue operation
+    is skipped, effectively pausing execution at that point.
 
-    **Endpoint**: `POST /api/jobs/{job_id}/breakpoints`
+    **Endpoint**: `POST /api/v1/jobs/{job_id}/breakpoints`
 
     **Use Cases**:
     - Debug job execution issues
-    - Inspect routine state at specific points
+    - Inspect data at specific slots
     - Control execution flow
     - Step through job execution
     - Analyze data transformations
 
-    **Breakpoint Types**:
-    - `routine`: Pauses when a specific routine is executed
-    - `slot`: Pauses when a specific slot is called
-    - `event`: Pauses when a specific event is emitted
-    - `connection`: Pauses when data flows through a specific connection
-
     **Request Example**:
     ```json
     {
-      "type": "routine",
       "routine_id": "data_processor",
+      "slot_name": "input",
       "enabled": true,
       "condition": null
     }
@@ -82,14 +70,8 @@ async def create_breakpoint(job_id: str, request: BreakpointCreateRequest):
     {
       "breakpoint_id": "bp_xyz789",
       "job_id": "job_abc123",
-      "type": "routine",
       "routine_id": "data_processor",
-      "slot_name": null,
-      "event_name": null,
-      "source_routine_id": null,
-      "source_event_name": null,
-      "target_routine_id": null,
-      "target_slot_name": null,
+      "slot_name": "input",
       "condition": null,
       "enabled": true,
       "hit_count": 0
@@ -97,29 +79,25 @@ async def create_breakpoint(job_id: str, request: BreakpointCreateRequest):
     ```
 
     **Breakpoint Configuration**:
-    - `type` (required): Breakpoint type (routine, slot, event, connection)
-    - `routine_id` (optional): Routine ID for routine/slot/event breakpoints
-    - `slot_name` (optional): Slot name for slot breakpoints
-    - `event_name` (optional): Event name for event breakpoints
-    - `source_routine_id` / `target_routine_id` (optional): For connection breakpoints
-    - `condition` (optional): Conditional expression (if supported)
+    - `routine_id` (required): Routine ID where the slot is located
+    - `slot_name` (required): Slot name where breakpoint is set
+    - `condition` (optional): Conditional expression (e.g., "data.get('value') > 10")
     - `enabled` (optional): Whether breakpoint is active (default: true)
 
     **Error Responses**:
-    - `404 Not Found`: Job not found, flow not found, or routine not found in flow
+    - `404 Not Found`: Job not found, flow not found, routine not found in flow, or slot not found in routine
     - `500 Internal Server Error`: Breakpoint manager not available
 
     **Best Practices**:
     1. Create breakpoints before job starts for best results
-    2. Use routine breakpoints for general debugging
-    3. Use slot/event breakpoints for specific data flow debugging
-    4. Disable breakpoints when not debugging: PUT /api/workers/{worker_id}/breakpoints/{breakpoint_id}
-    5. Remove breakpoints after debugging: DELETE /api/jobs/{job_id}/breakpoints/{breakpoint_id}
+    2. Use slot breakpoints to intercept data at specific points
+    3. Disable breakpoints when not debugging: PUT /api/workers/{worker_id}/breakpoints/{breakpoint_id}
+    4. Remove breakpoints after debugging: DELETE /api/jobs/{job_id}/breakpoints/{breakpoint_id}
 
     **Related Endpoints**:
-    - GET /api/jobs/{job_id}/breakpoints - List all breakpoints
-    - PUT /api/workers/{worker_id}/breakpoints/{breakpoint_id} - Enable/disable breakpoint
-    - DELETE /api/jobs/{job_id}/breakpoints/{breakpoint_id} - Delete breakpoint
+    - GET /api/v1/jobs/{job_id}/breakpoints - List all breakpoints
+    - PUT /api/v1/workers/{worker_id}/breakpoints/{breakpoint_id} - Enable/disable breakpoint
+    - DELETE /api/v1/jobs/{job_id}/breakpoints/{breakpoint_id} - Delete breakpoint
 
     Args:
         job_id: Unique job identifier
@@ -129,7 +107,7 @@ async def create_breakpoint(job_id: str, request: BreakpointCreateRequest):
         BreakpointResponse: Created breakpoint information
 
     Raises:
-        HTTPException: 404 if job, flow, or routine not found
+        HTTPException: 404 if job, flow, routine, or slot not found
         HTTPException: 500 if breakpoint manager unavailable
     """
     # Verify job exists (use new job storage)
@@ -147,72 +125,45 @@ async def create_breakpoint(job_id: str, request: BreakpointCreateRequest):
     if not flow_id:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' has no flow_id")
 
+    # Verify routine and slot exist in flow
+    from routilux.core.registry import FlowRegistry
+
+    flow_registry = FlowRegistry.get_instance()
+    flow = flow_registry.get(flow_id)
+
+    if not flow:
+        raise HTTPException(status_code=404, detail=f"Flow '{flow_id}' not found")
+
+    if request.routine_id not in flow.routines:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Routine '{request.routine_id}' not found in flow"
+        )
+
+    routine = flow.routines[request.routine_id]
+    slot = routine.get_slot(request.slot_name)
+
+    if slot is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Slot '{request.slot_name}' not found in routine '{request.routine_id}'"
+        )
+
+    # Get breakpoint manager
     registry = MonitoringRegistry.get_instance()
     breakpoint_mgr = registry.breakpoint_manager
 
     if not breakpoint_mgr:
         raise HTTPException(status_code=500, detail="Breakpoint manager not available")
 
-    # For routine-level breakpoints, use job-specific activation policy
-    if request.type == "routine" and request.routine_id:
-        # Get flow and routine to save original policy
-        from routilux.core.registry import FlowRegistry
-
-        flow_registry = FlowRegistry.get_instance()
-        flow = flow_registry.get(flow_id)
-
-        if not flow:
-            raise HTTPException(status_code=404, detail=f"Flow '{flow_id}' not found")
-
-        if request.routine_id not in flow.routines:
-            raise HTTPException(
-                status_code=404, detail=f"Routine '{request.routine_id}' not found in flow"
-            )
-
-        routine = flow.routines[request.routine_id]
-
-        # Save original policy (if exists)
-        original_policy = routine._activation_policy
-
-        # Create breakpoint policy and set as job-specific policy
-        from routilux.activation_policies import breakpoint_policy
-
-        bp_policy = breakpoint_policy(request.routine_id)
-        # Set policy on worker for the new system
-        from routilux.core.registry import WorkerRegistry
-
-        worker_registry = WorkerRegistry.get_instance()
-        worker = worker_registry.get(job_context.worker_id)
-        if worker:
-            # Store policy in worker state
-            if not hasattr(worker, "_job_activation_policies"):
-                worker._job_activation_policies = {}
-            worker._job_activation_policies[job_id] = {request.routine_id: bp_policy}
-
-        # Store original policy in breakpoint for restoration
-        # Note: We'll store it in a way that can be retrieved later
-        # Since Callable can't be serialized, we'll handle this in remove_breakpoint
-
-    # Create breakpoint
+    # Create breakpoint (no policy manipulation needed)
     breakpoint = Breakpoint(
         job_id=job_id,
-        type=request.type,
         routine_id=request.routine_id,
         slot_name=request.slot_name,
-        event_name=request.event_name,
-        source_routine_id=request.source_routine_id,
-        source_event_name=request.source_event_name,
-        target_routine_id=request.target_routine_id,
-        target_slot_name=request.target_slot_name,
         condition=request.condition,
         enabled=request.enabled,
     )
-
-    # Store original policy reference in breakpoint (non-serializable)
-    if request.type == "routine" and request.routine_id:
-        # We'll need to get the original policy when removing
-        # For now, we store a reference that we can use
-        breakpoint._original_policy = original_policy  # type: ignore
 
     breakpoint_mgr.add_breakpoint(breakpoint)
 
@@ -230,7 +181,7 @@ async def list_breakpoints(job_id: str):
     Returns a list of all breakpoints associated with a job. Use this to inspect active
     breakpoints, check breakpoint status, and manage debugging sessions.
 
-    **Endpoint**: `GET /api/jobs/{job_id}/breakpoints`
+    **Endpoint**: `GET /api/v1/jobs/{job_id}/breakpoints`
 
     **Use Cases**:
     - View all active breakpoints for a job
@@ -250,8 +201,9 @@ async def list_breakpoints(job_id: str):
         {
           "breakpoint_id": "bp_xyz789",
           "job_id": "job_abc123",
-          "type": "routine",
           "routine_id": "data_processor",
+          "slot_name": "input",
+          "condition": null,
           "enabled": true,
           "hit_count": 3
         }
@@ -267,7 +219,10 @@ async def list_breakpoints(job_id: str):
     **Breakpoint Information**:
     Each breakpoint includes:
     - `breakpoint_id`: Unique breakpoint identifier
-    - `type`: Breakpoint type (routine, slot, event, connection)
+    - `job_id`: Job ID this breakpoint is associated with
+    - `routine_id`: Routine ID where the slot is located (required)
+    - `slot_name`: Slot name where breakpoint is set (required)
+    - `condition`: Optional conditional expression
     - `enabled`: Whether breakpoint is currently active
     - `hit_count`: Number of times breakpoint was hit
 
@@ -275,9 +230,9 @@ async def list_breakpoints(job_id: str):
     - `404 Not Found`: Job with this ID does not exist
 
     **Related Endpoints**:
-    - POST /api/jobs/{job_id}/breakpoints - Create new breakpoint
-    - PUT /api/workers/{worker_id}/breakpoints/{breakpoint_id} - Enable/disable breakpoint
-    - DELETE /api/jobs/{job_id}/breakpoints/{breakpoint_id} - Delete breakpoint
+    - POST /api/v1/jobs/{job_id}/breakpoints - Create new breakpoint
+    - PUT /api/v1/workers/{worker_id}/breakpoints/{breakpoint_id} - Enable/disable breakpoint
+    - DELETE /api/v1/jobs/{job_id}/breakpoints/{breakpoint_id} - Delete breakpoint
 
     Args:
         job_id: Unique job identifier
@@ -321,10 +276,9 @@ async def delete_breakpoint(job_id: str, breakpoint_id: str):
 
     **Overview**:
     Permanently removes a breakpoint from a job. After deletion, the breakpoint will no
-    longer pause execution. If the breakpoint was a routine-level breakpoint, the routine's
-    original activation policy is restored.
+    longer intercept slot enqueue operations.
 
-    **Endpoint**: `DELETE /api/jobs/{job_id}/breakpoints/{breakpoint_id}`
+    **Endpoint**: `DELETE /api/v1/jobs/{job_id}/breakpoints/{breakpoint_id}`
 
     **Use Cases**:
     - Remove breakpoints after debugging
@@ -341,7 +295,6 @@ async def delete_breakpoint(job_id: str, breakpoint_id: str):
 
     **Behavior**:
     - Breakpoint is removed from the job
-    - For routine-level breakpoints, original activation policy is restored
     - Execution continues normally after deletion
     - Breakpoint cannot be recovered after deletion
 
@@ -355,9 +308,9 @@ async def delete_breakpoint(job_id: str, breakpoint_id: str):
     4. Verify deletion: GET /api/jobs/{job_id}/breakpoints
 
     **Related Endpoints**:
-    - GET /api/jobs/{job_id}/breakpoints - List breakpoints
-    - POST /api/jobs/{job_id}/breakpoints - Create breakpoint
-    - PUT /api/workers/{worker_id}/breakpoints/{breakpoint_id} - Enable/disable breakpoint
+    - GET /api/v1/jobs/{job_id}/breakpoints - List breakpoints
+    - POST /api/v1/jobs/{job_id}/breakpoints - Create breakpoint
+    - PUT /api/v1/workers/{worker_id}/breakpoints/{breakpoint_id} - Enable/disable breakpoint
 
     Args:
         job_id: Unique job identifier
@@ -390,17 +343,17 @@ async def delete_breakpoint(job_id: str, breakpoint_id: str):
     if not breakpoint_mgr:
         raise HTTPException(status_code=404, detail="Breakpoint manager not available")
 
-    # Get breakpoint to check if it's a routine-level breakpoint
+    # Verify breakpoint exists
     breakpoints = breakpoint_mgr.get_breakpoints(job_id)
     breakpoint = next((bp for bp in breakpoints if bp.breakpoint_id == breakpoint_id), None)
 
-    if breakpoint and breakpoint.type == "routine" and breakpoint.routine_id:
-        # Policy restoration handled at worker level
-        # Note: Breakpoint policies are managed by BreakpointManager
-        # The original policy restoration logic may need to be implemented
-        # based on how breakpoints are stored and managed
-        pass  # TODO: Implement policy restoration if needed
+    if not breakpoint:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Breakpoint '{breakpoint_id}' not found for job '{job_id}'"
+        )
 
+    # Remove breakpoint (no policy restoration needed)
     breakpoint_mgr.remove_breakpoint(breakpoint_id, job_id)
 
 

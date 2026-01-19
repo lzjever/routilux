@@ -168,9 +168,10 @@ class JobEventManager:
 
         async with self._lock:
             if job_id not in self._queues:
-                # No subscribers yet, silently ignore
-                logger.debug(f"No subscribers for job {job_id}, ignoring event")
-                return
+                # No subscribers yet - create queue anyway to buffer events
+                # This ensures events published before subscription are not lost
+                self._queues[job_id] = asyncio.Queue(maxsize=self.MAX_QUEUE_SIZE)
+                logger.debug(f"Created event queue for job {job_id} (no subscribers yet)")
 
             queue = self._queues[job_id]
 

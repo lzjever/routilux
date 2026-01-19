@@ -41,6 +41,11 @@ async def lifespan(app: FastAPI):
     runtime_registry = RuntimeRegistry.get_instance()
     # Create default runtime if it doesn't exist
     runtime_registry.get_or_create_default(thread_pool_size=0)
+    
+    # Initialize global event publisher for sync-to-async bridge
+    # This ensures events from sync contexts can be published efficiently
+    from routilux.monitoring.execution_hooks import _ensure_event_publisher
+    _ensure_event_publisher()
 
     if os.getenv("ROUTILUX_DEBUGGER_MODE") == "true":
         print("🔧 Debugger mode enabled - registering test flows...")
@@ -51,6 +56,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     print("🛑 Application shutting down...")
+    # Note: Event publisher thread is daemon, will exit with main process
 
 
 def _setup_examples_path():
@@ -178,29 +184,19 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
 # =============================================================================
-# API v1 Routes (New Architecture)
+# API v1 Routes (Unified Architecture)
 # =============================================================================
-# These are the new refactored routes following the Worker/Job model
+# All API endpoints are under /api/v1 prefix for consistency and clarity
 
 app.include_router(workers.router, prefix="/api/v1", tags=["workers"])
 app.include_router(jobs.router, prefix="/api/v1", tags=["jobs"])
 app.include_router(execute.router, prefix="/api/v1", tags=["execute"])
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
-
-# =============================================================================
-# Legacy Routes (for backward compatibility)
-# =============================================================================
-# These routes maintain backward compatibility with the old API
-
-app.include_router(flows.router, prefix="/api", tags=["flows"])
-app.include_router(flows.router, prefix="/api/v1", tags=["flows"])  # Also under v1
-app.include_router(breakpoints.router, prefix="/api", tags=["breakpoints"])
-app.include_router(websocket.router, prefix="/api", tags=["websocket"])
-app.include_router(discovery.router, prefix="/api", tags=["discovery"])
-app.include_router(objects.router, prefix="/api/factory", tags=["factory"])
-
-# Runtime management router
-app.include_router(runtimes.router, prefix="/api", tags=["runtimes"])
+app.include_router(flows.router, prefix="/api/v1", tags=["flows"])
+app.include_router(breakpoints.router, prefix="/api/v1", tags=["breakpoints"])
+app.include_router(websocket.router, prefix="/api/v1", tags=["websocket"])
+app.include_router(discovery.router, prefix="/api/v1", tags=["discovery"])
+app.include_router(objects.router, prefix="/api/v1/factory", tags=["factory"])
 app.include_router(runtimes.router, prefix="/api/v1", tags=["runtimes"])
 
 
@@ -266,123 +262,6 @@ def root():
     """
 
 
-@app.get("/api/health", dependencies=[RequireAuth])
-def legacy_health():
-    """
-    Legacy health check endpoint.
-
-    **Overview**:
-    Returns comprehensive health information about the API, including monitoring status,
-    store accessibility, and system statistics. This is a legacy endpoint maintained for
-    backward compatibility.
-
-    **Endpoint**: `GET /api/health`
-
-    **Note**: For new implementations, use the v1 health endpoints:
-    - GET /api/v1/health/live (liveness probe)
-    - GET /api/v1/health/ready (readiness probe)
-    - GET /api/v1/health/stats (detailed statistics)
-
-    **Use Cases**:
-    - Health monitoring
-    - System status checks
-    - Backward compatibility
-    - Legacy integrations
-
-    **Request Example**:
-    ```
-    GET /api/health
-    ```
-
-    **Response Example**:
-    ```json
-    {
-      "status": "healthy",
-      "auth_required": true,
-      "monitoring": {
-        "enabled": true
-      },
-      "stores": {
-        "accessible": true,
-        "flow_count": 10,
-        "job_count": 5
-      },
-      "version": "0.11.0"
-    }
-    ```
-
-    **Response Fields**:
-    - `status`: Overall health status ("healthy" or "unhealthy")
-    - `auth_required`: Whether API key authentication is enabled
-    - `monitoring.enabled`: Whether monitoring is enabled
-    - `stores.accessible`: Whether stores are accessible
-    - `stores.flow_count`: Number of flows in store (if accessible)
-    - `stores.job_count`: Number of active jobs (if accessible)
-    - `version`: API version
-
-    **Health Checks**:
-    - Verifies monitoring registry is enabled
-    - Checks flow registry accessibility
-    - Checks runtime accessibility
-    - Counts flows and jobs if accessible
-
-    **Error Handling**:
-    - Returns "healthy" status even if some checks fail
-    - Stores may show as inaccessible if there are errors
-    - Flow/job counts may be null if stores are inaccessible
-
-    **Authentication**:
-    - Requires API key if `ROUTILUX_API_KEY_ENABLED=true`
-    - Use `X-API-Key` header for authentication
-
-    **Related Endpoints**:
-    - GET /api/v1/health/live - Liveness probe (recommended)
-    - GET /api/v1/health/ready - Readiness probe (recommended)
-    - GET /api/v1/health/stats - Detailed statistics (recommended)
-
-    Returns:
-        dict: Health status with monitoring and store information
-
-    Raises:
-        HTTPException: 401 if authentication fails
-    """
-    from routilux.monitoring.registry import MonitoringRegistry
-    from routilux.server.dependencies import get_flow_registry, get_runtime
-
-    # Check monitoring status
-    monitoring_enabled = MonitoringRegistry.is_enabled()
-
-    # Check store accessibility
-    try:
-        flow_registry = get_flow_registry()
-        flow_count = len(flow_registry.list_all())
-
-        runtime = get_runtime()
-        with runtime._jobs_lock:
-            job_count = sum(len(jobs) for jobs in runtime._active_jobs.values())
-
-        stores_accessible = True
-    except Exception:
-        flow_count = None
-        job_count = None
-        stores_accessible = False
-
-    from routilux.server.config import get_config
-
-    config = get_config()
-    return {
-        "status": "healthy",
-        "auth_required": config.api_key_enabled,
-        "monitoring": {
-            "enabled": monitoring_enabled,
-        },
-        "stores": {
-            "accessible": stores_accessible,
-            "flow_count": flow_count,
-            "job_count": job_count,
-        },
-        "version": "0.11.0",
-    }
 
 
 # OpenAPI: document X-API-Key so Swagger UI shows Authorize

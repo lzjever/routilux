@@ -100,6 +100,38 @@ class Event(Serializable):
 
         Examples:
             >>> event.emit(runtime=runtime, worker_state=worker_state, result="data")
+
+        **Context Variable (contextvar) Requirements:**
+
+        This method automatically retrieves the current ``JobContext`` from the
+        thread-local context using ``get_current_job()``. The job_context is then
+        passed to the EventRoutingTask for proper breakpoint checking and job tracking.
+
+        **Important for Testing:**
+        When calling ``emit()`` directly in tests (outside of normal routine execution),
+        you must set the job_context in the current thread's context:
+
+        .. code-block:: python
+
+            from routilux.core.context import set_current_job
+
+            # In your test
+            worker_state, job_context = runtime.post(...)
+            set_current_job(job_context)  # Required for breakpoint checking
+
+            # Now emit will have access to job_context
+            source.output.emit(runtime=runtime, worker_state=worker_state, data="test")
+
+        **Why this matters:**
+        - Breakpoint checking requires job_context to match breakpoints by job_id
+        - Without job_context, breakpoints will not trigger even if conditions match
+        - The job_context is automatically set during normal routine execution
+        - In tests, you must manually set it when calling emit() directly
+
+        **Normal Usage (within routine logic):**
+        When called from within a routine's logic method, the job_context is
+        automatically available because WorkerExecutor sets it in the context
+        before executing the routine.
         """
         # Pack data with metadata
         emitted_from = "unknown"

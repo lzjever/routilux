@@ -491,8 +491,8 @@ class TestPerformanceAnalysis:
         # Create worker
         api_client.post("/api/v1/workers", json={"flow_id": flow_id})
 
-        # Get flow metrics (API is at /api/flows/..., not /api/v1/flows/...)
-        response = api_client.get(f"/api/flows/{flow_id}/metrics")
+        # Get flow metrics
+        response = api_client.get(f"/api/v1/flows/{flow_id}/metrics")
         # May return 404 if metrics not available
         assert response.status_code in (200, 404)
         if response.status_code == 200:
@@ -533,8 +533,8 @@ class TestPerformanceAnalysis:
 
         time.sleep(0.5)
 
-        # Get flow metrics (API is at /api/flows/..., not /api/v1/flows/...)
-        response = api_client.get(f"/api/flows/{flow_id}/metrics")
+        # Get flow metrics
+        response = api_client.get(f"/api/v1/flows/{flow_id}/metrics")
         # May return 404 if metrics not available
         assert response.status_code in (200, 404)
         if response.status_code == 200:

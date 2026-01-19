@@ -261,6 +261,17 @@ class Runtime:
                 self._active_jobs[worker_state.worker_id] = {}
             self._active_jobs[worker_state.worker_id][job_context.job_id] = job_context
 
+        # Call on_job_start hook
+        from routilux.core.hooks import get_execution_hooks
+
+        try:
+            hooks = get_execution_hooks()
+            logger.debug(f"Calling on_job_start hook for job {job_context.job_id}")
+            hooks.on_job_start(job_context, worker_state)
+            logger.debug(f"on_job_start hook completed for job {job_context.job_id}")
+        except Exception as e:
+            logger.warning(f"Exception in on_job_start hook: {e}", exc_info=True)
+
         # Get routine and slot
         if routine_name not in flow.routines:
             raise ValueError(f"Routine '{routine_name}' not found in flow")
@@ -297,12 +308,51 @@ class Runtime:
     ) -> None:
         """Handle event emission and route to connected slots.
 
-        This method routes event data to all connected slots.
+        This method routes event data to all connected slots. It is called by
+        WorkerExecutor's event loop thread when processing EventRoutingTask.
 
         Args:
             event: Event that was emitted
             event_data: Event data with "data" and "metadata" keys
             worker_state: WorkerState for this execution
+
+        **Context Variable (contextvar) Requirements:**
+
+        This method retrieves the current ``JobContext`` from the thread-local context
+        using ``get_current_job()``. The job_context is used for:
+
+        1. **Breakpoint checking**: Breakpoints are matched by (job_id, routine_id, slot_name).
+           Without job_context, breakpoints will not trigger.
+
+        2. **Execution hooks**: Hooks receive job_context for tracking and monitoring.
+
+        3. **Event tracking**: Event emissions are recorded with job_id for debugging.
+
+        **Important:**
+        - This method is called from WorkerExecutor's event loop thread
+        - WorkerExecutor sets job_context in the context before calling this method
+        - The job_context comes from EventRoutingTask.job_context, which was captured
+          when Event.emit() was called
+
+        **For Testing:**
+        When testing event routing directly, ensure job_context is set in the context:
+
+        .. code-block:: python
+
+            from routilux.core.context import set_current_job
+
+            # In your test
+            worker_state, job_context = runtime.post(...)
+            set_current_job(job_context)
+
+            # Now event routing will have access to job_context
+            source.output.emit(runtime=runtime, worker_state=worker_state, data="test")
+
+        **Breakpoint Mechanism:**
+        Before enqueueing data to a slot, this method checks for breakpoints matching
+        (job_id, routine_id, slot_name). If a breakpoint matches and its condition
+        (if any) evaluates to True, the enqueue operation is skipped, effectively
+        intercepting the event at that slot.
         """
         from routilux.core.hooks import get_execution_hooks
         from routilux.core.registry import FlowRegistry
@@ -317,7 +367,19 @@ class Runtime:
         # Find connections for this event
         connections = flow.get_connections_for_event(event)
         if not connections:
+            logger.debug(f"No connections found for event {event.name} from routine {event.routine}")
             return  # No consumers - normal case
+
+        # Get job context early (needed for hooks and breakpoint checking)
+        from routilux.core.context import get_current_job
+        from routilux.monitoring.registry import MonitoringRegistry
+
+        job_context = get_current_job()
+        
+        logger.debug(
+            f"Event routing: event={event.name}, connections={len(connections)}, "
+            f"job_context={job_context.job_id if job_context else None}"
+        )
 
         # Track event emission
         source_routine_id = self._get_routine_id(event.routine, worker_state)
@@ -330,17 +392,19 @@ class Runtime:
                 "event_emit",
                 {"event_name": event.name, "data": data},
             )
-
-            # Get job context
-            from routilux.core.context import get_current_job
-
-            job_context = get_current_job()
-
+            
             should_continue = hooks.on_event_emit(
                 event, source_routine_id, worker_state, job_context, data
             )
             if not should_continue:
                 return
+
+        # Get breakpoint manager if available
+        breakpoint_mgr = None
+        if job_context:
+            registry = MonitoringRegistry.get_instance()
+            if registry:
+                breakpoint_mgr = registry.breakpoint_manager
 
         # Route to all connected slots
         for connection in connections:
@@ -361,6 +425,82 @@ class Runtime:
                 data = event_data.get("data", {})
                 emitted_from = metadata.get("emitted_from", "unknown")
                 emitted_at = metadata.get("emitted_at", datetime.now())
+
+                # === BREAKPOINT CHECK (NEW) ===
+                # Check if there's a breakpoint for this slot before enqueueing
+                if job_context and breakpoint_mgr:
+                    # Get target routine and slot information
+                    target_routine = slot.routine
+                    if target_routine is not None:
+                        # Get routine_id from flow
+                        target_routine_id = flow._get_routine_id(target_routine)
+                        target_slot_name = slot.name
+
+                        if target_routine_id:
+                            # Check for breakpoint
+                            # Debug: Log breakpoint check details
+                            logger.debug(
+                                f"Checking breakpoint: job_id={job_context.job_id}, "
+                                f"routine_id={target_routine_id}, slot_name={target_slot_name}, "
+                                f"data_keys={list(data.keys()) if isinstance(data, dict) else 'not_dict'}"
+                            )
+                            
+                            breakpoint = breakpoint_mgr.check_slot_breakpoint(
+                                job_id=job_context.job_id,
+                                routine_id=target_routine_id,
+                                slot_name=target_slot_name,
+                                context=None,  # Can be enhanced later if needed
+                                variables=data,  # Pass event data as variables for condition evaluation
+                            )
+
+                            if breakpoint is not None:
+                                # Breakpoint hit - skip enqueue and publish event
+                                logger.info(
+                                    f"Breakpoint hit: job_id={job_context.job_id}, "
+                                    f"routine_id={target_routine_id}, slot_name={target_slot_name}, "
+                                    f"breakpoint_id={breakpoint.breakpoint_id}, condition={breakpoint.condition}"
+                                )
+                                
+                                # Publish breakpoint_hit event
+                                from routilux.monitoring.event_manager import get_event_manager
+                                from datetime import datetime
+                                
+                                event_manager = get_event_manager()
+                                try:
+                                    # Use asyncio.create_task for fire-and-forget async call
+                                    import asyncio
+                                    try:
+                                        loop = asyncio.get_running_loop()
+                                        asyncio.create_task(event_manager.publish(
+                                            job_context.job_id,
+                                            {
+                                                "type": "breakpoint_hit",
+                                                "job_id": job_context.job_id,
+                                                "timestamp": datetime.now().isoformat(),
+                                                "data": {
+                                                    "breakpoint_id": breakpoint.breakpoint_id,
+                                                    "routine_id": target_routine_id,
+                                                    "slot_name": target_slot_name,
+                                                    "condition": breakpoint.condition,
+                                                    "event_data": data,  # The data that would have been enqueued
+                                                }
+                                            }
+                                        ))
+                                    except RuntimeError:
+                                        # No event loop running - skip publishing
+                                        logger.debug("No event loop running, skipping breakpoint_hit event publish")
+                                except Exception as e:
+                                    logger.warning(f"Failed to publish breakpoint_hit event: {e}")
+                                
+                                # Skip this enqueue operation
+                                continue
+                            else:
+                                # Debug: Log when breakpoint check returns None
+                                logger.debug(
+                                    f"No breakpoint match: job_id={job_context.job_id}, "
+                                    f"routine_id={target_routine_id}, slot_name={target_slot_name}"
+                                )
+                # === END BREAKPOINT CHECK ===
 
                 slot.enqueue(
                     data=data,

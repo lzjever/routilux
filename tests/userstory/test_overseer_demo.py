@@ -246,7 +246,7 @@ class TestOverseerDemoSetup:
 
     def test_runtimes_registered(self, client, setup_demo_flows):
         """Test that runtimes are registered."""
-        response = client.get("/api/runtimes")
+        response = client.get("/api/v1/runtimes")
         assert response.status_code == 200
         data = response.json()
         assert "runtimes" in data
@@ -257,7 +257,7 @@ class TestOverseerDemoSetup:
 
     def test_flows_registered(self, client, setup_demo_flows):
         """Test that flows are registered."""
-        response = client.get("/api/flows")
+        response = client.get("/api/v1/flows")
         assert response.status_code == 200
         data = response.json()
         assert "flows" in data
@@ -268,7 +268,7 @@ class TestOverseerDemoSetup:
 
     def test_factory_objects_registered(self, client, setup_demo_flows):
         """Test that factory objects are registered."""
-        response = client.get("/api/factory/objects")
+        response = client.get("/api/v1/factory/objects")
         assert response.status_code == 200
         data = response.json()
         assert "objects" in data
@@ -550,7 +550,7 @@ class TestUserStory3_Debugging:
     """
 
     def test_set_breakpoint(self, client, setup_demo_flows):
-        """Test setting a breakpoint."""
+        """Test setting a slot-level breakpoint (new API design)."""
         # Submit job
         response = client.post(
             "/api/v1/jobs",
@@ -563,17 +563,23 @@ class TestUserStory3_Debugging:
         )
         job_id = response.json()["job_id"]
 
-        # Set breakpoint
+        # Set breakpoint on transformer's input slot (new slot-level API)
         response = client.post(
-            f"/api/jobs/{job_id}/breakpoints",
+            f"/api/v1/jobs/{job_id}/breakpoints",
             json={
-                "type": "routine",
                 "routine_id": "transformer",
+                "slot_name": "input",  # Required: slot name
+                "enabled": True,
             },
         )
-        if response.status_code in [200, 201]:
-            data = response.json()
-            assert "breakpoint_id" in data or "status" in data
+        assert response.status_code in [200, 201], f"Expected 200/201, got {response.status_code}: {response.text}"
+        data = response.json()
+        assert "breakpoint_id" in data
+        assert data["routine_id"] == "transformer"
+        assert data["slot_name"] == "input"
+        assert data["job_id"] == job_id
+        assert data["enabled"] is True
+        assert "hit_count" in data
 
     def test_debug_session(self, client, setup_demo_flows):
         """Test getting debug session."""
@@ -612,6 +618,166 @@ class TestUserStory3_Debugging:
         response = client.get(f"/api/jobs/{job_id}/debug/variables")
         # May return 404 if no debug session
         assert response.status_code in [200, 404]
+
+    def test_list_breakpoints(self, client, setup_demo_flows):
+        """Test listing breakpoints for a job."""
+        # Submit job
+        response = client.post(
+            "/api/v1/jobs",
+            json={
+                "flow_id": "debug_demo_flow",
+                "routine_id": "source",
+                "slot_name": "trigger",
+                "data": {"data": "test_data", "index": 1},
+            },
+        )
+        job_id = response.json()["job_id"]
+
+        # Create a breakpoint first
+        bp_response = client.post(
+            f"/api/v1/jobs/{job_id}/breakpoints",
+            json={
+                "routine_id": "transformer",
+                "slot_name": "input",
+                "enabled": True,
+            },
+        )
+        assert bp_response.status_code in [200, 201]
+
+        # List breakpoints
+        response = client.get(f"/api/v1/jobs/{job_id}/breakpoints")
+        assert response.status_code == 200
+        data = response.json()
+        assert "breakpoints" in data
+        assert "total" in data
+        assert isinstance(data["breakpoints"], list)
+        assert data["total"] >= 1
+        
+        # Verify breakpoint structure (new API design)
+        if len(data["breakpoints"]) > 0:
+            bp = data["breakpoints"][0]
+            assert "breakpoint_id" in bp
+            assert "job_id" in bp
+            assert "routine_id" in bp
+            assert "slot_name" in bp
+            assert "enabled" in bp
+            assert "hit_count" in bp
+            # Verify no deprecated fields
+            assert "type" not in bp, "Breakpoint response should not contain deprecated 'type' field"
+
+    def test_delete_breakpoint(self, client, setup_demo_flows):
+        """Test deleting a breakpoint."""
+        # Submit job
+        response = client.post(
+            "/api/v1/jobs",
+            json={
+                "flow_id": "debug_demo_flow",
+                "routine_id": "source",
+                "slot_name": "trigger",
+                "data": {"data": "test_data", "index": 1},
+            },
+        )
+        job_id = response.json()["job_id"]
+
+        # Create a breakpoint
+        bp_response = client.post(
+            f"/api/v1/jobs/{job_id}/breakpoints",
+            json={
+                "routine_id": "transformer",
+                "slot_name": "input",
+                "enabled": True,
+            },
+        )
+        assert bp_response.status_code in [200, 201]
+        breakpoint_id = bp_response.json()["breakpoint_id"]
+
+        # Delete breakpoint
+        response = client.delete(f"/api/v1/jobs/{job_id}/breakpoints/{breakpoint_id}")
+        assert response.status_code == 204
+
+        # Verify breakpoint is deleted
+        list_response = client.get(f"/api/v1/jobs/{job_id}/breakpoints")
+        assert list_response.status_code == 200
+        data = list_response.json()
+        assert data["total"] == 0
+
+    def test_breakpoint_with_condition(self, client, setup_demo_flows):
+        """Test creating breakpoint with condition."""
+        # Submit job
+        response = client.post(
+            "/api/v1/jobs",
+            json={
+                "flow_id": "debug_demo_flow",
+                "routine_id": "source",
+                "slot_name": "trigger",
+                "data": {"data": "test_data", "index": 1, "value": 42},
+            },
+        )
+        job_id = response.json()["job_id"]
+
+        # Create breakpoint with condition
+        bp_response = client.post(
+            f"/api/v1/jobs/{job_id}/breakpoints",
+            json={
+                "routine_id": "transformer",
+                "slot_name": "input",
+                "condition": "value > 40",
+                "enabled": True,
+            },
+        )
+        assert bp_response.status_code in [200, 201]
+        data = bp_response.json()
+        assert data["condition"] == "value > 40"
+        assert data["routine_id"] == "transformer"
+        assert data["slot_name"] == "input"
+
+    def test_breakpoint_validation_errors(self, client, setup_demo_flows):
+        """Test breakpoint API validation errors."""
+        # Submit job
+        response = client.post(
+            "/api/v1/jobs",
+            json={
+                "flow_id": "debug_demo_flow",
+                "routine_id": "source",
+                "slot_name": "trigger",
+                "data": {"data": "test_data"},
+            },
+        )
+        job_id = response.json()["job_id"]
+
+        # Test missing routine_id
+        response = client.post(
+            f"/api/v1/jobs/{job_id}/breakpoints",
+            json={"slot_name": "input"},
+        )
+        assert response.status_code == 422  # Validation error
+
+        # Test missing slot_name
+        response = client.post(
+            f"/api/v1/jobs/{job_id}/breakpoints",
+            json={"routine_id": "transformer"},
+        )
+        assert response.status_code == 422  # Validation error
+
+        # Test invalid routine_id (not in flow)
+        response = client.post(
+            f"/api/v1/jobs/{job_id}/breakpoints",
+            json={
+                "routine_id": "nonexistent_routine",
+                "slot_name": "input",
+            },
+        )
+        assert response.status_code == 404  # Routine not found
+
+        # Test invalid slot_name (not in routine)
+        response = client.post(
+            f"/api/v1/jobs/{job_id}/breakpoints",
+            json={
+                "routine_id": "transformer",
+                "slot_name": "nonexistent_slot",
+            },
+        )
+        assert response.status_code == 404  # Slot not found
 
 
 class TestUserStory4_FlowPatterns:
@@ -816,7 +982,7 @@ class TestUserStory6_RuntimeManagement:
 
     def test_list_runtimes(self, client, setup_demo_flows):
         """Test listing runtimes."""
-        response = client.get("/api/runtimes")
+        response = client.get("/api/v1/runtimes")
         assert response.status_code == 200
         data = response.json()
         assert "runtimes" in data
@@ -824,7 +990,7 @@ class TestUserStory6_RuntimeManagement:
 
     def test_get_runtime(self, client, setup_demo_flows):
         """Test getting specific runtime."""
-        response = client.get("/api/runtimes/production")
+        response = client.get("/api/v1/runtimes/production")
         assert response.status_code == 200
         data = response.json()
         # Response has a "runtime" field containing the runtime info
@@ -834,7 +1000,7 @@ class TestUserStory6_RuntimeManagement:
     def test_create_runtime(self, client, setup_demo_flows):
         """Test creating a new runtime."""
         response = client.post(
-            "/api/runtimes",
+            "/api/v1/runtimes",
             json={
                 "runtime_id": "custom_test",
                 "thread_pool_size": 3,
@@ -1053,7 +1219,7 @@ class TestDataConsistency:
     def test_flow_registry_consistency(self, client, setup_demo_flows):
         """Test that flow registry is consistent."""
         # Get flows from API
-        api_response = client.get("/api/flows")
+        api_response = client.get("/api/v1/flows")
         api_flows = {f["flow_id"] for f in api_response.json()["flows"]}
 
         # Get flows from registry

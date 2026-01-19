@@ -198,6 +198,48 @@ class Routine(Serializable):
         Raises:
             ValueError: If event_name does not exist
             RuntimeError: If runtime or worker_state cannot be determined
+
+        **Context Variable (contextvar) Behavior:**
+
+        This method uses context variables to automatically retrieve missing parameters:
+
+        1. **runtime**: If not provided, retrieved from ``self._current_runtime``
+           (set by Runtime during routine execution)
+
+        2. **worker_state**: If not provided, retrieved from thread-local context
+           using ``_current_worker_state.get(None)`` (set by WorkerExecutor)
+
+        3. **job_context**: The underlying ``Event.emit()`` method automatically
+           retrieves job_context from thread-local context using ``get_current_job()``
+
+        **Important for Testing:**
+        When calling ``emit()`` directly in tests (outside of normal routine execution),
+        you must ensure the context variables are set:
+
+        .. code-block:: python
+
+            from routilux.core.context import set_current_job, set_current_worker_state
+
+            # In your test
+            worker_state, job_context = runtime.post(...)
+            set_current_worker_state(worker_state)  # If worker_state not provided
+            set_current_job(job_context)  # Required for breakpoint checking
+
+            # Now emit will work correctly
+            routine.emit("output", runtime=runtime, data="test")
+            # Or with worker_state from context:
+            routine.emit("output", runtime=runtime, data="test")
+
+        **Normal Usage (within routine logic):**
+        When called from within a routine's logic method, all context variables
+        are automatically set by WorkerExecutor before execution, so you can
+        simply call:
+
+        .. code-block:: python
+
+            def logic(self, input_data, **kwargs):
+                # All context is automatically available
+                self.emit("output", data="result")
         """
         if event_name not in self._events:
             raise ValueError(f"Event '{event_name}' does not exist in {self}")

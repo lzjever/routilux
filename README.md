@@ -247,6 +247,8 @@ cd docs && make html
 
 Check out the `examples/` directory for practical examples:
 
+### Core Examples
+
 - **`basic_example.py`** - Your first workflow
 - **`data_processing.py`** - Multi-stage data pipeline
 - **`concurrent_flow_demo.py`** - Parallel execution
@@ -254,10 +256,21 @@ Check out the `examples/` directory for practical examples:
 - **`state_management_example.py`** - State tracking and recovery
 - **`builtin_routines_demo.py`** - Using built-in routines
 
+### Real-World Usage Patterns
+
+- **`data_pipeline.py`** - Multi-stage data processing with validation, transformation, and quality checks
+- **`async_orchestration.py`** - Concurrent task execution with result aggregation
+- **`long_running_workflow.py`** - Pause/resume execution with state persistence and recovery
+- **`error_handling.py`** - Retry patterns and fallback mechanisms
+
 Run examples:
 
 ```bash
 python examples/basic_example.py
+python examples/data_pipeline.py
+python examples/async_orchestration.py
+python examples/long_running_workflow.py
+python examples/error_handling.py
 ```
 
 ## 🧩 Built-in Routines

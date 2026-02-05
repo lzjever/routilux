@@ -63,7 +63,7 @@ class RoutineAnalyzer:
 
         tree = ast.parse(source_code, filename=str(file_path))
 
-        result = {"file_path": str(file_path), "routines": []}
+        result: dict[str, Any] = {"file_path": str(file_path), "routines": []}
 
         # Find all classes that inherit from Routine
         for node in ast.walk(tree):
@@ -106,7 +106,7 @@ class RoutineAnalyzer:
         Returns:
             Dictionary containing routine information.
         """
-        routine_info = {
+        routine_info: dict[str, Any] = {
             "name": class_node.name,
             "docstring": ast.get_docstring(class_node) or "",
             "slots": [],
@@ -254,7 +254,7 @@ class RoutineAnalyzer:
         if len(call_node.args) < 1:
             return None
 
-        event_info = {"name": self._extract_string_value(call_node.args[0]), "output_params": []}
+        event_info: dict[str, Any] = {"name": self._extract_string_value(call_node.args[0]), "output_params": []}
 
         # Extract output_params from args or kwargs
         if len(call_node.args) > 1:

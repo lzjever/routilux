@@ -63,12 +63,18 @@ class ExecutionRecord(Serializable):
             data["timestamp"] = data["timestamp"].isoformat()
         return data
 
-    def deserialize(self, data: Dict[str, Any]) -> None:
-        """Deserialize, handling datetime conversion."""
+    def deserialize(self, data: Dict[str, Any], strict: bool = False, registry: Optional[Any] = None) -> None:
+        """Deserialize, handling datetime conversion.
+
+        Args:
+            data: Serialized data dictionary.
+            strict: Whether to enforce strict deserialization.
+            registry: Optional registry for custom deserializers.
+        """
         # Convert string to datetime
         if isinstance(data.get("timestamp"), str):
             data["timestamp"] = datetime.fromisoformat(data["timestamp"])
-        super().deserialize(data)
+        super().deserialize(data, strict=strict, registry=registry)
 
 
 @register_serializable
@@ -490,8 +496,14 @@ class JobState(Serializable):
             data["updated_at"] = data["updated_at"].isoformat()
         return data
 
-    def deserialize(self, data: Dict[str, Any]) -> None:
-        """Deserialize, handling datetime and ExecutionRecord."""
+    def deserialize(self, data: Dict[str, Any], strict: bool = False, registry: Optional[Any] = None) -> None:
+        """Deserialize, handling datetime and ExecutionRecord.
+
+        Args:
+            data: Serialized data dictionary.
+            strict: Whether to enforce strict deserialization.
+            registry: Optional registry for custom deserializers.
+        """
         # Handle datetime
         if isinstance(data.get("created_at"), str):
             data["created_at"] = datetime.fromisoformat(data["created_at"])
@@ -516,7 +528,7 @@ class JobState(Serializable):
                     records.append(record)
             data["execution_history"] = records
 
-        super().deserialize(data)
+        super().deserialize(data, strict=strict, registry=registry)
 
     def add_deferred_event(self, routine_id: str, event_name: str, data: Dict[str, Any]) -> None:
         """Add a deferred event to be emitted on resume.

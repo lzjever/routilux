@@ -100,6 +100,7 @@ python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+no_implicit_optional = true
 ignore_missing_imports = true
 
 [tool.coverage.run]

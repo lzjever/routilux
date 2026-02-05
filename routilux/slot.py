@@ -585,18 +585,19 @@ class Slot(Serializable):
 
         return data
 
-    def deserialize(self, data: dict[str, Any], registry: Any | None = None) -> None:
+    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any | None = None) -> None:
         """Deserialize Slot.
 
         Callables (handler, merge_strategy) are automatically handled by Serializable base class.
 
         Args:
             data: Serialized data dictionary.
+            strict: Whether to enforce strict deserialization.
             registry: Optional ObjectRegistry for deserializing callables.
         """
         # Let base class handle registered fields (name, _data, handler, merge_strategy)
         # Serializable automatically deserializes callables if registry is provided
-        super().deserialize(data, registry=registry)
+        super().deserialize(data, strict=strict, registry=registry)
 
         # Handle legacy format: if merge_strategy was serialized as "_custom", restore it
         if hasattr(self, "merge_strategy") and self.merge_strategy == "_custom":

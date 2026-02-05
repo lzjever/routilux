@@ -102,11 +102,13 @@ class Connection(Serializable):
 
         return data
 
-    def deserialize(self, data: dict[str, Any]) -> None:
+    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any | None = None) -> None:
         """Deserialize the Connection.
 
         Args:
             data: Serialized data dictionary.
+            strict: Whether to enforce strict deserialization.
+            registry: Optional registry for custom deserializers.
         """
         # Save reference information for later restoration by Flow
         source_routine_id = data.pop("_source_routine_id", None)
@@ -115,7 +117,7 @@ class Connection(Serializable):
         target_slot_name = data.pop("_target_slot_name", None)
 
         # Let base class handle registered fields
-        super().deserialize(data)
+        super().deserialize(data, strict=strict, registry=registry)
 
         # Save reference information to be restored by Flow.deserialize()
         # (Flow has access to routines dictionary to restore references)
@@ -161,8 +163,10 @@ class Connection(Serializable):
                 >>> # Connection.activate() is called internally
         """
         # Transmit to target slot
-        self.target_slot.receive(data)
+        if self.target_slot is not None:
+            self.target_slot.receive(data)
 
     def disconnect(self) -> None:
         """Disconnect the connection."""
-        self.source_event.disconnect(self.target_slot)
+        if self.source_event is not None and self.target_slot is not None:
+            self.source_event.disconnect(self.target_slot)

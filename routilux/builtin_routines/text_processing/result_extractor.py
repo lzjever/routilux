@@ -137,7 +137,7 @@ class ResultExtractor(Routine):
         self._extractors["dict_extractor"] = self._extract_dict
         self._extractors["list_extractor"] = self._extract_list
 
-    def _handle_input(self, data: str | list | dict = None, **kwargs):
+    def _handle_input(self, data: str | list | dict | None = None, **kwargs):
         """Handle input data and extract results.
 
         Args:

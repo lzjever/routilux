@@ -144,7 +144,9 @@ def deserialize_pending_tasks(flow: "Flow", job_state: "JobState") -> None:
             continue
 
         routine = flow.routines[slot_routine_id]
-        slot = routine.get_slot(slot_name)
+        if not slot_name:
+            continue
+        slot = routine.get_slot(str(slot_name))
         if not slot:
             continue
 
@@ -336,7 +338,7 @@ def resume_flow(flow: "Flow", job_state: "JobState") -> "JobState":
             # Routine state is restored to JobState, not routine._stats
 
     for r in flow.routines.values():
-        r._current_flow = flow
+        setattr(r, "_current_flow", flow)
 
     deserialize_pending_tasks(flow, job_state)
 
@@ -354,8 +356,8 @@ def resume_flow(flow: "Flow", job_state: "JobState") -> "JobState":
             routine = flow.routines[routine_id]
             try:
                 # Ensure routine has the corresponding event
-                if routine.get_event(event_name):
-                    routine.emit(event_name, flow=flow, **event_data)
+                if event_name and routine.get_event(str(event_name)):
+                    routine.emit(str(event_name), flow=flow, **event_data)
                 else:
                     import warnings
 

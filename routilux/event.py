@@ -89,16 +89,17 @@ class Event(Serializable):
         # Flow will add routine_id when serializing routines
         return super().serialize()
 
-    def deserialize(self, data: dict[str, Any], registry: Any | None = None) -> None:
+    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any | None = None) -> None:
         """Deserialize the Event.
 
         Args:
             data: Serialized data dictionary.
+            strict: Whether to enforce strict deserialization.
             registry: Optional ObjectRegistry for deserializing callables.
         """
         # Let base class handle registered fields (name, output_params)
         # Base class is sufficient - no special handling needed
-        super().deserialize(data, registry=registry)
+        super().deserialize(data, strict=strict, registry=registry)
 
     def __repr__(self) -> str:
         """Return string representation of the Event."""

@@ -184,7 +184,7 @@ class Routine(ConfigMixin, ExecutionMixin, LifecycleMixin, Serializable):
         """
         return self._error_handler
 
-    def set_as_optional(self, strategy: ErrorStrategy = None) -> None:
+    def set_as_optional(self, strategy: ErrorStrategy | None = None) -> None:
         """Mark this routine as optional (failures are tolerated).
 
         This is a convenience method that sets up an error handler with CONTINUE
@@ -392,17 +392,18 @@ class Routine(ConfigMixin, ExecutionMixin, LifecycleMixin, Serializable):
 
         return data
 
-    def deserialize(self, data: dict[str, Any], registry: Any | None = None) -> None:
+    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any | None = None) -> None:
         """Deserialize Routine.
 
         Args:
             data: Serialized data dictionary.
+            strict: Whether to enforce strict deserialization.
             registry: Optional ObjectRegistry for deserializing callables.
         """
 
         # Let base class handle all registered fields including _slots and _events
         # Base class automatically deserializes Serializable objects in dicts
-        super().deserialize(data, registry=registry)
+        super().deserialize(data, strict=strict, registry=registry)
 
         # Restore routine references for slots and events (required after deserialization)
         if hasattr(self, "_slots") and self._slots:

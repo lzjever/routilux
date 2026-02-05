@@ -68,7 +68,7 @@ def handle_task_error(
 
     if error_handler:
         should_retry = error_handler.handle_error(
-            error, routine, routine_id, flow, job_state=task.job_state
+            error, routine, routine_id or "", flow, job_state=task.job_state
         )
 
         if error_handler.strategy.value == "retry":

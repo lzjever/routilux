@@ -80,7 +80,7 @@ def execute_sequential(
 
     try:
         for routine in flow.routines.values():
-            routine._current_flow = flow
+            setattr(routine, "_current_flow", flow)
 
         start_time = datetime.now()
         job_state.record_execution(entry_routine_id, "start", entry_params)

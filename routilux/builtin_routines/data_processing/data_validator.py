@@ -111,7 +111,7 @@ class DataValidator(Routine):
                 if field in rules:
                     validator = rules[field]
                     is_valid, error_msg = self._validate_field(field, value, validator)
-                    if not is_valid:
+                    if not is_valid and error_msg:
                         errors.append(error_msg)
                         if strict_mode:
                             break
@@ -126,7 +126,7 @@ class DataValidator(Routine):
                 if "items" in rules:
                     validator = rules["items"]
                     is_valid, error_msg = self._validate_field(f"items[{i}]", item, validator)
-                    if not is_valid:
+                    if not is_valid and error_msg:
                         errors.append(error_msg)
                         if strict_mode:
                             break
@@ -136,7 +136,7 @@ class DataValidator(Routine):
             if "value" in rules:
                 validator = rules["value"]
                 is_valid, error_msg = self._validate_field("value", data, validator)
-                if not is_valid:
+                if not is_valid and error_msg:
                     errors.append(error_msg)
 
         # Emit result

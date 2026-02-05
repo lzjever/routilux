@@ -4,7 +4,7 @@ Dependency graph management for Flow execution.
 Handles building and querying routine dependency graphs.
 """
 
-from typing import TYPE_CHECKING, Dict, List, Set
+from typing import TYPE_CHECKING, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     from routilux.connection import Connection
@@ -26,9 +26,9 @@ def build_dependency_graph(
     Returns:
         Dependency graph dictionary: {routine_id: {dependent routine_ids}}.
     """
-    graph = {rid: set() for rid in routines.keys()}
+    graph: Dict[str, Set[str]] = {rid: set() for rid in routines.keys()}
 
-    def get_routine_id(routine: "Routine") -> str | None:
+    def get_routine_id(routine: "Routine") -> Optional[str]:
         """Find the ID of a Routine object within routines dict."""
         for rid, r in routines.items():
             if r is routine:
@@ -36,11 +36,12 @@ def build_dependency_graph(
         return None
 
     for conn in connections:
-        source_rid = get_routine_id(conn.source_event.routine)
-        target_rid = get_routine_id(conn.target_slot.routine)
+        if conn.source_event is not None and conn.target_slot is not None:
+            source_rid = get_routine_id(conn.source_event.routine)
+            target_rid = get_routine_id(conn.target_slot.routine)
 
-        if source_rid and target_rid and source_rid != target_rid:
-            graph[target_rid].add(source_rid)
+            if source_rid and target_rid and source_rid != target_rid:
+                graph[target_rid].add(source_rid)
 
     return graph
 

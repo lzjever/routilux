@@ -70,7 +70,7 @@ class ExecutionTracker(Serializable):
             ["flow_id", "routine_executions", "event_flow", "performance_metrics"]
         )
 
-    def record_routine_start(self, routine_id: str, params: dict[str, Any] = None) -> None:
+    def record_routine_start(self, routine_id: str, params: dict[str, Any] | None = None) -> None:
         """Record the start of a routine execution.
 
         This method is called when a routine begins execution. It creates
@@ -177,7 +177,7 @@ class ExecutionTracker(Serializable):
         source_routine_id: str,
         event_name: str,
         target_routine_id: str | None = None,
-        data: dict[str, Any] = None,
+        data: dict[str, Any] | None = None,
     ) -> None:
         """Record an event emission in the event flow.
 

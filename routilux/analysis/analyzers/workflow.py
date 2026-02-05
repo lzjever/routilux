@@ -78,7 +78,7 @@ class WorkflowAnalyzer:
                 "entry_points": [...]
             }
         """
-        result = {
+        result: dict[str, Any] = {
             "flow_id": flow.flow_id,
             "execution_strategy": flow.execution_strategy,
             "max_workers": flow.max_workers,
@@ -121,7 +121,7 @@ class WorkflowAnalyzer:
         Returns:
             Dictionary containing routine information.
         """
-        routine_info = {
+        routine_info: dict[str, Any] = {
             "routine_id": routine_id,
             "class_name": routine.__class__.__name__,
             "docstring": inspect.getdoc(routine.__class__) or "",
@@ -233,7 +233,7 @@ class WorkflowAnalyzer:
         if not source_routine_id or not target_routine_id:
             return None
 
-        conn_info = {
+        conn_info: dict[str, Any] = {
             "source_routine_id": source_routine_id,
             "source_event": connection.source_event.name,
             "target_routine_id": target_routine_id,
@@ -253,7 +253,7 @@ class WorkflowAnalyzer:
             Dictionary mapping routine_id to list of dependency routine_ids.
             If A.event -> B.slot, then B depends on A.
         """
-        dependency_graph = {routine_id: [] for routine_id in flow.routines.keys()}
+        dependency_graph: dict[str, list[str]] = {routine_id: [] for routine_id in flow.routines.keys()}
 
         for connection in flow.connections:
             if not connection.source_event or not connection.target_slot:
@@ -819,7 +819,7 @@ class WorkflowAnalyzer:
         lines.append("")
 
         # Group routines by dependency level
-        levels = {}
+        levels: dict[int, list[str]] = {}
         processed = set()
 
         # Level 0: Entry points

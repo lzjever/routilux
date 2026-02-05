@@ -49,7 +49,8 @@ def deserialize_flow(flow: "Flow", data: Dict[str, Any]) -> None:
     Serializable.deserialize(flow, data)
 
     for routine in flow.routines.values():
-        routine.current_flow = flow._current_flow
+        # Set current_flow context for each routine (runtime attribute)
+        setattr(routine, "_current_flow", getattr(flow, "_current_flow", None))
 
     valid_connections = []
     for connection in flow.connections:

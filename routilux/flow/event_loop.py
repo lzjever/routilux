@@ -107,7 +107,7 @@ def execute_task(task: "SlotActivationTask", flow: "Flow") -> None:
 
         # Set routine._current_flow for slot.receive() to find routine_id
         if task.slot.routine:
-            task.slot.routine._current_flow = flow
+            setattr(task.slot.routine, "_current_flow", flow)
 
         task.slot.receive(data, job_state=task.job_state, flow=flow)
 

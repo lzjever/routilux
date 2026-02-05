@@ -339,7 +339,7 @@ class ConditionalRouter(Routine):
 
         return data
 
-    def deserialize(self, data: dict[str, Any], registry: Any | None = None) -> None:
+    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any | None = None) -> None:
         """Deserialize ConditionalRouter, restoring callable conditions from routes.
 
         Callable conditions are automatically deserialized by the serialization module,
@@ -347,9 +347,10 @@ class ConditionalRouter(Routine):
 
         Args:
             data: Serialized dictionary.
+            strict: Whether to enforce strict deserialization.
             registry: Optional ObjectRegistry for deserializing callables.
         """
-        super().deserialize(data, registry=registry)
+        super().deserialize(data, strict=strict, registry=registry)
 
         # Process routes configuration to restore callable conditions
         # Most callables are already deserialized by super().deserialize(), but we need

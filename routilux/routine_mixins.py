@@ -11,7 +11,7 @@ Mixin Architecture:
 The Routine class inherits from all three mixins in order.
 """
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union, cast
 
 # TYPE_CHECKING imports to avoid circular dependencies
 if TYPE_CHECKING:
@@ -172,12 +172,12 @@ class ExecutionMixin:
 
         from routilux.slot import Slot
 
-        slot = Slot(name, self, handler, merge_strategy)
+        slot = Slot(name, cast("Routine", self), handler, merge_strategy)
         self._slots[name] = slot
         return slot
 
     def define_event(
-        self, name: str, output_params: List[str] | None = None
+        self, name: str, output_params: Optional[List[str]] = None
     ) -> "Event":
         """Define an output event for transmitting data to other routines.
 
@@ -203,7 +203,7 @@ class ExecutionMixin:
 
         from routilux.event import Event
 
-        event = Event(name, self, output_params or [])
+        event = Event(name, cast("Routine", self), output_params or [])
         self._events[name] = event
         return event
 
@@ -229,7 +229,7 @@ class ExecutionMixin:
         """
         return self._events.get(name)
 
-    def emit(self, event_name: str, flow: "Flow" | None = None, **kwargs) -> None:
+    def emit(self, event_name: str, flow: Optional["Flow"] = None, **kwargs) -> None:
         """Emit an event and send data to all connected slots.
 
         This method triggers the specified event and transmits the provided
@@ -268,7 +268,7 @@ class ExecutionMixin:
         # Record execution history if we have flow and job_state
         # Skip during serialization to avoid recursion
         if flow is not None and job_state is not None and not getattr(flow, "_serializing", False):
-            routine_id = flow._get_routine_id(self)
+            routine_id = flow._get_routine_id(cast("Routine", self))
             if routine_id:
                 # Create safe data copy for execution history
                 safe_data = self._prepare_execution_data(kwargs)
@@ -282,11 +282,11 @@ class ExecutionMixin:
                 if event_obj and event_obj.connected_slots:
                     for slot in event_obj.connected_slots:
                         if slot.routine:
-                            target_routine_ids.append(slot.routine._id)
+                            target_routine_ids.append(getattr(slot.routine, "_id", ""))
 
                 # Use first target routine ID for tracker (or None if no connections)
                 target_routine_id = target_routine_ids[0] if target_routine_ids else None
-                flow.execution_tracker.record_event(self._id, event_name, target_routine_id, kwargs)
+                flow.execution_tracker.record_event(getattr(cast("Routine", self), "_id", ""), event_name, target_routine_id, kwargs)
 
     def _prepare_execution_data(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare data for execution history recording.

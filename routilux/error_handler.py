@@ -115,7 +115,7 @@ class ErrorHandler(Serializable):
 
     def __init__(
         self,
-        strategy: str = "stop",
+        strategy: str | ErrorStrategy = "stop",
         max_retries: int = 3,
         retry_delay: float = 1.0,
         retry_backoff: float = 2.0,
@@ -340,14 +340,15 @@ class ErrorHandler(Serializable):
             data["strategy"] = data["strategy"].value
         return data
 
-    def deserialize(self, data: dict[str, Any], registry: Any | None = None) -> None:
+    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any | None = None) -> None:
         """Deserialize the ErrorHandler.
 
         Args:
             data: Serialized data dictionary.
+            strict: Whether to enforce strict deserialization.
             registry: Optional ObjectRegistry for deserializing callables.
         """
         # ErrorStrategy needs to be converted from string to enum
         if "strategy" in data and isinstance(data["strategy"], str):
             data["strategy"] = ErrorStrategy(data["strategy"])
-        super().deserialize(data, registry=registry)
+        super().deserialize(data, strict=strict, registry=registry)

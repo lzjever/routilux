@@ -201,7 +201,7 @@ class WorkflowD2Formatter(BaseFormatter):
         Returns:
             List of D2 lines.
         """
-        lines = []
+        lines: list[str] = []
         dependency_graph = data.get("dependency_graph", {})
 
         if not dependency_graph:

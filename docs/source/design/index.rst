@@ -9,4 +9,5 @@ This section provides detailed design documentation for routilux.
    ../design_overview
    ../design_architecture
    ../design_optimization
+   code_review
 

@@ -199,8 +199,7 @@ class Slot(Serializable):
 
         Args:
             data: Dictionary of data to receive. This is typically the data
-                emitted by a connected event, possibly transformed by
-                parameter mapping from the Connection.
+                emitted by a connected event, transmitted directly.
                 Example: {"result": "success", "count": 42}
 
         Examples:

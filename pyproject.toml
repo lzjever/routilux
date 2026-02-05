@@ -41,6 +41,7 @@ dev = [
     "pip-audit>=2.6.0",
     "bandit>=1.7.5",
     "safety>=2.3.0",
+    "pytest-benchmark>=4.0.0",
 ]
 docs = [
     "sphinx>=5.0.0,<9.0.0",

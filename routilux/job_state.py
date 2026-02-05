@@ -8,7 +8,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from serilux import Serializable, register_serializable
@@ -142,6 +142,10 @@ class JobState(Serializable):
         # Deferred events to be emitted on resume
         self.deferred_events: List[Dict[str, Any]] = []
 
+        # History retention policies
+        self.max_history_size: Optional[int] = 1000  # Keep last 1000 records
+        self.history_ttl_seconds: Optional[int] = 3600  # Remove records older than 1 hour
+
         # Shared data area for execution-wide data storage
         self.shared_data: Dict[str, Any] = {}
         self.shared_log: List[Dict[str, Any]] = []
@@ -169,6 +173,8 @@ class JobState(Serializable):
                 "shared_data",
                 "shared_log",
                 "output_log",
+                "max_history_size",
+                "history_ttl_seconds",
             ]
         )
 
@@ -306,6 +312,36 @@ class JobState(Serializable):
         record = ExecutionRecord(routine_id, event_name, data)
         self.execution_history.append(record)
         self.updated_at = datetime.now()
+
+        # Clean up history based on retention policies
+        self._cleanup_history()
+
+    def _cleanup_history(self) -> None:
+        """Clean up execution history based on retention policies.
+
+        Enforces max_history_size and history_ttl_seconds limits.
+        Called automatically by record_execution().
+
+        Note:
+            - max_history_size: None = unlimited, 0 = clear all history
+            - history_ttl_seconds: None = unlimited, 0 = no time-based cleanup
+        """
+        now = datetime.now()
+
+        # Apply size limit
+        if self.max_history_size is not None and self.max_history_size >= 0:
+            excess = len(self.execution_history) - self.max_history_size
+            if excess > 0:
+                # Remove oldest entries
+                self.execution_history = self.execution_history[excess:]
+
+        # Apply time limit
+        if self.history_ttl_seconds is not None and self.history_ttl_seconds > 0:
+            cutoff_time = now - timedelta(seconds=self.history_ttl_seconds)
+            self.execution_history = [
+                record for record in self.execution_history
+                if record.timestamp > cutoff_time
+            ]
 
     def get_execution_history(self, routine_id: Optional[str] = None) -> List[ExecutionRecord]:
         """Get execution history, optionally filtered by routine.

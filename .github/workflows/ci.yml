@@ -9,25 +9,29 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.11', '3.14']
+      fail-fast: false
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Set up Python 3.14
+
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
-      
+          python-version: ${{ matrix.python-version }}
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
           version: "latest"
-      
+
       - name: Install dependencies
         run: |
-          uv sync --group docs
-      
+          uv sync --group dev
+
       - name: Run tests
         run: |
           uv run pytest tests/ routilux/builtin_routines/ \
@@ -36,29 +40,29 @@ jobs:
             --cov-report=term-missing \
             --cov-report=html \
             -v
-      
+
       - name: Run linting
         run: |
           uv run ruff check routilux/ tests/ examples/
-      
+
       - name: Check formatting
         run: |
           uv run ruff format --check routilux/ tests/ examples/
-      
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
+          flags: unittests-py${{ matrix.python-version }}
+          name: codecov-py${{ matrix.python-version }}
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
-      
+
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: coverage-report
+          name: coverage-report-py${{ matrix.python-version }}
           path: htmlcov/
           retention-days: 7
           if-no-files-found: ignore

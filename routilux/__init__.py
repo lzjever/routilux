@@ -33,6 +33,16 @@ from routilux.builtin_routines import (
 from routilux.connection import Connection
 from routilux.error_handler import ErrorHandler, ErrorStrategy
 from routilux.event import Event
+
+# Import exceptions
+from routilux.exceptions import (
+    ConfigurationError,
+    ExecutionError,
+    RoutiluxError,
+    SerializationError,
+    SlotHandlerError,
+    StateError,
+)
 from routilux.execution_tracker import ExecutionTracker
 from routilux.flow import Flow
 from routilux.job_state import ExecutionRecord, JobState
@@ -44,6 +54,7 @@ from routilux.output_handler import (
 )
 from routilux.routine import ExecutionContext, Routine
 from routilux.slot import Slot
+from routilux.validators import ValidationError, Validator
 
 __all__ = [
     # Core classes
@@ -58,6 +69,16 @@ __all__ = [
     "ExecutionTracker",
     "ErrorHandler",
     "ErrorStrategy",
+    # Exceptions
+    "RoutiluxError",
+    "ExecutionError",
+    "SerializationError",
+    "ConfigurationError",
+    "StateError",
+    "SlotHandlerError",
+    "ValidationError",
+    # Validators
+    "Validator",
     # Output handlers
     "OutputHandler",
     "QueueOutputHandler",

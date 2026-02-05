@@ -31,25 +31,6 @@ dependencies = [
     "serilux>=0.3.1",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "sphinx>=5.0.0",
-    "sphinx-rtd-theme>=1.0.0",
-    "ruff>=0.1.0",
-    "mypy>=0.991",
-]
-
-docs = [
-    "sphinx>=5.0.0,<9.0.0",
-    "sphinx-rtd-theme>=1.0.0",
-    "furo>=2024.1.0",
-    "sphinx-autodoc-typehints>=1.19.0",
-    "sphinx-copybutton>=0.5.0",
-    "sphinx-design>=0.5.0",
-]
-
 [dependency-groups]
 dev = [
     "pytest>=7.0.0",
@@ -57,6 +38,9 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=0.991",
     "build>=0.10.0",
+    "pip-audit>=2.6.0",
+    "bandit>=1.7.5",
+    "safety>=2.3.0",
 ]
 docs = [
     "sphinx>=5.0.0,<9.0.0",
@@ -111,7 +95,7 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short"
 
 [tool.mypy]
-python_version = "3.7"
+python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

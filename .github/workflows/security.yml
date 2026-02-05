@@ -1,0 +1,91 @@
+name: Security
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly on Sundays at 00:00 UTC
+    - cron: '0 0 * * 0'
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.11', '3.14']
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run pip-audit (dependency vulnerabilities)
+        run: |
+          uv run pip-audit --desc > pip-audit-report.txt || true
+        continue-on-error: true
+
+      - name: Display pip-audit results
+        if: always()
+        run: |
+          cat pip-audit-report.txt || echo "No pip-audit report"
+
+      - name: Upload pip-audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report-py${{ matrix.python-version }}
+          path: pip-audit-report.txt
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Run bandit (code security issues)
+        run: |
+          uv run bandit -r routilux/ -f json -o bandit-report.json || true
+        continue-on-error: true
+
+      - name: Display bandit results
+        if: always()
+        run: |
+          cat bandit-report.json || echo "No bandit report"
+
+      - name: Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report-py${{ matrix.python-version }}
+          path: bandit-report.json
+          retention-days: 30
+
+      - name: Run safety check
+        run: |
+          uv run safety check --json > safety-report.json || true
+        continue-on-error: true
+
+      - name: Display safety results
+        if: always()
+        run: |
+          cat safety-report.json || echo "No safety report"
+
+      - name: Upload safety report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-vulnerability-report-py${{ matrix.python-version }}
+          path: safety-report.json
+          retention-days: 30

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable
 if TYPE_CHECKING:
     from routilux.event import Event
     from routilux.routine import Routine
+    from routilux.validators import Validator
 
 from serilux import Serializable, register_serializable
 
@@ -91,6 +92,7 @@ class Slot(Serializable):
         routine: Routine | None = None,
         handler: Callable | None = None,
         merge_strategy: str = "override",
+        validator: Validator | None = None,
     ):
         """Initialize Slot.
 
@@ -120,6 +122,11 @@ class Slot(Serializable):
                   that implements custom merge logic. The function should return
                   the merged result. Use this for complex merge requirements like
                   deep merging, averaging, or domain-specific operations.
+            validator: Optional input validator for validating data before calling
+                the handler. If provided, data will be validated against the validator
+                before being passed to the handler. Invalid data will be rejected
+                and logged. Use Validator.types() for type validation or Validator.custom()
+                for custom validation logic.
 
         Note:
             The merge_strategy determines how data accumulates in self._data and
@@ -131,6 +138,7 @@ class Slot(Serializable):
         self.routine: Routine = routine
         self.handler: Callable | None = handler
         self.merge_strategy: Any = merge_strategy
+        self.validator: Validator | None = validator
         self.connected_events: list[Event] = []
         self._data: dict[str, Any] = {}
 
@@ -211,6 +219,29 @@ class Slot(Serializable):
         # Merge new data with existing data according to merge_strategy
         # This updates self._data and returns the merged result
         merged_data = self._merge_data(data)
+
+        # Validate data if validator is set
+        if self.validator is not None:
+            from routilux.validators import ValidationError
+
+            try:
+                self.validator.validate(merged_data)
+            except ValidationError as e:
+                import logging
+                logging.warning(f"Validation failed for slot {self.name}: {e}")
+                # Record validation error but don't interrupt flow
+                if job_state and self.routine:
+                    if flow is None:
+                        flow = getattr(self.routine, "_current_flow", None)
+                    if flow:
+                        routine_id = flow._get_routine_id(self.routine)
+                        if routine_id:
+                            job_state.record_execution(
+                                routine_id,
+                                "validation_failed",
+                                {"slot": self.name, "error": str(e)},
+                            )
+                return  # Don't call handler for invalid data
 
         # Set job_state in context variable for thread-safe access
         # ContextVar ensures each execution context has its own value

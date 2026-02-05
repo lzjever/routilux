@@ -2,21 +2,26 @@
 Routine base class.
 
 Improved Routine mechanism supporting slots (input slots) and events (output events).
+
+Refactored to use mixins for separation of concerns:
+- ConfigMixin: Configuration and parameter management
+- ExecutionMixin: Event emission and slot management
+- LifecycleMixin: Lifecycle hooks and state management
 """
 
 from __future__ import annotations
 
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any, Callable, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 if TYPE_CHECKING:
     from routilux.error_handler import ErrorHandler, ErrorStrategy
-    from routilux.event import Event
     from routilux.flow import Flow
     from routilux.job_state import JobState
-    from routilux.slot import Slot
 
 from serilux import Serializable, register_serializable
+
+from routilux.routine_mixins import ConfigMixin, ExecutionMixin, LifecycleMixin
 
 # Context variable for thread-safe job_state access
 # Each execution context has its own value, even in the same thread
@@ -41,18 +46,24 @@ class ExecutionContext(NamedTuple):
 
 
 @register_serializable
-class Routine(Serializable):
+class Routine(ConfigMixin, ExecutionMixin, LifecycleMixin, Serializable):
     """Improved Routine base class with enhanced capabilities.
 
     Features:
-    - Support for slots (input slots)
-    - Support for events (output events)
-    - Configuration dictionary (_config) for storing routine-specific settings
+    - Support for slots (input slots) via ExecutionMixin
+    - Support for events (output events) via ExecutionMixin
+    - Configuration dictionary (_config) via ConfigMixin
+    - Lifecycle hooks via LifecycleMixin
+
+    The Routine class is now a composition of three mixins:
+    - ConfigMixin: Configuration and parameter management
+    - ExecutionMixin: Event emission and slot management
+    - LifecycleMixin: State management and lifecycle hooks
 
     Configuration Management (_config):
         The _config dictionary stores routine-specific configuration that should
         persist across serialization. Use set_config() and get_config() methods
-        for convenient access.
+        for convenient access. Also provides configure() and get_param() aliases.
 
     Important Constraints:
         - Routines MUST NOT accept constructor parameters (except self).
@@ -85,17 +96,14 @@ class Routine(Serializable):
             ...         super().__init__()
             ...         # Set configuration
             ...         self.set_config(name="my_routine", timeout=30)
+            ...         # Or use the new alias:
+            ...         self.configure(name="my_routine", timeout=30)
             ...
             ...     def process(self, **kwargs):
             ...         # Use configuration
             ...         timeout = self.get_config("timeout", default=10)
-            ...         # Store execution state in JobState
-            ...         flow = getattr(self, "_current_flow", None)
-            ...         if flow:
-            ...             job_state = getattr(flow._current_execution_job_state, "value", None)
-            ...             if job_state:
-            ...                 routine_id = flow._get_routine_id(self)
-            ...                 job_state.update_routine_state(routine_id, {"processed": True})
+            ...         # Or use the new alias:
+            ...         timeout = self.get_param("timeout", default=10)
 
         Incorrect usage (will break serialization):
             >>> class BadRoutine(Routine):
@@ -122,344 +130,26 @@ class Routine(Serializable):
             should be stored in self._config dictionary after object creation.
             See set_config() method for a convenient way to set configuration.
         """
+        # Call all mixin __init__ methods (ConfigMixin, ExecutionMixin, LifecycleMixin)
+        # and Serializable.__init__()
         super().__init__()
         self._id: str = hex(id(self))
-        self._slots: dict[str, Slot] = {}
-        self._events: dict[str, Event] = {}
-
-        # Configuration dictionary for storing routine-specific settings
-        # All configuration values are automatically serialized/deserialized
-        # Use set_config() and get_config() methods for convenient access
-        self._config: dict[str, Any] = {}
 
         # Error handler for this routine (optional)
         # Priority: routine-level error handler > flow-level error handler > default (STOP)
         self._error_handler: ErrorHandler | None = None
 
         # Register serializable fields
-        # _slots and _events are included - base class automatically serializes/deserializes them
-        self.add_serializable_fields(["_id", "_config", "_error_handler", "_slots", "_events"])
+        # _config, _slots, _events are from mixins and need to be registered
+        # _id and _error_handler are from Routine
+        # _before_hooks, _after_hooks are from LifecycleMixin
+        self.add_serializable_fields(
+            ["_id", "_config", "_error_handler", "_slots", "_events", "_before_hooks", "_after_hooks"]
+        )
 
     def __repr__(self) -> str:
         """Return string representation of the Routine."""
         return f"{self.__class__.__name__}[{self._id}]"
-
-    def define_slot(
-        self, name: str, handler: Callable | None = None, merge_strategy: str = "override"
-    ) -> Slot:
-        """Define an input slot for receiving data from other routines.
-
-        This method creates a new slot that can be connected to events from
-        other routines. When data is received, it's merged with existing data
-        according to the merge_strategy, then passed to the handler.
-
-        Args:
-            name: Slot name. Must be unique within this routine. Used to
-                identify the slot when connecting events.
-            handler: Handler function called when slot receives data. The function
-                signature can be flexible - see Slot.__init__ documentation for
-                details on how data is passed to the handler. If None, no handler
-                is called when data is received.
-            merge_strategy: Strategy for merging new data with existing data.
-                Possible values:
-
-                - "override" (default): New data completely replaces old data.
-                  Each receive() passes only the new data to the handler.
-                  Use this when you only need the latest data.
-                - "append": New values are appended to lists. The handler receives
-                  accumulated data each time. Use this for aggregation scenarios
-                  where you need to collect multiple data points.
-                - Callable: A function(old_data: Dict, new_data: Dict) -> Dict
-                  that implements custom merge logic. Use this for complex
-                  requirements like deep merging or domain-specific operations.
-
-                See Slot class documentation for detailed examples and behavior.
-
-        Returns:
-            Slot object that can be connected to events from other routines.
-
-        Raises:
-            ValueError: If slot name already exists in this routine.
-
-        Examples:
-            Simple slot with override strategy (default):
-
-            >>> routine = MyRoutine()
-            >>> slot = routine.define_slot("input", handler=process_data)
-            >>> # slot uses "override" strategy by default
-
-            Aggregation slot with append strategy:
-
-            >>> slot = routine.define_slot(
-            ...     "input",
-            ...     handler=aggregate_data,
-            ...     merge_strategy="append"
-            ... )
-            >>> # Values will be accumulated in lists
-
-            Custom merge strategy:
-
-            >>> def deep_merge(old, new):
-            ...     result = old.copy()
-            ...     for k, v in new.items():
-            ...         if k in result and isinstance(result[k], dict):
-            ...             result[k] = deep_merge(result[k], v)
-            ...         else:
-            ...             result[k] = v
-            ...     return result
-            >>> slot = routine.define_slot("input", merge_strategy=deep_merge)
-        """
-        if name in self._slots:
-            raise ValueError(f"Slot '{name}' already exists in {self}")
-
-        # Lazy import to avoid circular dependency
-        from routilux.slot import Slot
-
-        slot = Slot(name, self, handler, merge_strategy)
-        self._slots[name] = slot
-        return slot
-
-    def define_event(self, name: str, output_params: list[str] | None = None) -> Event:
-        """Define an output event for transmitting data to other routines.
-
-        This method creates a new event that can be connected to slots in
-        other routines. When you emit this event, the data is automatically
-        sent to all connected slots.
-
-        Event Emission:
-            Use emit() method to trigger the event and send data:
-            - ``emit(event_name, **kwargs)`` - passes kwargs as data
-            - Data is sent to all connected slots via their connections
-            - Parameter mapping (from Flow.connect()) is applied during transmission
-
-        Args:
-            name: Event name. Must be unique within this routine.
-                Used to identify the event when connecting via Flow.connect().
-                Example: "output", "result", "error"
-            output_params: Optional list of parameter names this event emits.
-                This is for documentation purposes only - it doesn't enforce
-                what parameters can be emitted. Helps document the event's API.
-                Example: ["result", "status", "metadata"]
-
-        Returns:
-            Event object. You typically don't need to use this, but it can be
-            useful for programmatic access or advanced use cases.
-
-        Raises:
-            ValueError: If event name already exists in this routine.
-
-        Examples:
-            Basic event definition:
-                >>> class MyRoutine(Routine):
-                ...     def __init__(self):
-                ...         super().__init__()
-                ...         self.output_event = self.define_event("output", ["result", "status"])
-                ...
-                ...     def __call__(self):
-                ...         self.emit("output", result="success", status=200)
-
-            Event with documentation:
-                >>> routine.define_event("data_ready", output_params=["data", "timestamp", "source"])
-                >>> # Documents that this event emits these parameters
-
-            Multiple events:
-                >>> routine.define_event("success", ["result"])
-                >>> routine.define_event("error", ["error_code", "message"])
-                >>> # Can emit different events for different outcomes
-        """
-        if name in self._events:
-            raise ValueError(f"Event '{name}' already exists in {self}")
-
-        # Lazy import to avoid circular dependency
-        from routilux.event import Event
-
-        event = Event(name, self, output_params or [])
-        self._events[name] = event
-        return event
-
-    def emit(self, event_name: str, flow: Flow | None = None, **kwargs) -> None:
-        """Emit an event and send data to all connected slots.
-
-        This method triggers the specified event and transmits the provided
-        data to all slots connected to this event. The data transmission
-        respects parameter mappings defined in Flow.connect().
-
-        Data Flow:
-            1. Event is emitted with ``**kwargs`` data
-            2. For each connected slot:
-               a. Parameter mapping is applied (if defined in Flow.connect())
-               b. Data is merged with slot's existing data (according to merge_strategy)
-               c. Slot's handler is called with the merged data
-            3. In concurrent mode, handlers may execute in parallel threads
-
-        Flow Context:
-            If flow is not provided, the method attempts to get it from the
-            routine's context (_current_flow). This works automatically when
-            the routine is executed within a Flow context. For standalone
-            usage or testing, you may need to provide the flow explicitly.
-
-        Args:
-            event_name: Name of the event to emit. Must be defined using
-                define_event() before calling this method.
-            flow: Optional Flow object. Used for:
-                - Finding Connection objects for parameter mapping
-                - Recording execution history
-                - Tracking event emissions
-                If None, attempts to get from routine context.
-                Provide explicitly for standalone usage or testing.
-            ``**kwargs``: Data to transmit via the event. These keyword arguments
-                become the data dictionary sent to connected slots.
-                Example: emit("output", result="success", count=42)
-                sends {"result": "success", "count": 42} to connected slots.
-
-        Raises:
-            ValueError: If event_name does not exist in this routine.
-                Define the event first using define_event().
-
-        Examples:
-            Basic emission:
-                >>> routine.define_event("output", ["result"])
-                >>> routine.emit("output", result="data", status="ok")
-                >>> # Sends {"result": "data", "status": "ok"} to connected slots
-
-            Emission with flow context:
-                >>> routine.emit("output", flow=my_flow, data="value")
-                >>> # Explicitly provides flow for parameter mapping
-
-            Multiple parameters:
-                >>> routine.emit("result",
-                ...              success=True,
-                ...              data={"key": "value"},
-                ...              timestamp=time.time(),
-                ...              metadata={"source": "processor"})
-                >>> # All parameters are sent to connected slots
-        """
-        if event_name not in self._events:
-            raise ValueError(f"Event '{event_name}' does not exist in {self}")
-
-        event = self._events[event_name]
-
-        # If flow not provided, try to get from context
-        if flow is None and hasattr(self, "_current_flow"):
-            flow = getattr(self, "_current_flow", None)
-
-        # Get job_state from context variable if not in kwargs
-        # Note: event.emit() will pop job_state from kwargs, so we need to preserve it
-        job_state = kwargs.get("job_state")
-        if job_state is None:
-            job_state = _current_job_state.get(None)
-            if job_state is not None:
-                kwargs["job_state"] = job_state
-
-        # Emit event (this will create tasks and enqueue them)
-        event.emit(flow=flow, **kwargs)
-
-        # Record execution history if we have flow and job_state
-        # Skip during serialization to avoid recursion
-        if flow is not None and job_state is not None and not getattr(flow, "_serializing", False):
-            routine_id = flow._get_routine_id(self)
-            if routine_id:
-                # Create safe data copy for execution history
-                # Remove job_state and convert Serializable objects to strings to avoid recursion
-                safe_data = self._prepare_execution_data(kwargs)
-                job_state.record_execution(routine_id, event_name, safe_data)
-
-            # Record to execution tracker
-            if flow.execution_tracker is not None:
-                # Get all target routine IDs (there may be multiple connected slots)
-                target_routine_ids = []
-                event_obj = self._events.get(event_name)
-                if event_obj and event_obj.connected_slots:
-                    for slot in event_obj.connected_slots:
-                        if slot.routine:
-                            target_routine_ids.append(slot.routine._id)
-
-                # Use first target routine ID for tracker (or None if no connections)
-                target_routine_id = target_routine_ids[0] if target_routine_ids else None
-                flow.execution_tracker.record_event(self._id, event_name, target_routine_id, kwargs)
-
-    def _prepare_execution_data(self, kwargs: dict[str, Any]) -> dict[str, Any]:
-        """Prepare data for execution history recording.
-
-        Removes job_state and converts Serializable objects to strings
-        to avoid circular references during serialization.
-
-        Args:
-            kwargs: Original keyword arguments from emit().
-
-        Returns:
-            Safe dictionary for execution history recording.
-        """
-        safe_data = {}
-        from serilux import Serializable
-
-        for k, v in kwargs.items():
-            if k == "job_state":
-                continue  # Skip job_state to avoid circular reference
-            # Convert Serializable objects to strings to prevent recursion during serialization
-            if isinstance(v, Serializable):
-                safe_data[k] = str(v)
-            else:
-                safe_data[k] = v
-        return safe_data
-
-    def _extract_input_data(self, data: Any = None, **kwargs) -> Any:
-        """Extract input data from slot parameters.
-
-        This method provides a consistent way to extract data from slot inputs,
-        handling various input patterns. It's particularly useful in slot handlers
-        to simplify data extraction logic.
-
-        Input patterns handled:
-        - Direct data parameter: Returns data as-is
-        - 'data' key in kwargs: Returns kwargs["data"]
-        - Single value in kwargs: Returns the single value
-        - Multiple values in kwargs: Returns the entire kwargs dict
-        - Empty input: Returns empty dict
-
-        Args:
-            data: Direct data parameter (optional).
-            **kwargs: Additional keyword arguments from slot.
-
-        Returns:
-            Extracted data value. Type depends on input.
-
-        Examples:
-            >>> # In a slot handler
-            >>> def _handle_input(self, data=None, **kwargs):
-            ...     # Extract data using helper
-            ...     data = self._extract_input_data(data, **kwargs)
-            ...     # Process data...
-
-            >>> # Direct parameter
-            >>> self._extract_input_data("text")
-            'text'
-
-            >>> # From kwargs
-            >>> self._extract_input_data(None, data="text")
-            'text'
-
-            >>> # Single value in kwargs
-            >>> self._extract_input_data(None, text="value")
-            'value'
-
-            >>> # Multiple values
-            >>> self._extract_input_data(None, a=1, b=2)
-            {'a': 1, 'b': 2}
-        """
-        if data is not None:
-            return data
-
-        if "data" in kwargs:
-            return kwargs["data"]
-
-        if len(kwargs) == 1:
-            return list(kwargs.values())[0]
-
-        if len(kwargs) > 0:
-            return kwargs
-
-        return {}
 
     def __call__(self, **kwargs) -> None:
         r"""Execute routine (deprecated - use slot handlers instead).
@@ -501,88 +191,13 @@ class Routine(Serializable):
         # Execution state should be tracked in JobState, not routine._stats
         pass
 
-    def get_slot(self, name: str) -> Slot | None:
-        """Get specified slot.
+    # Note: define_slot, define_event, emit, get_slot, get_event, _prepare_execution_data,
+    # _extract_input_data are now provided by ExecutionMixin
 
-        Args:
-            name: Slot name.
+    # Note: set_config, get_config, config, configure, get_param are now provided by ConfigMixin
 
-        Returns:
-            Slot object if found, None otherwise.
-        """
-        return self._slots.get(name)
-
-    def get_event(self, name: str) -> Event | None:
-        """Get specified event.
-
-        Args:
-            name: Event name.
-
-        Returns:
-            Event object if found, None otherwise.
-        """
-        return self._events.get(name)
-
-    def set_config(self, **kwargs) -> None:
-        """Set configuration values in the _config dictionary.
-
-        This is the recommended way to set routine configuration after object
-        creation. All configuration values are stored in self._config and will
-        be automatically serialized/deserialized.
-
-        Args:
-            ``**kwargs``: Configuration key-value pairs to set. These will be stored
-                in self._config dictionary.
-
-        Examples:
-            >>> routine = MyRoutine()
-            >>> routine.set_config(name="processor_1", timeout=30, retries=3)
-            >>> # Now routine._config contains:
-            >>> # {"name": "processor_1", "timeout": 30, "retries": 3}
-
-            >>> # You can also set config directly:
-            >>> routine._config["custom_setting"] = "value"
-
-        Note:
-            - Configuration can be set at any time after object creation.
-            - All values in _config are automatically serialized.
-            - Use this method instead of constructor parameters to ensure
-              proper serialization/deserialization support.
-        """
-        self._config.update(kwargs)
-
-    def get_config(self, key: str, default: Any = None) -> Any:
-        """Get a configuration value from the _config dictionary.
-
-        Args:
-            key: Configuration key to retrieve.
-            default: Default value to return if key doesn't exist.
-
-        Returns:
-            Configuration value if found, default value otherwise.
-
-        Examples:
-            >>> routine = MyRoutine()
-            >>> routine.set_config(timeout=30)
-            >>> timeout = routine.get_config("timeout", default=10)  # Returns 30
-            >>> retries = routine.get_config("retries", default=0)  # Returns 0
-        """
-        return self._config.get(key, default)
-
-    def config(self) -> dict[str, Any]:
-        """Get a copy of the configuration dictionary.
-
-        Returns:
-            Copy of the _config dictionary. Modifications to the returned
-            dictionary will not affect the original _config.
-
-        Examples:
-            >>> routine = MyRoutine()
-            >>> routine.set_config(name="test", timeout=30)
-            >>> config = routine.config()
-            >>> print(config)  # {"name": "test", "timeout": 30}
-        """
-        return self._config.copy()
+    # Note: before_execution, after_execution, _run_before_hooks, _run_after_hooks
+    # are now provided by LifecycleMixin
 
     def set_error_handler(self, error_handler: ErrorHandler) -> None:
         """Set error handler for this routine.

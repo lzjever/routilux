@@ -53,28 +53,6 @@ class TestConnectionDisconnect:
 class TestConnectionActivation:
     """Connection 激活测试"""
 
-    def test_activate_with_mapping(self):
-        """测试带参数映射的激活"""
-        routine1 = Routine()
-        routine = Routine()
-
-        received_data = {}
-
-        def handler(mapped_param):
-            received_data["mapped_param"] = mapped_param
-
-        event = routine1.define_event("output", ["source_param"])
-        slot = routine.define_slot("input", handler=handler)
-
-        param_mapping = {"source_param": "mapped_param"}
-        connection = Connection(event, slot, param_mapping=param_mapping)
-
-        # 激活连接
-        connection.activate({"source_param": "test_value"})
-
-        # 验证参数映射生效
-        assert received_data["mapped_param"] == "test_value"
-
     def test_activate_without_mapping(self):
         """测试不带参数映射的激活"""
         routine1 = Routine()
@@ -98,30 +76,28 @@ class TestConnectionActivation:
         # 验证数据传递
         assert received_data["data"] == "test_value"
 
-    def test_activate_with_partial_mapping(self):
-        """测试部分参数映射"""
+    def test_activate_with_multiple_params(self):
+        """测试激活连接并传递多个参数"""
         routine1 = Routine()
         routine = Routine()
 
         received_data = {}
 
-        def handler(mapped_param, other_param):
-            received_data["mapped_param"] = mapped_param
-            received_data["other_param"] = other_param
+        def handler(**kwargs):
+            received_data.update(kwargs)
 
-        event = routine1.define_event("output", ["source_param", "other_param"])
+        event = routine1.define_event("output", ["param1", "param2", "param3"])
         slot = routine.define_slot("input", handler=handler)
 
-        # 只映射一个参数
-        param_mapping = {"source_param": "mapped_param"}
-        connection = Connection(event, slot, param_mapping=param_mapping)
+        connection = Connection(event, slot)
 
-        # 激活连接
-        connection.activate({"source_param": "test_value", "other_param": "other_value"})
+        # 激活连接，传递多个参数
+        connection.activate({"param1": "value1", "param2": "value2", "param3": "value3"})
 
-        # 验证参数映射和直接传递
-        assert received_data["mapped_param"] == "test_value"
-        assert received_data["other_param"] == "other_value"
+        # 验证所有参数都被传递
+        assert received_data["param1"] == "value1"
+        assert received_data["param2"] == "value2"
+        assert received_data["param3"] == "value3"
 
 
 class TestConnectionSerialization:
@@ -135,15 +111,13 @@ class TestConnectionSerialization:
         event = routine1.define_event("output", ["data"])
         slot = routine.define_slot("input")
 
-        param_mapping = {"data": "input_data"}
-        connection = Connection(event, slot, param_mapping=param_mapping)
+        connection = Connection(event, slot)
 
         data = connection.serialize()
 
         assert data["_type"] == "Connection"
         assert data["_source_event_name"] == "output"
         assert data["_target_slot_name"] == "input"
-        assert data["param_mapping"] == param_mapping
 
     def test_connection_deserialize(self):
         """测试连接反序列化"""
@@ -157,7 +131,6 @@ class TestConnectionSerialization:
             "_type": "Connection",
             "_source_event_name": "output",
             "_target_slot_name": "input",
-            "param_mapping": {"data": "input_data"},
         }
 
         connection = Connection()
@@ -169,4 +142,3 @@ class TestConnectionSerialization:
 
         assert connection.source_event == event
         assert connection.target_slot == slot
-        assert connection.param_mapping == {"data": "input_data"}

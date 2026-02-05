@@ -102,16 +102,14 @@ def execute_task(task: "SlotActivationTask", flow: "Flow") -> None:
         flow: Flow object.
     """
     try:
-        if task.connection:
-            mapped_data = task.connection._apply_mapping(task.data)
-        else:
-            mapped_data = task.data
+        # Data is passed directly without transformation
+        data = task.data
 
         # Set routine._current_flow for slot.receive() to find routine_id
         if task.slot.routine:
             task.slot.routine._current_flow = flow
 
-        task.slot.receive(mapped_data, job_state=task.job_state, flow=flow)
+        task.slot.receive(data, job_state=task.job_state, flow=flow)
 
     except Exception as e:
         from routilux.flow.error_handling import handle_task_error

@@ -269,7 +269,6 @@ class Flow(Serializable):
         source_event: str,
         target_routine_id: str,
         target_slot: str,
-        param_mapping: dict[str, str] | None = None,
     ) -> Connection:
         """Connect two routines by linking a source event to a target slot.
 
@@ -278,8 +277,6 @@ class Flow(Serializable):
             source_event: Name of the event to connect from.
             target_routine_id: Identifier of the routine that receives the data.
             target_slot: Name of the slot to connect to.
-            param_mapping: Optional dictionary mapping event parameter names to
-                slot parameter names.
 
         Returns:
             Connection object representing this connection.
@@ -305,7 +302,7 @@ class Flow(Serializable):
 
         from routilux.connection import Connection
 
-        connection = Connection(source_event_obj, target_slot_obj, param_mapping)
+        connection = Connection(source_event_obj, target_slot_obj)
         self.connections.append(connection)
 
         key = (source_event_obj, target_slot_obj)

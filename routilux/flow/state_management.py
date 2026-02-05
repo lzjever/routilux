@@ -113,7 +113,6 @@ def serialize_pending_tasks(flow: "Flow", job_state: "JobState") -> None:
             "connection_target_slot_name": (
                 connection.target_slot.name if connection and connection.target_slot else None
             ),
-            "param_mapping": connection.param_mapping if connection else {},
             "priority": task.priority.value,
             "retry_count": task.retry_count,
             "max_retries": task.max_retries,

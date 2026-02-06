@@ -89,7 +89,9 @@ class Event(Serializable):
         # Flow will add routine_id when serializing routines
         return super().serialize()
 
-    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any | None = None) -> None:
+    def deserialize(
+        self, data: dict[str, Any], strict: bool = False, registry: Any | None = None
+    ) -> None:
         """Deserialize the Event.
 
         Args:

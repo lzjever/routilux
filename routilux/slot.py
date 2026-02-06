@@ -225,6 +225,7 @@ class Slot(Serializable):
                 self.validator.validate(merged_data)
             except ValidationError as e:
                 import logging
+
                 logging.warning(f"Validation failed for slot {self.name}: {e}")
                 # Record validation error but don't interrupt flow
                 if job_state and self.routine:
@@ -589,7 +590,9 @@ class Slot(Serializable):
 
         return data
 
-    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any | None = None) -> None:
+    def deserialize(
+        self, data: dict[str, Any], strict: bool = False, registry: Any | None = None
+    ) -> None:
         """Deserialize Slot.
 
         Callables (handler, merge_strategy) are automatically handled by Serializable base class.

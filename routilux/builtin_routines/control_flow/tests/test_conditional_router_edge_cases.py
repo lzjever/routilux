@@ -3,6 +3,7 @@ Edge case tests for ConditionalRouter routine.
 """
 
 import pytest
+
 from routilux.builtin_routines.control_flow import ConditionalRouter
 from routilux.slot import Slot
 
@@ -180,7 +181,7 @@ class TestConditionalRouterEdgeCases:
         )
 
         received = []
-        new_slot = Slot("new", None, lambda **kwargs: received.append(kwargs))
+        _ = Slot("new", None, lambda **kwargs: received.append(kwargs))
 
         # Event doesn't exist yet
         assert router.get_event("new_route") is None
@@ -202,7 +203,7 @@ class TestConditionalRouterEdgeCases:
         )
 
         received = []
-        default_slot = Slot("default", None, lambda **kwargs: received.append(kwargs))
+        _ = Slot("default", None, lambda **kwargs: received.append(kwargs))
 
         # Default event doesn't exist yet
         assert router.get_event("default") is None

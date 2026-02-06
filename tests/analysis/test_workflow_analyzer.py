@@ -1,11 +1,6 @@
 """Tests for workflow analyzer module."""
 
 import json
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock
-
-import pytest
 
 from routilux import Flow, Routine
 from routilux.analysis.analyzers.routine import RoutineAnalyzer

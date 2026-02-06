@@ -29,6 +29,7 @@ def _get_current_job_state():
     and routine modules.
     """
     import routilux.routine as routine_module
+
     return getattr(routine_module, "_current_job_state", None)
 
 
@@ -177,9 +178,7 @@ class ExecutionMixin:
         self._slots[name] = slot
         return slot
 
-    def define_event(
-        self, name: str, output_params: Optional[List[str]] = None
-    ) -> "Event":
+    def define_event(self, name: str, output_params: Optional[List[str]] = None) -> "Event":
         """Define an output event for transmitting data to other routines.
 
         This method creates a new event that can be connected to slots in
@@ -287,7 +286,9 @@ class ExecutionMixin:
 
                 # Use first target routine ID for tracker (or None if no connections)
                 target_routine_id = target_routine_ids[0] if target_routine_ids else None
-                flow.execution_tracker.record_event(getattr(cast("Routine", self), "_id", ""), event_name, target_routine_id, kwargs)
+                flow.execution_tracker.record_event(
+                    getattr(cast("Routine", self), "_id", ""), event_name, target_routine_id, kwargs
+                )
 
     def _prepare_execution_data(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare data for execution history recording.

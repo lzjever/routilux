@@ -2,8 +2,9 @@
 Tests for flow state management module.
 """
 
-import pytest
 from datetime import datetime
+
+import pytest
 
 from routilux import Flow, JobState, Routine
 from routilux.flow.state_management import (
@@ -92,7 +93,7 @@ class TestWaitForActiveTasks:
         routine.define_event("output", ["result"])
 
         flow.add_routine(routine, "routine1")
-        job_state = flow.execute("routine1", entry_params={"data": {}})
+        _ = flow.execute("routine1", entry_params={"data": {}})
 
         # Should wait but eventually return
         wait_for_active_tasks(flow)

@@ -561,7 +561,9 @@ class Flow(Serializable):
 
         return serialize_flow(self)
 
-    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any | None = None) -> None:
+    def deserialize(
+        self, data: dict[str, Any], strict: bool = False, registry: Any | None = None
+    ) -> None:
         """Deserialize Flow, restoring all routines and connections.
 
         Args:

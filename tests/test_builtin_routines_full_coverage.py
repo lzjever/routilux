@@ -11,8 +11,6 @@ These tests cover the uncovered lines in:
 - utils/time_provider.py
 """
 
-import pytest
-from datetime import datetime
 
 from routilux.builtin_routines.data_processing import (
     DataTransformer,
@@ -140,12 +138,7 @@ class TestDataValidatorCoverage:
         validator.valid_event.connect(valid_slot)
 
         # Set validation rules
-        validator.set_config(
-            rules={
-                "name": "is_string",
-                "age": "is_int"
-            }
-        )
+        validator.set_config(rules={"name": "is_string", "age": "is_int"})
 
         # Valid data
         validator.input_slot.receive({"data": {"name": "John", "age": 30}})
@@ -163,9 +156,7 @@ class TestDataValidatorCoverage:
         validator.invalid_event.connect(invalid_slot)
 
         # Set validation rules with required fields
-        validator.set_config(
-            required_fields=["name"]
-        )
+        validator.set_config(required_fields=["name"])
 
         # Invalid data (missing required field)
         validator.input_slot.receive({"data": {"age": 30}})
@@ -183,9 +174,7 @@ class TestDataValidatorCoverage:
         validator.invalid_event.connect(invalid_slot)
 
         # Set validation rules with unknown validator
-        validator.set_config(
-            rules={"age": "unknown_validator"}
-        )
+        validator.set_config(rules={"age": "unknown_validator"})
 
         # Input data
         validator.input_slot.receive({"data": {"age": 30}})
@@ -208,9 +197,7 @@ class TestDataValidatorCoverage:
                 return True, None
             return False, "Age must be between 0 and 120"
 
-        validator.set_config(
-            rules={"age": range_validator}
-        )
+        validator.set_config(rules={"age": range_validator})
 
         # Valid data
         validator.input_slot.receive({"data": {"age": 30}})
@@ -227,9 +214,7 @@ class TestDataValidatorCoverage:
         validator.valid_event.connect(valid_slot)
 
         # Set validation rules for list items
-        validator.set_config(
-            rules={"items": "is_int"}
-        )
+        validator.set_config(rules={"items": "is_int"})
 
         # Valid list data
         validator.input_slot.receive({"data": [1, 2, 3, 4]})
@@ -246,9 +231,7 @@ class TestDataValidatorCoverage:
         validator.valid_event.connect(valid_slot)
 
         # Set validation rules for primitive value
-        validator.set_config(
-            rules={"value": "is_positive"}
-        )
+        validator.set_config(rules={"value": "is_positive"})
 
         # Valid primitive data
         validator.input_slot.receive({"data": 42})
@@ -299,8 +282,7 @@ class TestResultExtractorCoverage:
 
         # Set custom priority
         extractor.set_config(
-            strategy="priority",
-            extractor_priority=["dict_extractor", "json_string"]
+            strategy="priority", extractor_priority=["dict_extractor", "json_string"]
         )
 
         # Input that's both dict and potentially JSON
@@ -319,9 +301,9 @@ class TestResultExtractorCoverage:
         extractor.output_event.connect(output_slot)
 
         # Input with JSON code block
-        extractor.input_slot.receive({
-            "data": 'Some text\n```json\n{"key": "value"}\n```\nMore text'
-        })
+        extractor.input_slot.receive(
+            {"data": 'Some text\n```json\n{"key": "value"}\n```\nMore text'}
+        )
 
         # Should extract JSON
         assert len(received) == 1
@@ -457,7 +439,9 @@ class TestTextClipperCoverage:
         clipper.set_config(max_length=10, preserve_tracebacks=True)
 
         # Input text with traceback
-        clipper.input_slot.receive({"text": "Some text\nTraceback (most recent call last):\n  Error here"})
+        clipper.input_slot.receive(
+            {"text": "Some text\nTraceback (most recent call last):\n  Error here"}
+        )
 
         # Should not clip because of traceback
         assert len(received) == 1
@@ -565,12 +549,9 @@ class TestDataFlattenerCoverage:
         flattener.output_event.connect(output_slot)
 
         # Input nested dict
-        flattener.input_slot.receive({
-            "data": {
-                "user": {"name": "John", "age": 30},
-                "address": {"city": "NYC"}
-            }
-        })
+        flattener.input_slot.receive(
+            {"data": {"user": {"name": "John", "age": 30}, "address": {"city": "NYC"}}}
+        )
 
         # Should flatten
         assert len(received) == 1
@@ -635,7 +616,18 @@ class TestTimeProviderCoverage:
         assert len(received) == 1
         assert "formatted" in received[0]
         # English format should contain weekday name
-        assert any(day in received[0]["time_string"] for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
+        assert any(
+            day in received[0]["time_string"]
+            for day in [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday",
+            ]
+        )
 
     def test_provide_timestamp_format(self):
         """Test providing time as timestamp."""

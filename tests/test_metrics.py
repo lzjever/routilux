@@ -1,8 +1,7 @@
 """Tests for metrics export."""
 
-import pytest
 from routilux import Flow, Routine
-from routilux.metrics import MetricsCollector, Counter, Histogram, Gauge
+from routilux.metrics import Counter, Gauge, Histogram, MetricsCollector
 
 
 def test_counter_increment():
@@ -54,7 +53,7 @@ def test_metrics_collector_tracks_flow_execution():
             pass
 
     routine = WorkerRoutine()
-    routine_id = flow.add_routine(routine, "worker")
+    _ = flow.add_routine(routine, "worker")
 
     # Enable metrics
     collector = MetricsCollector()
@@ -62,11 +61,15 @@ def test_metrics_collector_tracks_flow_execution():
 
     # Simulate metrics tracking
     collector.get_or_create_counter("flow_executions_total", "Total flow executions").inc()
-    collector.get_or_create_counter("routine_executions_total", "Total routine executions", labels={"routine": "worker"}).inc()
+    collector.get_or_create_counter(
+        "routine_executions_total", "Total routine executions", labels={"routine": "worker"}
+    ).inc()
 
     # Check metrics were recorded
     assert collector.get_counter("flow_executions_total").value >= 1
-    assert collector.get_counter("routine_executions_total", labels={"routine": "worker"}).value >= 1
+    assert (
+        collector.get_counter("routine_executions_total", labels={"routine": "worker"}).value >= 1
+    )
 
 
 def test_metrics_export_prometheus_format():
@@ -97,7 +100,7 @@ def test_flow_has_metrics_collector():
     flow = Flow()
 
     # Flow should have metrics_collector attribute
-    assert hasattr(flow, 'metrics_collector')
+    assert hasattr(flow, "metrics_collector")
 
     # Should be able to set a custom collector
     collector = MetricsCollector()

@@ -2,7 +2,7 @@
 
 import queue
 from datetime import datetime
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -135,9 +135,7 @@ class TestCallbackOutputHandler:
             timestamp=timestamp,
         )
 
-        callback.assert_called_once_with(
-            "job1", "routine1", "result", {"key": "value"}, timestamp
-        )
+        callback.assert_called_once_with("job1", "routine1", "result", {"key": "value"}, timestamp)
 
     def test_handle_without_timestamp_passes_now(self):
         """Test that handle passes current time when no timestamp provided."""
@@ -164,6 +162,7 @@ class TestCallbackOutputHandler:
 
     def test_handle_with_exception_in_callback(self):
         """Test that exceptions in callback are propagated."""
+
         def failing_callback(*args):
             raise ValueError("Callback failed")
 

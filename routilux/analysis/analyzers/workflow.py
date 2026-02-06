@@ -190,7 +190,10 @@ class WorkflowAnalyzer:
                 routines_list = analysis.get("routines", [])
                 if isinstance(routines_list, list):
                     for routine_data in routines_list:
-                        if isinstance(routine_data, dict) and routine_data.get("name") == routine.__class__.__name__:
+                        if (
+                            isinstance(routine_data, dict)
+                            and routine_data.get("name") == routine.__class__.__name__
+                        ):
                             return routine_data
         except (OSError, TypeError):
             # Source file not available (e.g., built-in, dynamically created)
@@ -240,7 +243,9 @@ class WorkflowAnalyzer:
             "source_event": connection.source_event.name,
             "target_routine_id": target_routine_id,
             "target_slot": connection.target_slot.name,
-            "param_mapping": dict(connection.param_mapping) if hasattr(connection, "param_mapping") and connection.param_mapping else {},
+            "param_mapping": dict(connection.param_mapping)
+            if hasattr(connection, "param_mapping") and connection.param_mapping
+            else {},
         }
 
         return conn_info
@@ -255,7 +260,9 @@ class WorkflowAnalyzer:
             Dictionary mapping routine_id to list of dependency routine_ids.
             If A.event -> B.slot, then B depends on A.
         """
-        dependency_graph: dict[str, list[str]] = {routine_id: [] for routine_id in flow.routines.keys()}
+        dependency_graph: dict[str, list[str]] = {
+            routine_id: [] for routine_id in flow.routines.keys()
+        }
 
         for connection in flow.connections:
             if not connection.source_event or not connection.target_slot:
@@ -268,7 +275,11 @@ class WorkflowAnalyzer:
                 source_routine_id = self._get_routine_id(source_routine, flow)
                 target_routine_id = self._get_routine_id(target_routine, flow)
 
-                if source_routine_id and target_routine_id and source_routine_id != target_routine_id:
+                if (
+                    source_routine_id
+                    and target_routine_id
+                    and source_routine_id != target_routine_id
+                ):
                     if source_routine_id not in dependency_graph[target_routine_id]:
                         dependency_graph[target_routine_id].append(source_routine_id)
 

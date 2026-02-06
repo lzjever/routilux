@@ -141,6 +141,7 @@ class TestTextClipper(unittest.TestCase):
 
     def test_non_object_as_input(self):
         """Test handling non-dict, non-string object that becomes string."""
+
         # Pass an object that's not a string or dict
         class CustomObject:
             def __str__(self):
@@ -409,7 +410,7 @@ class TestResultExtractor(unittest.TestCase):
     def test_xml_code_block_extraction(self):
         """Test XML code block extraction."""
         self.extractor.set_config(extract_xml_blocks=True)
-        text = '```xml\n<root><item>test</item></root>\n```'
+        text = "```xml\n<root><item>test</item></root>\n```"
         self.extractor.input_slot.receive({"data": text})
 
         self.assertEqual(len(self.received_data), 1)
@@ -442,12 +443,15 @@ class TestResultExtractor(unittest.TestCase):
 
     def test_extractor_error_handling_continue_on_error(self):
         """Test error handling with continue_on_error=True."""
+
         # Create an extractor that will fail
         def failing_extractor(data, config):
             raise RuntimeError("Intentional failure")
 
         self.extractor.register_extractor("failing", failing_extractor)
-        self.extractor.set_config(continue_on_error=True, extractor_priority=["failing", "json_string"])
+        self.extractor.set_config(
+            continue_on_error=True, extractor_priority=["failing", "json_string"]
+        )
         self.extractor.set_config(parse_json_strings=True)
 
         text = '{"key": "value"}'
@@ -459,14 +463,13 @@ class TestResultExtractor(unittest.TestCase):
 
     def test_extractor_error_handling_stop_on_error(self):
         """Test error handling with continue_on_error=False."""
+
         def failing_extractor(data, config):
             raise RuntimeError("Intentional failure")
 
         self.extractor.register_extractor("failing", failing_extractor)
         self.extractor.set_config(
-            continue_on_error=False,
-            return_original_on_failure=True,
-            extractor_priority=["failing"]
+            continue_on_error=False, return_original_on_failure=True, extractor_priority=["failing"]
         )
 
         text = '{"key": "value"}'

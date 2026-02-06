@@ -2,17 +2,16 @@
 Additional edge case tests for flow state management module.
 """
 
-import pytest
 from datetime import datetime
-from unittest.mock import Mock, patch
+
+import pytest
 
 from routilux import Flow, JobState, Routine
 from routilux.flow.state_management import (
-    deserialize_pending_tasks,
-    pause_flow,
-    resume_flow,
-    cancel_flow,
     _recover_slot_tasks,
+    cancel_flow,
+    deserialize_pending_tasks,
+    resume_flow,
 )
 
 
@@ -400,6 +399,7 @@ class TestResumeFlowEdgeCases:
 
         # Should warn but not crash
         import warnings
+
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             resume_flow(flow, job_state)
@@ -433,6 +433,7 @@ class TestResumeFlowEdgeCases:
 
         # Should warn but not crash
         import warnings
+
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             resume_flow(flow, job_state)
@@ -466,6 +467,7 @@ class TestResumeFlowEdgeCases:
 
         # Should warn but not crash
         import warnings
+
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             resume_flow(flow, job_state)
@@ -560,6 +562,7 @@ class TestCancelFlowEdgeCases:
 
         # Add a mock active task (it's a set, so we use add)
         from concurrent.futures import Future
+
         mock_task = Future()
         flow._active_tasks.add(mock_task)
 

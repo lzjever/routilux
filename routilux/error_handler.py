@@ -339,7 +339,9 @@ class ErrorHandler(Serializable):
             data["strategy"] = data["strategy"].value
         return data
 
-    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any | None = None) -> None:
+    def deserialize(
+        self, data: dict[str, Any], strict: bool = False, registry: Any | None = None
+    ) -> None:
         """Deserialize the ErrorHandler.
 
         Args:

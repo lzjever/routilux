@@ -1,7 +1,6 @@
 """Stress tests for high-throughput concurrent execution."""
 
 import gc
-import sys
 import time
 
 from routilux import Flow, Routine
@@ -72,7 +71,7 @@ def test_many_concurrent_routines():
 
     # Emit to all routines
     for routine in flow.routines.values():
-        if hasattr(routine, 'output_event'):
+        if hasattr(routine, "output_event"):
             routine.output_event.emit(value=42)
 
     # Should complete - use JobState.wait_for_completion
@@ -114,7 +113,7 @@ def test_high_concurrency_many_routines():
 
     # Emit to all routines to trigger processing
     for routine in flow.routines.values():
-        if hasattr(routine, 'input_slot'):
+        if hasattr(routine, "input_slot"):
             routine.input_slot.receive({})
 
     # Should complete without issues

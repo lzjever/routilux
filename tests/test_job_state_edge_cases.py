@@ -1,9 +1,6 @@
 """Edge case tests for job_state module."""
 
-import json
-import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -192,15 +189,9 @@ class TestJobStateEdgeCases:
         t2 = datetime(2024, 1, 1, 11, 0, 0)
         t3 = datetime(2024, 1, 1, 13, 0, 0)
 
-        job_state.execution_history.append(
-            ExecutionRecord("r1", "test", {}, timestamp=t1)
-        )
-        job_state.execution_history.append(
-            ExecutionRecord("r2", "test", {}, timestamp=t2)
-        )
-        job_state.execution_history.append(
-            ExecutionRecord("r3", "test", {}, timestamp=t3)
-        )
+        job_state.execution_history.append(ExecutionRecord("r1", "test", {}, timestamp=t1))
+        job_state.execution_history.append(ExecutionRecord("r2", "test", {}, timestamp=t2))
+        job_state.execution_history.append(ExecutionRecord("r3", "test", {}, timestamp=t3))
 
         history = job_state.get_execution_history()
 
@@ -491,9 +482,7 @@ class TestJobStateWaitMethods:
         flow._execution_lock.__enter__ = MagicMock()
         flow._execution_lock.__exit__ = MagicMock()
 
-        result = JobState.wait_for_completion(
-            flow, job_state, timeout=1.0, check_interval=0.01
-        )
+        result = JobState.wait_for_completion(flow, job_state, timeout=1.0, check_interval=0.01)
 
         assert result is True
 
@@ -508,9 +497,7 @@ class TestJobStateWaitMethods:
         flow._execution_lock.__enter__ = MagicMock()
         flow._execution_lock.__exit__ = MagicMock()
 
-        result = JobState.wait_for_completion(
-            flow, job_state, timeout=0.1, check_interval=0.05
-        )
+        result = JobState.wait_for_completion(flow, job_state, timeout=0.1, check_interval=0.05)
 
         assert result is False
 

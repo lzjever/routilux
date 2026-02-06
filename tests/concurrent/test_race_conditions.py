@@ -30,6 +30,7 @@ def test_concurrent_slot_receives_merges_correctly():
     # Simulate concurrent emits to the slot
     threads = []
     for i in range(10):
+
         def emit_func(idx=i):
             time.sleep(0.001)  # Slight delay to encourage interleaving
             routine.input_slot.receive({"value": idx})
@@ -93,6 +94,7 @@ def test_concurrent_emit_to_same_slot():
     # Emit concurrently
     threads = []
     for emitter in emitters:
+
         def emit_func(e=emitter):
             e.output_event.emit(value=42)
 

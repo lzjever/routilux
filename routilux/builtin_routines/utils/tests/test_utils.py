@@ -137,7 +137,7 @@ class TestDataFlattener(unittest.TestCase):
         self.flattener.input_slot.receive({"data": data})
 
         self.assertEqual(len(self.received_data), 1)
-        flattened = self.received_data[0]["flattened_data"]
+        _ = self.received_data[0]["flattened_data"]
         depth = self.received_data[0]["depth"]
         # Should stop at max_depth and convert remaining to string
         self.assertGreaterEqual(depth, 2)

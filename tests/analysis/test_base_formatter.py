@@ -2,9 +2,7 @@
 Tests for BaseFormatter base class.
 """
 
-import tempfile
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
 

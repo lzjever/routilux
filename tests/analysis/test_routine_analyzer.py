@@ -1,8 +1,6 @@
 """Tests for routine analyzer module."""
 
 import json
-import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -280,12 +278,12 @@ class RegularClass:
 
     def test_inherits_from_routine_detects_direct_inheritance(self, tmp_path):
         """Test _inherits_from_routine with direct inheritance."""
-        routine_code = '''
+        routine_code = """
 from routilux import Routine
 
 class DirectRoutine(Routine):
     pass
-'''
+"""
         test_file = tmp_path / "direct.py"
         test_file.write_text(routine_code)
 
@@ -322,12 +320,12 @@ class JsonRoutine(Routine):
 
     def test_to_json_with_custom_indent(self, tmp_path):
         """Test JSON serialization with custom indentation."""
-        routine_code = '''
+        routine_code = """
 from routilux import Routine
 
 class IndentRoutine(Routine):
     pass
-'''
+"""
         test_file = tmp_path / "indent_routine.py"
         test_file.write_text(routine_code)
 
@@ -363,12 +361,12 @@ class SaveRoutine(Routine):
 
     def test_save_json_creates_parent_directories(self, tmp_path):
         """Test that save_json creates parent directories."""
-        routine_code = '''
+        routine_code = """
 from routilux import Routine
 
 class SaveRoutine(Routine):
     pass
-'''
+"""
         test_file = tmp_path / "save_routine.py"
         test_file.write_text(routine_code)
 
@@ -460,13 +458,13 @@ class TestRoutineAnalyzerEdgeCases:
 
     def test_analyze_empty_init_method(self, tmp_path):
         """Test routine with empty __init__ method."""
-        routine_code = '''
+        routine_code = """
 from routilux import Routine
 
 class EmptyInitRoutine(Routine):
     def __init__(self):
         super().__init__()
-'''
+"""
         test_file = tmp_path / "empty_init.py"
         test_file.write_text(routine_code)
 
@@ -490,14 +488,14 @@ class EmptyInitRoutine(Routine):
 
     def test_analyze_with_lambda_in_config(self, tmp_path):
         """Test analyzing routine with lambda (should still work)."""
-        routine_code = '''
+        routine_code = """
 from routilux import Routine
 
 class LambdaRoutine(Routine):
     def __init__(self):
         super().__init__()
         self.set_config(func=lambda x: x * 2)
-'''
+"""
         test_file = tmp_path / "lambda_routine.py"
         test_file.write_text(routine_code)
 
@@ -505,7 +503,7 @@ class LambdaRoutine(Routine):
         result = analyzer.analyze_file(test_file)
 
         # Lambda values are not literal, so config may be empty or have None
-        routine = result["routines"][0]
+        _ = result["routines"][0]
         # The analyzer should not crash on lambdas
 
     def test_method_parameters_extraction(self, tmp_path):

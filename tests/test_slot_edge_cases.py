@@ -124,9 +124,7 @@ class TestSlotMergeDataEdgeCases:
 
         result = slot._merge_data({"outer": {"inner": "new", "extra": "value"}})
 
-        assert result == {
-            "outer": {"inner": "new", "keep": "me", "extra": "value"}
-        }
+        assert result == {"outer": {"inner": "new", "keep": "me", "extra": "value"}}
 
 
 class TestSlotReceiveEdgeCases:
@@ -178,7 +176,6 @@ class TestSlotReceiveEdgeCases:
 
     def test_receive_with_handler_that_raises_exception(self):
         """Test that handler exceptions are caught and logged."""
-        import logging
 
         def failing_handler(data):
             raise ValueError("Handler error")
@@ -193,6 +190,7 @@ class TestSlotReceiveEdgeCases:
 
         # Create a simple mock flow
         from unittest.mock import MagicMock
+
         flow = MagicMock()
         flow._get_routine_id.return_value = "test_routine"
 
@@ -288,6 +286,7 @@ class TestSlotCallHandlerEdgeCases:
 
     def test_call_handler_with_propagate_exceptions(self):
         """Test that exceptions propagate when propagate_exceptions=True."""
+
         def failing_handler(data):
             raise ValueError("Handler error")
 
@@ -298,7 +297,6 @@ class TestSlotCallHandlerEdgeCases:
 
     def test_call_handler_without_propagate_exceptions(self):
         """Test that exceptions are caught when propagate_exceptions=False."""
-        import logging
 
         def failing_handler(data):
             raise ValueError("Handler error")
@@ -426,6 +424,7 @@ class TestSlotIsKwargsHandler:
 
     def test_is_kwargs_handler_with_kwargs(self):
         """Test detection of **kwargs handler."""
+
         def kwargs_handler(**kwargs):
             pass
 
@@ -433,6 +432,7 @@ class TestSlotIsKwargsHandler:
 
     def test_is_kwargs_handler_without_kwargs(self):
         """Test detection of non-kwargs handler."""
+
         def regular_handler(data):
             pass
 
@@ -440,6 +440,7 @@ class TestSlotIsKwargsHandler:
 
     def test_is_kwargs_handler_with_mixed_params(self):
         """Test detection of handler with both regular and **kwargs."""
+
         def mixed_handler(a, b, **kwargs):
             pass
 
@@ -447,6 +448,7 @@ class TestSlotIsKwargsHandler:
 
     def test_is_kwargs_handler_with_args(self):
         """Test detection of handler with *args."""
+
         def args_handler(*args):
             pass
 
@@ -454,6 +456,7 @@ class TestSlotIsKwargsHandler:
 
     def test_is_kwargs_handler_with_no_params(self):
         """Test detection of handler with no parameters."""
+
         def no_params_handler():
             pass
 
@@ -465,6 +468,7 @@ class TestSlotSerializationEdgeCases:
 
     def test_serialize_with_custom_merge_strategy(self):
         """Test serializing slot with custom merge strategy."""
+
         def custom_merge(old, new):
             return {**old, **new}
 
@@ -506,6 +510,7 @@ class TestSlotSerializationEdgeCases:
 
     def test_serialize_with_handler(self):
         """Test serializing slot with handler."""
+
         def test_handler(data):
             pass
 

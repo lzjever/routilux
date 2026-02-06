@@ -194,6 +194,7 @@ class TestDataValidator(unittest.TestCase):
 
     def test_validator_returning_tuple(self):
         """Test validator returning tuple with custom error (lines 176-180)."""
+
         def custom_validator(value):
             if isinstance(value, int) and value > 10:
                 return (True, None)  # Return as tuple
@@ -210,6 +211,7 @@ class TestDataValidator(unittest.TestCase):
 
     def test_validator_tuple_false_result(self):
         """Test validator returning tuple with False as first element."""
+
         def custom_validator(value):
             # Using explicit False to trigger the tuple branch
             if value > 10:
@@ -244,6 +246,7 @@ class TestDataValidator(unittest.TestCase):
 
     def test_validator_returning_tuple_valid(self):
         """Test validator returning tuple with valid result."""
+
         def custom_validator(value):
             if isinstance(value, int) and value > 10:
                 return True, None
@@ -257,6 +260,7 @@ class TestDataValidator(unittest.TestCase):
 
     def test_validator_returning_non_bool_non_tuple(self):
         """Test validator returning truthy value (line 182)."""
+
         def truthy_validator(value):
             return value  # Returns the value itself (truthy if non-empty)
 
@@ -276,6 +280,7 @@ class TestDataValidator(unittest.TestCase):
 
     def test_validator_raises_exception(self):
         """Test validator that raises exception (lines 191-192)."""
+
         def failing_validator(value):
             raise ValueError("Intentional validation error")
 

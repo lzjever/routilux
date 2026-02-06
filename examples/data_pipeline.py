@@ -78,8 +78,12 @@ class DataTransformer(Routine):
             # Example transformation: normalize and enrich
             transformed_record = {
                 "id": record.get("id"),
-                "name": record.get("name", "").strip().lower() if isinstance(record.get("name"), str) else str(record.get("name", "")).lower(),
-                "value": float(record.get("value", 0)) if str(record.get("value", "")).replace(".", "").replace("-", "").isdigit() else 0.0,
+                "name": record.get("name", "").strip().lower()
+                if isinstance(record.get("name"), str)
+                else str(record.get("name", "")).lower(),
+                "value": float(record.get("value", 0))
+                if str(record.get("value", "")).replace(".", "").replace("-", "").isdigit()
+                else 0.0,
                 "processed": True,
             }
             transformed.append(transformed_record)
@@ -116,7 +120,14 @@ class QualityChecker(Routine):
             quality = "low"
 
         print(f"Quality score: {quality_score:.2f} ({quality})")
-        self.emit("output", quality=quality, route=route, score=quality_score, total=len(transformed), valid=valid_count)
+        self.emit(
+            "output",
+            quality=quality,
+            route=route,
+            score=quality_score,
+            total=len(transformed),
+            valid=valid_count,
+        )
 
 
 class ResultAggregator(Routine):
@@ -129,9 +140,17 @@ class ResultAggregator(Routine):
 
     def aggregate(self, quality=None, route=None, score=None, total=None, valid=None, **kwargs):
         """Aggregate final results."""
-        result = {"quality": quality, "route": route, "score": score, "total": total, "valid": valid}
+        result = {
+            "quality": quality,
+            "route": route,
+            "score": score,
+            "total": total,
+            "valid": valid,
+        }
         self.final_results.append(result)
-        print(f"Aggregated: Quality={quality}, Route={route}, Score={score:.2f} ({valid}/{total} valid)")
+        print(
+            f"Aggregated: Quality={quality}, Route={route}, Score={score:.2f} ({valid}/{total} valid)"
+        )
 
 
 def main():

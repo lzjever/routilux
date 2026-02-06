@@ -1,6 +1,5 @@
 """Tests for Routine mixin separation."""
 
-
 from routilux.routine import Routine
 
 

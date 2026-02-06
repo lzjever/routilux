@@ -2,8 +2,6 @@
 Tests for flow event_loop module.
 """
 
-import pytest
-import queue
 import threading
 import time
 
@@ -238,9 +236,7 @@ class TestEventLoopExecution:
 
         from routilux.flow.task import SlotActivationTask, TaskPriority
 
-        task = SlotActivationTask(
-            slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None
-        )
+        task = SlotActivationTask(slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None)
 
         flow._task_queue.put(task)
 
@@ -270,9 +266,7 @@ class TestEventLoopExecution:
 
         from routilux.flow.task import SlotActivationTask, TaskPriority
 
-        task = SlotActivationTask(
-            slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None
-        )
+        task = SlotActivationTask(slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None)
 
         flow._task_queue.put(task)
 
@@ -335,9 +329,7 @@ class TestEventLoopErrorHandling:
 
         from routilux.flow.task import SlotActivationTask, TaskPriority
 
-        task = SlotActivationTask(
-            slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None
-        )
+        task = SlotActivationTask(slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None)
 
         flow._task_queue.put(task)
 
@@ -368,9 +360,7 @@ class TestEventLoopActiveTasksTracking:
 
         from routilux.flow.task import SlotActivationTask, TaskPriority
 
-        task = SlotActivationTask(
-            slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None
-        )
+        task = SlotActivationTask(slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None)
 
         flow._task_queue.put(task)
 
@@ -386,7 +376,7 @@ class TestEventLoopActiveTasksTracking:
 
         # Should have active task
         with flow._execution_lock:
-            active_count = len([f for f in flow._active_tasks if not f.done()])
+            _ = len([f for f in flow._active_tasks if not f.done()])
 
         # Clean up
         flow._running = False
@@ -408,9 +398,7 @@ class TestEventLoopTaskDoneCallback:
 
         from routilux.flow.task import SlotActivationTask, TaskPriority
 
-        task = SlotActivationTask(
-            slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None
-        )
+        task = SlotActivationTask(slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None)
 
         flow._task_queue.put(task)
 

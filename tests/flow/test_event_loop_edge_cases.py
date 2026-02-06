@@ -2,18 +2,15 @@
 Edge case tests for flow event_loop module.
 """
 
-import pytest
 import threading
 import time
+from unittest.mock import Mock
 
-from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import Mock, patch
-
-from routilux import Flow, Routine, JobState
+from routilux import Flow, JobState, Routine
 from routilux.flow.event_loop import (
     enqueue_task,
-    execute_task,
     event_loop,
+    execute_task,
 )
 from routilux.flow.task import SlotActivationTask, TaskPriority
 
@@ -54,7 +51,9 @@ class TestEventLoopExecutorShutdown:
 
         # Mock executor that raises RuntimeError on submit
         mock_executor = Mock()
-        mock_executor.submit.side_effect = RuntimeError("cannot schedule new futures after shutdown")
+        mock_executor.submit.side_effect = RuntimeError(
+            "cannot schedule new futures after shutdown"
+        )
 
         flow._get_executor = Mock(return_value=mock_executor)
 
@@ -119,9 +118,7 @@ class TestExecuteTaskErrorHandling:
         routine = Routine()
         slot = routine.define_slot("input", handler=handler)
 
-        task = SlotActivationTask(
-            slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None
-        )
+        task = SlotActivationTask(slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None)
 
         execute_task(task, flow)
 
@@ -182,9 +179,7 @@ class TestEventLoopExceptionHandling:
         routine = Routine()
         slot = routine.define_slot("input", handler=failing_handler)
 
-        task = SlotActivationTask(
-            slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None
-        )
+        task = SlotActivationTask(slot=slot, data={}, priority=TaskPriority.NORMAL, job_state=None)
 
         flow._task_queue.put(task)
         flow._running = True

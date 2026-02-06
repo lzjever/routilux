@@ -4,7 +4,7 @@ Edge case tests for Routine class.
 
 import pytest
 
-from routilux import Flow, Routine, JobState
+from routilux import Flow, JobState, Routine
 
 
 class TestRoutineExecutionContext:
@@ -64,15 +64,21 @@ class TestRoutineExecutionContext:
 
         # Mock the execution context properly
         # We need to set up the context that get_execution_context expects
-        from unittest.mock import patch, MagicMock
-        from routilux.routine import _current_job_state, ExecutionContext
+        from unittest.mock import patch
+
+        from routilux.routine import ExecutionContext, _current_job_state
 
         token = _current_job_state.set(job_state)
 
         try:
             # Patch get_execution_context to return a valid context
-            with patch.object(routine, 'get_execution_context',
-                           return_value=ExecutionContext(flow=flow, job_state=job_state, routine_id="routine1")):
+            with patch.object(
+                routine,
+                "get_execution_context",
+                return_value=ExecutionContext(
+                    flow=flow, job_state=job_state, routine_id="routine1"
+                ),
+            ):
                 routine.emit_deferred_event("test_event", data="value")
 
             # Check that event was added to deferred events
@@ -102,14 +108,20 @@ class TestRoutineExecutionContext:
 
         # Mock the execution context properly
         from unittest.mock import patch
-        from routilux.routine import _current_job_state, ExecutionContext
+
+        from routilux.routine import ExecutionContext, _current_job_state
 
         token = _current_job_state.set(job_state)
 
         try:
             # Patch get_execution_context to return a valid context
-            with patch.object(routine, 'get_execution_context',
-                           return_value=ExecutionContext(flow=flow, job_state=job_state, routine_id="routine1")):
+            with patch.object(
+                routine,
+                "get_execution_context",
+                return_value=ExecutionContext(
+                    flow=flow, job_state=job_state, routine_id="routine1"
+                ),
+            ):
                 routine.send_output("result", value=123, status="success")
 
             # Check that output was logged
@@ -190,7 +202,7 @@ class TestRoutineEmitEdgeCases:
     def test_emit_with_parameters(self):
         """Test that emit passes parameters correctly."""
         routine = Routine()
-        event = routine.define_event("output", ["result", "status", "count"])
+        _ = routine.define_event("output", ["result", "status", "count"])
 
         # Capture emitted data
         received = []
@@ -212,6 +224,7 @@ class TestRoutineEmitEdgeCases:
 
         # Wait for task to process
         import time
+
         time.sleep(0.1)
 
 
@@ -260,8 +273,7 @@ class TestRoutineWithFlowLifecycle:
 
         # After execution, routine should have _current_flow set
         # This happens during task execution
-        job_state = flow.execute("routine1", entry_params={"data": {}})
+        _ = flow.execute("routine1", entry_params={"data": {}})
 
         # After execution completes, _current_flow may still be set
         # (it depends on when it's cleared)
-

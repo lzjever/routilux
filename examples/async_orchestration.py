@@ -25,7 +25,11 @@ class UserFetcher(Routine):
         """Fetch user data."""
         user_id = user_id if user_id is not None else kwargs.get("user_id", 0)
         time.sleep(0.5)  # Simulate API call
-        result = {"user_id": user_id, "name": f"User_{user_id}", "email": f"user{user_id}@example.com"}
+        result = {
+            "user_id": user_id,
+            "name": f"User_{user_id}",
+            "email": f"user{user_id}@example.com",
+        }
         print(f"  [Task 1] Fetched user data: {result['name']}")
         self.emit("output", **result)
 
@@ -91,11 +95,15 @@ class ProfileAggregator(Routine):
         # Check if we have all data (3 sources)
         if self.received_count == 3:
             print("\n  [Aggregator] Profile complete!")
-            user_name = self.profile_data.get('user', {}).get('name', 'Unknown')
-            orders_data = self.profile_data.get('orders', {})
-            orders_list = orders_data.get('orders', [])
-            orders_total = orders_data.get('total', 0) if isinstance(orders_data.get('total'), (int, float)) else 0
-            theme = self.profile_data.get('preferences', {}).get('theme', 'default')
+            user_name = self.profile_data.get("user", {}).get("name", "Unknown")
+            orders_data = self.profile_data.get("orders", {})
+            orders_list = orders_data.get("orders", [])
+            orders_total = (
+                orders_data.get("total", 0)
+                if isinstance(orders_data.get("total"), (int, float))
+                else 0
+            )
+            theme = self.profile_data.get("preferences", {}).get("theme", "default")
             print(f"  - User: {user_name}")
             print(f"  - Orders: {len(orders_list) if isinstance(orders_list, list) else 0} items")
             print(f"  - Total: ${float(orders_total):.2f}")

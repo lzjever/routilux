@@ -254,7 +254,10 @@ class RoutineAnalyzer:
         if len(call_node.args) < 1:
             return None
 
-        event_info: dict[str, Any] = {"name": self._extract_string_value(call_node.args[0]), "output_params": []}
+        event_info: dict[str, Any] = {
+            "name": self._extract_string_value(call_node.args[0]),
+            "output_params": [],
+        }
 
         # Extract output_params from args or kwargs
         if len(call_node.args) > 1:
@@ -317,7 +320,9 @@ class RoutineAnalyzer:
             return node.s
         elif hasattr(ast, "Num") and isinstance(node, ast.Num):  # Python < 3.8 compatibility
             return node.n
-        elif hasattr(ast, "NameConstant") and isinstance(node, ast.NameConstant):  # Python < 3.8 compatibility
+        elif hasattr(ast, "NameConstant") and isinstance(
+            node, ast.NameConstant
+        ):  # Python < 3.8 compatibility
             return node.value
         elif isinstance(node, ast.List):
             return [self._extract_literal_value(item) for item in node.elts]

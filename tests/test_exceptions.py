@@ -1,6 +1,5 @@
 """Tests for custom exception hierarchy."""
 
-
 from routilux.exceptions import (
     ConfigurationError,
     ExecutionError,

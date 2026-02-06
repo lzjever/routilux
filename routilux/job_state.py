@@ -63,7 +63,9 @@ class ExecutionRecord(Serializable):
             data["timestamp"] = data["timestamp"].isoformat()
         return data
 
-    def deserialize(self, data: Dict[str, Any], strict: bool = False, registry: Optional[Any] = None) -> None:
+    def deserialize(
+        self, data: Dict[str, Any], strict: bool = False, registry: Optional[Any] = None
+    ) -> None:
         """Deserialize, handling datetime conversion.
 
         Args:
@@ -345,8 +347,7 @@ class JobState(Serializable):
         if self.history_ttl_seconds is not None and self.history_ttl_seconds > 0:
             cutoff_time = now - timedelta(seconds=self.history_ttl_seconds)
             self.execution_history = [
-                record for record in self.execution_history
-                if record.timestamp > cutoff_time
+                record for record in self.execution_history if record.timestamp > cutoff_time
             ]
 
     def get_execution_history(self, routine_id: Optional[str] = None) -> List[ExecutionRecord]:
@@ -496,7 +497,9 @@ class JobState(Serializable):
             data["updated_at"] = data["updated_at"].isoformat()
         return data
 
-    def deserialize(self, data: Dict[str, Any], strict: bool = False, registry: Optional[Any] = None) -> None:
+    def deserialize(
+        self, data: Dict[str, Any], strict: bool = False, registry: Optional[Any] = None
+    ) -> None:
         """Deserialize, handling datetime and ExecutionRecord.
 
         Args:

@@ -60,6 +60,7 @@ class TestCustomValidator:
 
     def test_custom_validator_passes(self):
         """Custom validator should pass when function returns True."""
+
         def validate(data):
             return len(data.get("name", "")) > 0
 
@@ -68,6 +69,7 @@ class TestCustomValidator:
 
     def test_custom_validator_fails(self):
         """Custom validator should raise ValidationError when function returns False."""
+
         def validate(data):
             return len(data.get("name", "")) > 0
 
@@ -77,6 +79,7 @@ class TestCustomValidator:
 
     def test_custom_validator_with_message(self):
         """Custom validator can provide custom error message."""
+
         def validate(data):
             if not data.get("email"):
                 return False, "Email is required"

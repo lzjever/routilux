@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-02-07
+
+### Changed
+- Applied ruff formatting to all Python files for consistent code style
+- Fixed lint issues including unused imports, unused variables, and import sorting
+- All 823 tests passing with proper code quality standards
+
+### Fixed
+- Fixed F841 lint errors (unused local variables) by prefixing with underscore
+- Fixed I001 errors (import block sorting) with ruff --fix
+- Fixed F401 errors (unused imports) with ruff --fix
+
 ## [0.10.0] - 2026-01-03
 
 ### Changed

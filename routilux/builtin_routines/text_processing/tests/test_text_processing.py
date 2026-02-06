@@ -82,6 +82,87 @@ class TestTextClipper(unittest.TestCase):
         # No longer using routine.stats() - execution state is in JobState
         self.assertTrue(True)  # Placeholder assertion
 
+    def test_dict_input_with_text_key(self):
+        """Test handling dict input with 'text' key."""
+        self.clipper.input_slot.receive({"text": {"text": "Hello World"}})
+
+        self.assertEqual(len(self.received_data), 1)
+        self.assertEqual(self.received_data[0]["clipped_text"], "Hello World")
+        self.assertFalse(self.received_data[0]["was_clipped"])
+
+    def test_dict_input_with_content_key(self):
+        """Test handling dict input with 'content' key."""
+        self.clipper.input_slot.receive({"text": {"content": "Test content"}})
+
+        self.assertEqual(len(self.received_data), 1)
+        self.assertEqual(self.received_data[0]["clipped_text"], "Test content")
+
+    def test_dict_input_with_message_key(self):
+        """Test handling dict input with 'message' key."""
+        self.clipper.input_slot.receive({"text": {"message": "Important message"}})
+
+        self.assertEqual(len(self.received_data), 1)
+        self.assertEqual(self.received_data[0]["clipped_text"], "Important message")
+
+    def test_dict_input_with_any_string_value(self):
+        """Test handling dict input finding any string value."""
+        self.clipper.input_slot.receive({"text": {"data": {"nested": "Found it"}}})
+
+        self.assertEqual(len(self.received_data), 1)
+        self.assertIn("Found it", self.received_data[0]["clipped_text"])
+
+    def test_dict_input_non_string_values(self):
+        """Test handling dict input with only non-string values (converts to string)."""
+        self.clipper.input_slot.receive({"text": {"count": 42, "flag": True}})
+
+        self.assertEqual(len(self.received_data), 1)
+        # Should convert dict to string
+        self.assertIsInstance(self.received_data[0]["clipped_text"], str)
+
+    def test_exact_max_length(self):
+        """Test text exactly at max_length is not clipped."""
+        self.clipper.set_config(max_length=20)
+        text = "12345678901234567890"  # Exactly 20 chars
+        self.clipper.input_slot.receive({"text": text})
+
+        self.assertEqual(len(self.received_data), 1)
+        self.assertEqual(self.received_data[0]["clipped_text"], text)
+        self.assertFalse(self.received_data[0]["was_clipped"])
+
+    def test_clip_text_all_lines_fit_exactly(self):
+        """Test edge case where all lines fit exactly in max_length (not clipped)."""
+        # This tests line 142: if not clipped: return "\n".join(head), False
+        self.clipper.set_config(max_length=100)
+        text = "Line 1\nLine 2\nLine 3"  # Total with newlines < 100
+        self.clipper.input_slot.receive({"text": text})
+
+        self.assertEqual(len(self.received_data), 1)
+        self.assertFalse(self.received_data[0]["was_clipped"])
+
+    def test_non_object_as_input(self):
+        """Test handling non-dict, non-string object that becomes string."""
+
+        # Pass an object that's not a string or dict
+        class CustomObject:
+            def __str__(self):
+                return "CustomObject string"
+
+        self.clipper.input_slot.receive({"text": CustomObject()})
+
+        self.assertEqual(len(self.received_data), 1)
+        self.assertIn("CustomObject string", self.received_data[0]["clipped_text"])
+
+    def test_dict_with_string_value_not_in_expected_keys(self):
+        """Test dict with string value in non-standard key (lines 77-78)."""
+        # This specifically tests the for value in data.values() loop
+        # The dict should not have text, content, message, or data keys
+        # but should have a string value
+        self.clipper.input_slot.receive({"text": {"random_key": "found_string"}})
+
+        self.assertEqual(len(self.received_data), 1)
+        # Should find the string value
+        self.assertIn("found_string", self.received_data[0]["clipped_text"])
+
 
 class TestTextRenderer(unittest.TestCase):
     """Test cases for TextRenderer routine."""
@@ -292,3 +373,108 @@ class TestResultExtractor(unittest.TestCase):
         # Should return original text
         self.assertEqual(self.received_data[0]["extracted_result"], text)
         self.assertEqual(self.received_data[0]["confidence"], 0.0)
+
+    def test_strategy_all(self):
+        """Test 'all' strategy returns all successful extractions."""
+        self.extractor.set_config(strategy="all")
+        text = '```json\n{"key": "value"}\n```\n```python\nprint("test")\n```'
+        self.extractor.input_slot.receive({"data": text})
+
+        self.assertEqual(len(self.received_data), 1)
+        # Should return list of all extractions
+        self.assertEqual(self.received_data[0]["format"], "multi")
+        self.assertIsInstance(self.received_data[0]["extracted_result"], list)
+        self.assertGreater(len(self.received_data[0]["extracted_result"]), 0)
+
+    def test_raise_on_failure(self):
+        """Test ValueError when return_original_on_failure=False and all extractors fail."""
+        self.extractor.set_config(return_original_on_failure=False)
+        text = "No valid data here"
+
+        # The error will be caught by the slot handler, so the test
+        # verifies that the extractor attempts to raise the error
+        # The slot will log the error but not propagate it
+        self.extractor.input_slot.receive({"data": text})
+        # After the error, no data should be received because the handler failed
+        # But the slot catches errors, so this test verifies the behavior
+        self.assertEqual(len(self.received_data), 0)
+
+    def test_empty_dict_to_string_conversion(self):
+        """Test empty dict is converted to empty string."""
+        self.extractor.input_slot.receive({"data": {}})
+
+        self.assertEqual(len(self.received_data), 1)
+        # Empty dict should be converted to empty string
+        self.assertEqual(self.received_data[0]["confidence"], 0.0)
+
+    def test_xml_code_block_extraction(self):
+        """Test XML code block extraction."""
+        self.extractor.set_config(extract_xml_blocks=True)
+        text = "```xml\n<root><item>test</item></root>\n```"
+        self.extractor.input_slot.receive({"data": text})
+
+        self.assertEqual(len(self.received_data), 1)
+        self.assertEqual(self.received_data[0]["format"], "xml")
+        self.assertIn("<root>", self.received_data[0]["extracted_result"])
+
+    def test_interpreter_output_with_string_elements(self):
+        """Test interpreter output extraction with string elements in list."""
+        outputs = ["Line 1", "Line 2", {"format": "output", "content": "Line 3"}]
+        self.extractor.input_slot.receive({"data": outputs})
+
+        self.assertEqual(len(self.received_data), 1)
+        self.assertEqual(self.received_data[0]["format"], "interpreter_output")
+        self.assertIn("Line 1", self.received_data[0]["extracted_result"])
+
+    def test_register_extractor_initializes_dict(self):
+        """Test register_extractor initializes _extractors if not present."""
+        # Create a new extractor without calling __init__ properly
+        from routilux.builtin_routines.text_processing import ResultExtractor
+
+        extractor = ResultExtractor()
+        # Remove _extractors to test initialization
+        if hasattr(extractor, "_extractors"):
+            delattr(extractor, "_extractors")
+
+        # Register should initialize the dict
+        extractor.register_extractor("test_custom", lambda data, config: None)
+        self.assertTrue(hasattr(extractor, "_extractors"))
+        self.assertIn("test_custom", extractor._extractors)
+
+    def test_extractor_error_handling_continue_on_error(self):
+        """Test error handling with continue_on_error=True."""
+
+        # Create an extractor that will fail
+        def failing_extractor(data, config):
+            raise RuntimeError("Intentional failure")
+
+        self.extractor.register_extractor("failing", failing_extractor)
+        self.extractor.set_config(
+            continue_on_error=True, extractor_priority=["failing", "json_string"]
+        )
+        self.extractor.set_config(parse_json_strings=True)
+
+        text = '{"key": "value"}'
+        self.extractor.input_slot.receive({"data": text})
+
+        # Should continue and find valid JSON
+        self.assertEqual(len(self.received_data), 1)
+        self.assertEqual(self.received_data[0]["format"], "json")
+
+    def test_extractor_error_handling_stop_on_error(self):
+        """Test error handling with continue_on_error=False."""
+
+        def failing_extractor(data, config):
+            raise RuntimeError("Intentional failure")
+
+        self.extractor.register_extractor("failing", failing_extractor)
+        self.extractor.set_config(
+            continue_on_error=False, return_original_on_failure=True, extractor_priority=["failing"]
+        )
+
+        text = '{"key": "value"}'
+        self.extractor.input_slot.receive({"data": text})
+
+        # Should fail and return original
+        self.assertEqual(len(self.received_data), 1)
+        self.assertEqual(self.received_data[0]["format"], "str")

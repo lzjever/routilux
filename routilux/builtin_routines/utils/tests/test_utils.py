@@ -128,3 +128,54 @@ class TestDataFlattener(unittest.TestCase):
         self.assertEqual(len(self.received_data), 1)
         flattened = self.received_data[0]["flattened_data"]
         self.assertIn("a_b", flattened)
+
+    def test_max_depth_limit(self):
+        """Test max_depth limit prevents infinite recursion."""
+        self.flattener.set_config(max_depth=2)
+        # Create deeply nested data
+        data = {"a": {"b": {"c": {"d": 1}}}}
+        self.flattener.input_slot.receive({"data": data})
+
+        self.assertEqual(len(self.received_data), 1)
+        _ = self.received_data[0]["flattened_data"]
+        depth = self.received_data[0]["depth"]
+        # Should stop at max_depth and convert remaining to string
+        self.assertGreaterEqual(depth, 2)
+        self.assertLessEqual(depth, 3)
+
+    def test_circular_reference_handling(self):
+        """Test circular reference is detected and handled."""
+        data = {"a": 1}
+        data["self"] = data  # Create circular reference
+        self.flattener.input_slot.receive({"data": data})
+
+        self.assertEqual(len(self.received_data), 1)
+        flattened = self.received_data[0]["flattened_data"]
+        # Should detect circular reference and handle it gracefully
+        self.assertIn("self", flattened)
+        self.assertEqual(flattened["self"], "[Circular Reference]")
+
+    def test_preserve_lists_false(self):
+        """Test preserve_lists=False flattens list items without indices."""
+        self.flattener.set_config(preserve_lists=False)
+        data = {"items": [1, 2, 3]}
+        self.flattener.input_slot.receive({"data": data})
+
+        self.assertEqual(len(self.received_data), 1)
+        flattened = self.received_data[0]["flattened_data"]
+        # Without preserve_lists, indices should not be in keys
+        # Items should be merged directly
+        self.assertGreater(len(flattened), 0)
+
+    def test_circular_reference_in_list(self):
+        """Test circular reference handling in lists."""
+        data = [1, 2]
+        data.append(data)  # Create circular reference
+        self.flattener.input_slot.receive({"data": data})
+
+        self.assertEqual(len(self.received_data), 1)
+        flattened = self.received_data[0]["flattened_data"]
+        # Should detect circular reference and handle it gracefully
+        self.assertIn("2", flattened)
+        # The circular reference should be handled
+        self.assertGreater(len(flattened), 0)

@@ -144,7 +144,15 @@ class Routine(ConfigMixin, ExecutionMixin, LifecycleMixin, Serializable):
         # _id and _error_handler are from Routine
         # _before_hooks, _after_hooks are from LifecycleMixin
         self.add_serializable_fields(
-            ["_id", "_config", "_error_handler", "_slots", "_events", "_before_hooks", "_after_hooks"]
+            [
+                "_id",
+                "_config",
+                "_error_handler",
+                "_slots",
+                "_events",
+                "_before_hooks",
+                "_after_hooks",
+            ]
         )
 
     def __repr__(self) -> str:
@@ -392,7 +400,9 @@ class Routine(ConfigMixin, ExecutionMixin, LifecycleMixin, Serializable):
 
         return data
 
-    def deserialize(self, data: dict[str, Any], strict: bool = False, registry: Any | None = None) -> None:
+    def deserialize(
+        self, data: dict[str, Any], strict: bool = False, registry: Any | None = None
+    ) -> None:
         """Deserialize Routine.
 
         Args:

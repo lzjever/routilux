@@ -301,7 +301,9 @@ class MetricsCollector:
                 self._histograms[key] = Histogram(name, description, labels, buckets)
             return self._histograms[key]
 
-    def get_or_create_counter(self, name: str, description: str, labels: dict[str, str] | None = None) -> Counter:
+    def get_or_create_counter(
+        self, name: str, description: str, labels: dict[str, str] | None = None
+    ) -> Counter:
         """Get or create a counter metric with description.
 
         This is a convenience method that ensures the counter exists.

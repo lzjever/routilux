@@ -368,12 +368,12 @@ def resume_flow(flow: "Flow", job_state: "JobState") -> "JobState":
                 import warnings
 
                 warnings.warn(
-                    f"Failed to emit deferred event '{event_name}' from routine '{routine_id}': {e}"
+                    f"Failed to emit deferred event '{event_name}' from routine '{event_routine_id}': {e}"
                 )
         else:
             import warnings
 
-            warnings.warn(f"Routine '{routine_id}' not found in flow for deferred event")
+            warnings.warn(f"Routine '{event_routine_id}' not found in flow for deferred event")
 
     # Clear deferred events (they have been processed)
     job_state.deferred_events.clear()

@@ -240,7 +240,7 @@ class WorkflowAnalyzer:
             "source_event": connection.source_event.name,
             "target_routine_id": target_routine_id,
             "target_slot": connection.target_slot.name,
-            "param_mapping": dict(connection.param_mapping) if connection.param_mapping else {},
+            "param_mapping": dict(connection.param_mapping) if hasattr(connection, "param_mapping") and connection.param_mapping else {},
         }
 
         return conn_info

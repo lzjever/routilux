@@ -296,7 +296,7 @@ class RoutineAnalyzer:
         """
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             return node.value
-        elif isinstance(node, ast.Str):  # Python < 3.8 compatibility
+        elif hasattr(ast, "Str") and isinstance(node, ast.Str):  # Python < 3.8 compatibility
             # node.s is typed as Any, so we need to cast it
             s_val: Any = node.s
             return s_val if isinstance(s_val, str) else None
@@ -313,11 +313,11 @@ class RoutineAnalyzer:
         """
         if isinstance(node, ast.Constant):
             return node.value
-        elif isinstance(node, ast.Str):  # Python < 3.8 compatibility
+        elif hasattr(ast, "Str") and isinstance(node, ast.Str):  # Python < 3.8 compatibility
             return node.s
-        elif isinstance(node, ast.Num):  # Python < 3.8 compatibility
+        elif hasattr(ast, "Num") and isinstance(node, ast.Num):  # Python < 3.8 compatibility
             return node.n
-        elif isinstance(node, ast.NameConstant):  # Python < 3.8 compatibility
+        elif hasattr(ast, "NameConstant") and isinstance(node, ast.NameConstant):  # Python < 3.8 compatibility
             return node.value
         elif isinstance(node, ast.List):
             return [self._extract_literal_value(item) for item in node.elts]

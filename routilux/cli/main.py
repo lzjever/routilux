@@ -3,8 +3,8 @@
 import click
 from pathlib import Path
 
-# Import commands (will implement these in subsequent tasks)
-# from routilux.cli.commands.run import run
+# Import commands
+from routilux.cli.commands.run import run
 # from routilux.cli.commands.server import server
 # from routilux.cli.commands.list import list_cmd
 # from routilux.cli.commands.validate import validate
@@ -36,11 +36,8 @@ def cli(ctx, routines_dir, config, verbose, quiet):
     ctx.obj["quiet"] = quiet
 
 
-# Placeholder commands - will be implemented
-@cli.command()
-def run():
-    """Run a workflow from a DSL file."""
-    click.echo("run command - to be implemented")
+# Add commands to CLI
+cli.add_command(run)
 
 
 @cli.command()

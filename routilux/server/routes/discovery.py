@@ -479,3 +479,97 @@ async def sync_workers():
     except Exception as e:
         logger.exception(f"Failed to sync workers: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to sync workers: {str(e)}") from e
+
+
+@router.get("/discovery", dependencies=[RequireAuth])
+async def get_discovery_status():
+    """Get current discovery status.
+
+    Returns information about discovered routines and configuration.
+
+    **Response Example**:
+    ```json
+    {
+      "routines_count": 42,
+      "directories": ["./routines", "~/.routilux/routines"],
+      "routines": [
+        {
+          "name": "my_processor",
+          "category": "processing",
+          "type": "routine"
+        }
+      ]
+    }
+    ```
+    """
+    import os
+    from pathlib import Path
+    from routilux.tools.factory.factory import ObjectFactory
+
+    factory = ObjectFactory.get_instance()
+    routines = factory.list_available()
+
+    # Get routines directories from environment
+    routines_dirs_str = os.getenv("ROUTILUX_ROUTINES_DIRS", "")
+    directories = []
+    if routines_dirs_str:
+        directories = routines_dirs_str.split(":")
+
+    return {
+        "routines_count": len(routines),
+        "directories": directories,
+        "routines": [
+            {
+                "name": r["name"],
+                "category": r.get("category", ""),
+                "type": r.get("object_type", "routine"),
+            }
+            for r in routines
+        ],
+    }
+
+
+@router.post("/dsl/file", dependencies=[RequireAuth])
+async def load_dsl_from_file(request: dict):
+    """Load DSL from file path.
+
+    Alternative to POST /api/v1/flows with DSL in body.
+    This endpoint loads DSL from a file path on the server.
+
+    **Request Example**:
+    ```json
+    {
+      "file_path": "/path/to/flow.yaml"
+    }
+    ```
+
+    **Response**: Flow object (same as POST /api/v1/flows)
+    """
+    from pathlib import Path
+    from routilux.tools.factory.factory import ObjectFactory
+    from routilux.cli.commands.run import _load_dsl
+
+    file_path = request.get("file_path")
+    if not file_path:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="file_path is required")
+
+    path = Path(file_path)
+    if not path.exists():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+
+    # Load DSL
+    dsl_dict = _load_dsl(path)
+
+    # Load flow from factory
+    factory = ObjectFactory.get_instance()
+    flow = factory.load_flow_from_dsl(dsl_dict)
+
+    # Store flow
+    from routilux.monitoring.storage import flow_store
+    flow_store.add(flow)
+
+    from routilux.server.routes.flows import _flow_to_response
+    return _flow_to_response(flow)
+

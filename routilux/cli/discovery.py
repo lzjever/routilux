@@ -44,14 +44,18 @@ class RoutineDiscovery:
 
         return list(directory.rglob("*.py"))
 
-    def load_module(self, file_path: Path) -> Optional[object]:
+    def load_module(self, file_path: Path, on_error: str = "warn") -> Optional[object]:
         """Load a Python module from file path.
 
         Args:
             file_path: Path to Python file
+            on_error: Error handling strategy - "warn", "raise", or "ignore"
 
         Returns:
             Module object or None if loading failed
+
+        Raises:
+            ValueError: If on_error="raise" and loading fails
         """
         try:
             # Create unique module name based on file path
@@ -60,7 +64,10 @@ class RoutineDiscovery:
             # Load module
             spec = importlib.util.spec_from_file_location(module_name, file_path)
             if spec is None or spec.loader is None:
-                logger.warning(f"Could not load spec for {file_path}")
+                msg = f"Could not load spec for {file_path}"
+                if on_error == "raise":
+                    raise ValueError(msg)
+                logger.warning(msg)
                 return None
 
             module = importlib.util.module_from_spec(spec)
@@ -70,6 +77,8 @@ class RoutineDiscovery:
             return module
 
         except Exception as e:
+            if on_error == "raise":
+                raise
             logger.warning(f"Failed to load {file_path}: {e}")
             return None
 
@@ -95,7 +104,7 @@ class RoutineDiscovery:
 
         for file_path in files:
             try:
-                module = self.load_module(file_path)
+                module = self.load_module(file_path, on_error=on_error)
                 if module is not None:
                     # The module's decorators should have registered routines
                     count += 1

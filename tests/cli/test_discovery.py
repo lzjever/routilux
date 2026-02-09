@@ -20,7 +20,6 @@ def test_discovery_scan_directory(tmp_path):
     assert all(f.suffix == ".py" for f in files)
 
 
-@pytest.mark.skip(reason="Task 3 (decorator system) not implemented yet")
 def test_discovery_with_decorator(tmp_path):
     """Test discovering routines decorated with @register_routine."""
     # Create a routine file with decorator
@@ -41,13 +40,14 @@ def my_logic(data):
     assert "test_processor" in routine_names
 
 
-@pytest.mark.skip(reason="Task 3 (decorator system) not implemented yet")
 def test_discovery_with_class_based(tmp_path):
     """Test discovering class-based routines."""
     routine_file = tmp_path / "class_routine.py"
     routine_file.write_text("""
 from routilux.core.routine import Routine
+from routilux.cli.decorators import auto_register_routine
 
+@auto_register_routine()
 class MyProcessor(Routine):
     factory_name = "class_processor"
 
@@ -80,7 +80,6 @@ def test_discovery_handles_import_errors(tmp_path):
     assert factory is not None
 
 
-@pytest.mark.skip(reason="Task 3 (decorator system) not implemented yet")
 def test_discovery_duplicate_registration(tmp_path):
     """Test that duplicate registration raises error."""
     routine_file = tmp_path / "routine.py"
@@ -97,4 +96,4 @@ def func2(data):
 """)
 
     with pytest.raises(ValueError, match="already registered"):
-        discover_routines([tmp_path])
+        discover_routines([tmp_path], on_error="raise")

@@ -65,9 +65,6 @@ def validate(ctx, workflow, routines_dir):
 
     # Validate flow
     try:
-        from routilux.tools.factory.factory import ObjectFactory
-
-        factory = ObjectFactory.get_instance()
         flow = factory.load_flow_from_dsl(dsl_dict)
 
         # Validate flow structure

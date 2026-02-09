@@ -6,7 +6,7 @@ import logging
 import sys
 import warnings
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from routilux.tools.factory.factory import ObjectFactory
 
@@ -23,7 +23,6 @@ class RoutineDiscovery:
             factory: ObjectFactory instance. Uses global singleton if None.
         """
         self.factory = factory or ObjectFactory.get_instance()
-        self._registered_routines = set()
 
     def scan_directory(self, directory: Path) -> List[Path]:
         """Scan directory for Python files.
@@ -156,7 +155,6 @@ def get_default_routines_dirs() -> List[Path]:
         dirs.append(local_dir)
 
     # User-global directory
-    from pathlib import Path
     home = Path.home()
     global_dir = home / ".routilux" / "routines"
     if global_dir.exists():

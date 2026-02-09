@@ -7,7 +7,7 @@ from pathlib import Path
 from routilux.cli.commands.run import run
 from routilux.cli.commands.server import server
 from routilux.cli.commands.list import list_cmd
-# from routilux.cli.commands.validate import validate
+from routilux.cli.commands.validate import validate
 # from routilux.cli.commands.init import initialize
 
 
@@ -40,12 +40,7 @@ def cli(ctx, routines_dir, config, verbose, quiet):
 cli.add_command(run)
 cli.add_command(server)
 cli.add_command(list_cmd)
-
-
-@cli.command()
-def validate():
-    """Validate a workflow DSL file."""
-    click.echo("validate command - to be implemented")
+cli.add_command(validate)
 
 
 @cli.command()

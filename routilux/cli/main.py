@@ -6,7 +6,7 @@ from pathlib import Path
 # Import commands
 from routilux.cli.commands.run import run
 from routilux.cli.commands.server import server
-# from routilux.cli.commands.list import list_cmd
+from routilux.cli.commands.list import list_cmd
 # from routilux.cli.commands.validate import validate
 # from routilux.cli.commands.init import initialize
 
@@ -39,12 +39,7 @@ def cli(ctx, routines_dir, config, verbose, quiet):
 # Add commands to CLI
 cli.add_command(run)
 cli.add_command(server)
-
-
-@cli.command()
-def list_cmd():
-    """List available routines or flows."""
-    click.echo("list command - to be implemented")
+cli.add_command(list_cmd)
 
 
 @cli.command()

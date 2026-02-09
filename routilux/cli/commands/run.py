@@ -1,13 +1,12 @@
 """Run workflow command implementation."""
 
-import click
-import yaml
 import json
 from pathlib import Path
-from typing import Optional
+
+import click
+import yaml
 
 from routilux.cli.discovery import discover_routines, get_default_routines_dirs
-from routilux.tools.factory.factory import ObjectFactory
 
 
 @click.command()
@@ -98,7 +97,7 @@ def run(ctx, workflow, routines_dir, param, output, timeout):
         params = _parse_params(param)
 
         if not quiet:
-            click.echo(f"Executing flow...")
+            click.echo("Executing flow...")
 
         # Create worker and submit job
         worker_state, job_context = runtime.post(

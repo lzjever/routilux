@@ -1,14 +1,16 @@
 """Main CLI entry point using click framework."""
 
-import click
 from pathlib import Path
+
+import click
+
+from routilux.cli.commands.init import initialize
+from routilux.cli.commands.list import list_cmd
 
 # Import commands
 from routilux.cli.commands.run import run
 from routilux.cli.commands.server import server
-from routilux.cli.commands.list import list_cmd
 from routilux.cli.commands.validate import validate
-from routilux.cli.commands.init import initialize
 
 
 @click.group()

@@ -1,10 +1,11 @@
 """Validate command implementation."""
 
-import click
 from pathlib import Path
 
-from routilux.cli.discovery import discover_routines, get_default_routines_dirs
+import click
+
 from routilux.cli.commands.run import _load_dsl
+from routilux.cli.discovery import discover_routines, get_default_routines_dirs
 
 
 @click.command()

@@ -1,7 +1,8 @@
 """Server command implementation."""
 
-import click
 from pathlib import Path
+
+import click
 
 
 @click.group()
@@ -47,7 +48,6 @@ def start(ctx, host, port, routines_dir, reload, log_level):
     Routines are automatically discovered from specified directories.
     """
     quiet = ctx.obj.get("quiet", False)
-    verbose = ctx.obj.get("verbose", False)
 
     # Gather routines directories
     routines_dirs = list(routines_dir)

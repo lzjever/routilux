@@ -1,7 +1,6 @@
 # routilux/cli/decorators.py
 """Decorator for registering routines with the factory."""
 
-import functools
 from typing import Callable, Optional
 
 from routilux.core.routine import Routine

@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import List, Optional
 
 from routilux.cli.discovery import discover_routines, get_default_routines_dirs
-from routilux.tools.factory.factory import ObjectFactory
 
 
 def start_server(

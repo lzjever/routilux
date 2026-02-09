@@ -1,8 +1,9 @@
 """List command implementation."""
 
-import click
 from pathlib import Path
 from typing import Optional
+
+import click
 
 from routilux.cli.discovery import discover_routines, get_default_routines_dirs
 from routilux.tools.factory.factory import ObjectFactory
@@ -49,7 +50,6 @@ def list_cmd(ctx, resource, category, routines_dir, dir, output_format):
 
 def _list_routines(category: Optional[str], routines_dirs: tuple, output_format: str, quiet: bool):
     """List discovered routines."""
-    from routilux.tools.factory.factory import ObjectFactory
 
     # Gather routines directories
     all_dirs = list(routines_dirs)

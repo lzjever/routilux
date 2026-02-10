@@ -96,12 +96,22 @@ class ResultExtractor(Routine):
         self._register_builtin_extractors()
 
         # Define input slot
-        self.input_slot = self.define_slot("input", handler=self._handle_input)
+        self.input_slot = self.add_slot("input")
 
         # Define output event
-        self.output_event = self.define_event(
+        self.output_event = self.add_event(
             "output", ["extracted_result", "format", "metadata", "confidence", "extraction_path"]
         )
+
+        # Set up activation policy and logic
+        self.set_activation_policy(
+            lambda slots, worker_state: (
+                len(slots["input"]) > 0,
+                {"input": slots["input"].consume_all_new()},
+                "slot_activated",
+            )
+        )
+        self.set_logic(self._handle_input)
 
     def _register_builtin_extractors(self) -> None:
         """Register built-in extractor functions."""
@@ -148,8 +158,13 @@ class ResultExtractor(Routine):
             **kwargs: Additional data from slot. If 'data' is not provided,
                 will use kwargs or the first value.
         """
-        # Extract data using Routine helper method
-        data = self._extract_input_data(data, **kwargs)
+        # Extract data: use data parameter if provided, otherwise check 'data' key in kwargs
+        if data is None:
+            data = kwargs.get("data")
+            if data is None and len(kwargs) == 1:
+                data = next(iter(kwargs.values()))
+            elif data is None and len(kwargs) > 1:
+                data = kwargs
         if data == {}:
             data = ""  # Default to empty string for result extractor
 

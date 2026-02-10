@@ -23,11 +23,23 @@ class TestConditionalRouter(unittest.TestCase):
         self.received_normal = []
 
         # Create test slots to capture output
-        self.high_slot = Slot("high", None, lambda **kwargs: self.received_high.append(kwargs))
-        self.low_slot = Slot("low", None, lambda **kwargs: self.received_low.append(kwargs))
-        self.normal_slot = Slot(
-            "normal", None, lambda **kwargs: self.received_normal.append(kwargs)
-        )
+        self.high_slot = Slot("high", None)
+        self.low_slot = Slot("low", None)
+        self.normal_slot = Slot("normal", None)
+
+        # Set up manual capture handlers
+        def capture_high(**kwargs):
+            self.received_high.append(kwargs)
+
+        def capture_low(**kwargs):
+            self.received_low.append(kwargs)
+
+        def capture_normal(**kwargs):
+            self.received_normal.append(kwargs)
+
+        self._capture_high = capture_high
+        self._capture_low = capture_low
+        self._capture_normal = capture_normal
 
         self.router.set_config(
             routes=[
@@ -44,19 +56,19 @@ class TestConditionalRouter(unittest.TestCase):
         if high_event:
             high_event.connect(self.high_slot)
         else:
-            self.router.define_event("high", ["data", "route"]).connect(self.high_slot)
+            self.router.add_event("high", ["data", "route"]).connect(self.high_slot)
 
         low_event = self.router.get_event("low")
         if low_event:
             low_event.connect(self.low_slot)
         else:
-            self.router.define_event("low", ["data", "route"]).connect(self.low_slot)
+            self.router.add_event("low", ["data", "route"]).connect(self.low_slot)
 
         normal_event = self.router.get_event("normal")
         if normal_event:
             normal_event.connect(self.normal_slot)
         else:
-            self.router.define_event("normal", ["data", "route"]).connect(self.normal_slot)
+            self.router.add_event("normal", ["data", "route"]).connect(self.normal_slot)
 
     def test_route_high_priority(self):
         """Test routing high priority data."""

@@ -41,12 +41,22 @@ class TextClipper(Routine):
         )
 
         # Define input slot
-        self.input_slot = self.define_slot("input", handler=self._handle_input)
+        self.input_slot = self.add_slot("input")
 
         # Define output event
-        self.output_event = self.define_event(
+        self.output_event = self.add_event(
             "output", ["clipped_text", "was_clipped", "original_length"]
         )
+
+        # Set up activation policy and logic
+        self.set_activation_policy(
+            lambda slots, worker_state: (
+                len(slots["input"]) > 0,
+                {"input": slots["input"].consume_all_new()},
+                "slot_activated",
+            )
+        )
+        self.set_logic(self._handle_input)
 
     def _handle_input(self, text: Any = None, max_length: int | None = None, **kwargs):
         """Handle input text and clip if necessary.
@@ -58,8 +68,14 @@ class TextClipper(Routine):
             **kwargs: Additional data from slot. If 'text' is not provided,
                 will try to extract from kwargs or use the first value.
         """
-        # Extract text using helper method
-        data = self._extract_input_data(text, **kwargs)
+        # Extract text: use text parameter if provided, otherwise check 'data' key in kwargs
+        data = text
+        if data is None:
+            data = kwargs.get("data")
+            if data is None and len(kwargs) == 1:
+                data = next(iter(kwargs.values()))
+            elif data is None and len(kwargs) > 1:
+                data = kwargs
 
         # Convert to string - handle various input types
         if isinstance(data, str):

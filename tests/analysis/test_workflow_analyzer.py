@@ -12,8 +12,18 @@ class DummyRoutine(Routine):
 
     def __init__(self):
         super().__init__()
-        self.define_slot("input", self.handle_input)
-        self.define_event("output", ["data"])
+        self.input_slot = self.add_slot("input")
+        self.output_event = self.add_event("output", ["data"])
+
+        # Set up activation policy and logic
+        self.set_activation_policy(
+            lambda slots, worker_state: (
+                len(slots["input"]) > 0,
+                {"input": slots["input"].consume_all_new()},
+                "slot_activated",
+            )
+        )
+        self.set_logic(self.handle_input)
 
     def handle_input(self, data):
         pass
@@ -24,8 +34,18 @@ class TriggerRoutine(Routine):
 
     def __init__(self):
         super().__init__()
-        self.define_slot("trigger", self.handle_trigger)
-        self.define_event("output", ["result"])
+        self.trigger_slot = self.add_slot("trigger")
+        self.output_event = self.add_event("output", ["result"])
+
+        # Set up activation policy and logic
+        self.set_activation_policy(
+            lambda slots, worker_state: (
+                len(slots["trigger"]) > 0,
+                {"trigger": slots["trigger"].consume_all_new()},
+                "slot_activated",
+            )
+        )
+        self.set_logic(self.handle_trigger)
 
     def handle_trigger(self, data):
         pass

@@ -45,12 +45,22 @@ class TimeProvider(Routine):
         )
 
         # Define input slot (trigger slot - no data needed)
-        self.trigger_slot = self.define_slot("request", handler=self._handle_request)
+        self.trigger_slot = self.add_slot("request")
 
         # Define output event
-        self.output_event = self.define_event(
+        self.output_event = self.add_event(
             "output", ["time_string", "timestamp", "datetime", "formatted"]
         )
+
+        # Set up activation policy and logic
+        self.set_activation_policy(
+            lambda slots, worker_state: (
+                len(slots["request"]) > 0,
+                {"request": slots["request"].consume_all_new()},
+                "slot_activated",
+            )
+        )
+        self.set_logic(self._handle_request)
 
     def _handle_request(self, data: dict[str, Any] | None = None, **kwargs):
         """Handle time request.

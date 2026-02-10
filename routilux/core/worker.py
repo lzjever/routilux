@@ -434,13 +434,13 @@ class WorkerState(Serializable):
         Args:
             flow: Flow object
             worker_state: WorkerState to monitor
-            timeout: Maximum wait time in seconds (None = 1 hour default)
+            timeout: Maximum wait time in seconds (None = 5 minutes default)
             check_interval: Check interval in seconds
 
         Returns:
             True if completed, False if timeout
         """
-        max_timeout = timeout if timeout is not None else 3600.0
+        max_timeout = timeout if timeout is not None else 300.0
         start_time = time.time()
 
         while True:

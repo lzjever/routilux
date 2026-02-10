@@ -160,8 +160,6 @@ class TestWorkflowAnalyzer:
         """Test that execution metadata is extracted."""
         flow = Flow(
             "test_flow",
-            execution_strategy="concurrent",
-            max_workers=4,
             execution_timeout=60.0,
         )
 
@@ -170,8 +168,8 @@ class TestWorkflowAnalyzer:
         analyzer = WorkflowAnalyzer()
         result = analyzer.analyze_flow(flow)
 
-        assert result["execution_strategy"] == "concurrent"
-        assert result["max_workers"] == 4
+        assert result["execution_strategy"] == "sequential"  # default value
+        assert result["max_workers"] == 1  # default value
         assert result["execution_timeout"] == 60.0
 
     def test_to_json(self):

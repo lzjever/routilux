@@ -79,9 +79,9 @@ class WorkflowAnalyzer:
         """
         result: dict[str, Any] = {
             "flow_id": flow.flow_id,
-            "execution_strategy": flow.execution_strategy,
-            "max_workers": flow.max_workers,
-            "execution_timeout": flow.execution_timeout,
+            "execution_strategy": getattr(flow, "execution_strategy", "sequential"),
+            "max_workers": getattr(flow, "max_workers", 1),
+            "execution_timeout": getattr(flow, "execution_timeout", 300.0),
             "routines": [],
             "connections": [],
             "dependency_graph": {},

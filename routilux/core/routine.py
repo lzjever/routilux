@@ -157,6 +157,120 @@ class Routine(Serializable):
             self._events[name] = event
             return event
 
+    def define_slot(
+        self,
+        name: str,
+        handler: Callable | None = None,
+        max_queue_length: int = 1000,
+        watermark: float = 0.8,
+    ) -> Slot:
+        """Define a slot with optional handler (convenience method).
+
+        This is a convenience method that combines add_slot(), set_activation_policy(),
+        and set_logic() for the common case of a slot that triggers a handler when
+        data arrives.
+
+        Args:
+            name: Slot name (must be unique within this routine)
+            handler: Optional handler function to execute when slot receives data.
+                If provided, automatically sets up activation policy and logic.
+            max_queue_length: Maximum queue length (default: 1000)
+            watermark: Watermark threshold for auto-shrink (default: 0.8)
+
+        Returns:
+            Slot object
+
+        Raises:
+            ValueError: If slot name already exists
+
+        Examples:
+            >>> class MyRoutine(Routine):
+            ...     def __init__(self):
+            ...         super().__init__()
+            ...         self.input_slot = self.define_slot("input", handler=self._handle_input)
+            ...
+            ...     def _handle_input(self, data=None, **kwargs):
+            ...         extracted = self._extract_input_data(data, **kwargs)
+            ...         self.emit("output", result=extracted)
+        """
+        slot = self.add_slot(name, max_queue_length=max_queue_length, watermark=watermark)
+        if handler:
+            # Set up activation policy: triggers when slot has new data
+            self.set_activation_policy(
+                lambda slots, worker_state: (
+                    len(slots[name]) > 0,
+                    {name: slots[name].consume_all_new()},
+                    "slot_activated",
+                )
+            )
+            self.set_logic(handler)
+        return slot
+
+    def define_event(self, name: str, output_params: list[str] | None = None) -> Event:
+        """Define an output event (semantic alias for add_event).
+
+        This is a semantic alias for add_event() - it does the same thing but
+        uses clearer terminology for defining routine interfaces.
+
+        Args:
+            name: Event name (must be unique within this routine)
+            output_params: Optional list of parameter names (for documentation)
+
+        Returns:
+            Event object
+
+        Raises:
+            ValueError: If event name already exists
+
+        Examples:
+            >>> class MyRoutine(Routine):
+            ...     def __init__(self):
+            ...         super().__init__()
+            ...         self.output_event = self.define_event("output", ["result", "status"])
+        """
+        return self.add_event(name, output_params)
+
+    def _extract_input_data(self, data: Any = None, **kwargs: Any) -> Any:
+        """Extract and normalize input data from slot parameters.
+
+        This helper method handles various input patterns from slot handlers:
+        - Direct parameter: _extract_input_data("text") -> "text"
+        - 'data' key: _extract_input_data(None, data="text") -> "text"
+        - Single value: _extract_input_data(None, text="value") -> "value"
+        - Multiple values: _extract_input_data(None, a=1, b=2) -> {"a": 1, "b": 2}
+
+        Args:
+            data: Primary data parameter
+            **kwargs: Additional parameters from slot
+
+        Returns:
+            Extracted data - single value for single input, dict for multiple
+
+        Examples:
+            >>> # In a slot handler
+            >>> def _handle_input(self, data=None, **kwargs):
+            ...     extracted = self._extract_input_data(data, **kwargs)
+            ...     # Process extracted data
+        """
+        # If data is explicitly provided and not None, use it
+        if data is not None:
+            return data
+
+        # If 'data' key exists in kwargs, use it
+        if "data" in kwargs:
+            return kwargs["data"]
+
+        # If single value in kwargs, return it
+        if len(kwargs) == 1:
+            return next(iter(kwargs.values()))
+
+        # Multiple values in kwargs, return as dict
+        if kwargs:
+            return kwargs
+
+        # No data provided
+        return None
+
     def emit(
         self,
         event_name: str,

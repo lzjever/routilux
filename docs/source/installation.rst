@@ -3,6 +3,37 @@ Installation
 
 Routilux can be installed in several ways depending on your needs. This guide covers all installation methods for Mac and Linux.
 
+One-Line Install (Recommended)
+------------------------------
+
+The easiest way to install Routilux on Mac or Linux:
+
+.. code-block:: bash
+
+   # Auto-detects best method (uv > pipx > pip)
+   curl -fsSL https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
+
+   # Or with wget
+   wget -qO- https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
+
+**Options:**
+
+.. code-block:: bash
+
+   # Use pipx instead of uv
+   METHOD=pipx curl -fsSL https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
+
+   # Install specific version
+   VERSION=0.14.0 curl -fsSL https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
+
+**What the installer does:**
+
+1. Detects your OS and architecture
+2. Checks Python version (requires 3.8+)
+3. Installs uv (or pipx) if not present
+4. Installs routilux with CLI dependencies
+5. Verifies the installation
+
 pipx (Recommended for CLI)
 --------------------------
 

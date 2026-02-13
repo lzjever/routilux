@@ -31,6 +31,26 @@
 
 ## 📦 Installation
 
+### ⚡ One-Line Install (Recommended)
+
+```bash
+# Mac / Linux - Auto-detects best method (uv > pipx > pip)
+curl -fsSL https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
+
+# Or with wget
+wget -qO- https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
+```
+
+**Installation options:**
+
+```bash
+# Use pipx instead of uv
+METHOD=pipx curl -fsSL https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
+
+# Install specific version
+VERSION=0.14.0 curl -fsSL https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
+```
+
 ### Recommended: Isolated CLI Installation (pipx)
 
 The best way to install Routilux CLI without affecting your system:

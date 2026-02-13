@@ -119,25 +119,16 @@ install_routilux_uv() {
         pkg="routilux[cli]==$VERSION"
     fi
 
-    # Check if installed via uv
+    # Try upgrade first (if installed via uv)
     if uv tool list 2>/dev/null | grep -q "routilux"; then
-        info "routilux already installed via uv, upgrading..."
-        uv tool upgrade routilux
-        success "routilux upgraded with uv"
-        return 0
+        info "Upgrading routilux..."
+        uv tool upgrade routilux 2>/dev/null && success "Upgraded to latest version" && return 0
     fi
 
-    # Check if executable exists (might be from pip/pipx)
-    if command -v routilux &>/dev/null; then
-        info "routilux executable found, reinstalling with uv..."
-        uv tool install --force "$pkg"
-        success "routilux installed with uv"
-        return 0
-    fi
-
-    info "Installing routilux with uv..."
-    uv tool install "$pkg"
-    success "routilux installed with uv"
+    # Install with --force to handle existing executable
+    info "Installing routilux..."
+    uv tool install --force "$pkg" 2>/dev/null
+    success "Installed latest version"
 }
 
 install_routilux_pipx() {
@@ -146,39 +137,27 @@ install_routilux_pipx() {
         pkg="routilux[cli]==$VERSION"
     fi
 
-    # Check if installed via pipx
+    # Try upgrade first
     if pipx list 2>/dev/null | grep -q "routilux"; then
-        info "routilux already installed via pipx, upgrading..."
-        pipx upgrade routilux
-        success "routilux upgraded with pipx"
-        return 0
+        info "Upgrading routilux..."
+        pipx upgrade routilux 2>/dev/null && success "Upgraded to latest version" && return 0
     fi
 
-    # Check if executable exists (might be from pip/uv)
-    if command -v routilux &>/dev/null; then
-        info "routilux executable found, reinstalling with pipx..."
-        pipx install --force "$pkg"
-        success "routilux installed with pipx"
-        return 0
-    fi
-
-    info "Installing routilux with pipx..."
-    pipx install "$pkg"
-    success "routilux installed with pipx"
+    # Install with --force
+    info "Installing routilux..."
+    pipx install --force "$pkg" 2>/dev/null
+    success "Installed latest version"
 }
 
 install_routilux_pip() {
-    warn "pip install is not recommended. Consider using uv or pipx instead."
-
     local pkg="routilux[cli]"
     if [ -n "$VERSION" ]; then
         pkg="routilux[cli]==$VERSION"
     fi
 
-    # Always use --upgrade to handle both install and upgrade
-    info "Installing/upgrading routilux with pip..."
-    $PYTHON -m pip install --user --upgrade "$pkg"
-    success "routilux installed with pip"
+    info "Installing routilux..."
+    $PYTHON -m pip install --user --upgrade --quiet "$pkg" 2>/dev/null
+    success "Installed latest version"
 }
 
 verify_installation() {

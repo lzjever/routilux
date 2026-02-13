@@ -217,4 +217,4 @@ __all__ = [
     "WorkflowD2Formatter",
 ]
 
-__version__ = "0.14.4"
+__version__ = "0.15.0"

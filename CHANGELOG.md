@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-02-14
+
+### Added
+
+- **Server enhancements**:
+  - `--flows-dir` option to load flows at startup
+  - Automatic registration of built-in routines (Mapper, Filter, etc.)
+  - Hot reload for flow files (watchdog-based)
+  - Flow ID conflict detection with clear error messages
+
+- **Job CLI commands**:
+  - `routilux job submit` - Submit jobs (local and remote modes)
+  - `routilux job status` - Check job status
+  - `routilux job list` - List jobs
+  - Support for `--server` flag to target remote servers
+
+- **New APIs**:
+  - `register_all_builtins(factory)` - Register all built-in routines with a factory
+  - `load_flows_from_directory(dir, factory)` - Load flows with duplicate detection
+
+### Dependencies
+
+- Added `watchdog>=3.0.0` to `[server]` and `[all]` extras
+
 ## [0.14.4] - 2026-02-13
 
 ### Fixed

@@ -9,6 +9,7 @@ from routilux import __version__
 # Import commands
 from routilux.cli.commands.completion import completion
 from routilux.cli.commands.init import initialize
+from routilux.cli.commands.job import job
 from routilux.cli.commands.list import list_cmd
 from routilux.cli.commands.run import run
 from routilux.cli.commands.server import server
@@ -82,6 +83,7 @@ cli.add_command(list_cmd)
 cli.add_command(validate)
 cli.add_command(initialize, name="init")
 cli.add_command(completion)
+cli.add_command(job)
 
 
 def main():

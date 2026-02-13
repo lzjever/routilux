@@ -119,11 +119,19 @@ install_routilux_uv() {
         pkg="routilux[cli]==$VERSION"
     fi
 
-    # Check if already installed - upgrade by default
-    if uv tool list 2>/dev/null | grep -q "^routilux"; then
-        info "routilux already installed, upgrading..."
+    # Check if installed via uv
+    if uv tool list 2>/dev/null | grep -q "routilux"; then
+        info "routilux already installed via uv, upgrading..."
         uv tool upgrade routilux
         success "routilux upgraded with uv"
+        return 0
+    fi
+
+    # Check if executable exists (might be from pip/pipx)
+    if command -v routilux &>/dev/null; then
+        info "routilux executable found, reinstalling with uv..."
+        uv tool install --force "$pkg"
+        success "routilux installed with uv"
         return 0
     fi
 
@@ -138,11 +146,19 @@ install_routilux_pipx() {
         pkg="routilux[cli]==$VERSION"
     fi
 
-    # Check if already installed - upgrade by default
+    # Check if installed via pipx
     if pipx list 2>/dev/null | grep -q "routilux"; then
-        info "routilux already installed, upgrading..."
+        info "routilux already installed via pipx, upgrading..."
         pipx upgrade routilux
         success "routilux upgraded with pipx"
+        return 0
+    fi
+
+    # Check if executable exists (might be from pip/uv)
+    if command -v routilux &>/dev/null; then
+        info "routilux executable found, reinstalling with pipx..."
+        pipx install --force "$pkg"
+        success "routilux installed with pipx"
         return 0
     fi
 

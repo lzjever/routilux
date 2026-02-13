@@ -114,9 +114,9 @@ install_pipx() {
 }
 
 install_routilux_uv() {
-    local pkg="routilux[cli]"
+    local pkg="routilux[all]"
     if [ -n "$VERSION" ]; then
-        pkg="routilux[cli]==$VERSION"
+        pkg="routilux[all]==$VERSION"
     fi
 
     # Try upgrade first (if installed via uv)
@@ -132,9 +132,9 @@ install_routilux_uv() {
 }
 
 install_routilux_pipx() {
-    local pkg="routilux[cli]"
+    local pkg="routilux[all]"
     if [ -n "$VERSION" ]; then
-        pkg="routilux[cli]==$VERSION"
+        pkg="routilux[all]==$VERSION"
     fi
 
     # Try upgrade first
@@ -150,9 +150,9 @@ install_routilux_pipx() {
 }
 
 install_routilux_pip() {
-    local pkg="routilux[cli]"
+    local pkg="routilux[all]"
     if [ -n "$VERSION" ]; then
-        pkg="routilux[cli]==$VERSION"
+        pkg="routilux[all]==$VERSION"
     fi
 
     info "Installing routilux..."

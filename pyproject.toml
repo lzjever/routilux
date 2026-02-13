@@ -41,9 +41,21 @@ cli = [
     "pyyaml>=6.0",
     "rich>=13.0.0",
 ]
-# Convenience extra that includes CLI dependencies
+server = [
+    "uvicorn>=0.20.0",
+    "fastapi>=0.100.0",
+    "websockets>=10.0",
+    "slowapi>=0.1.9",
+]
+# Convenience extra that includes all optional dependencies
 all = [
-    "routilux[cli]",
+    "click>=8.0",
+    "pyyaml>=6.0",
+    "rich>=13.0.0",
+    "uvicorn>=0.20.0",
+    "fastapi>=0.100.0",
+    "websockets>=10.0",
+    "slowapi>=0.1.9",
 ]
 
 [dependency-groups]

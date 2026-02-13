@@ -7,14 +7,16 @@
 #   wget -qO- https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
 #
 # Options:
-#   METHOD=uv    - Use uv tool install (default, recommended)
-#   METHOD=pipx  - Use pipx install
-#   METHOD=pip   - Use pip --user install (not recommended)
+#   METHOD=uv     - Use uv tool install (default, recommended)
+#   METHOD=pipx   - Use pipx install
+#   METHOD=pip    - Use pip --user install (not recommended)
 #   VERSION=x.x.x - Install specific version
+#   FORCE=1       - Upgrade if already installed
 #
 # Examples:
 #   METHOD=pipx curl -fsSL https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
 #   VERSION=0.14.0 curl -fsSL https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
+#   FORCE=1 curl -fsSL https://raw.githubusercontent.com/lzjever/routilux/main/install.sh | bash
 #
 set -e
 
@@ -31,6 +33,7 @@ ROUTILUX_REPO="lzjever/routilux"
 ROUTILUX_PYPI="routilux"
 METHOD="${METHOD:-uv}"
 VERSION="${VERSION:-}"
+FORCE="${FORCE:-}"
 PREFIX="${PREFIX:-$HOME/.local}"
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -114,39 +117,64 @@ install_pipx() {
 }
 
 install_routilux_uv() {
-    info "Installing routilux with uv..."
-
     local pkg="routilux[cli]"
     if [ -n "$VERSION" ]; then
         pkg="routilux[cli]==$VERSION"
     fi
 
+    # Check if already installed
+    if uv tool list 2>/dev/null | grep -q "^routilux"; then
+        if [ -n "$FORCE" ]; then
+            info "Upgrading routilux with uv..."
+            uv tool upgrade routilux
+        else
+            success "routilux is already installed (use FORCE=1 to upgrade)"
+        fi
+        return 0
+    fi
+
+    info "Installing routilux with uv..."
     uv tool install "$pkg"
     success "routilux installed with uv"
 }
 
 install_routilux_pipx() {
-    info "Installing routilux with pipx..."
-
     local pkg="routilux[cli]"
     if [ -n "$VERSION" ]; then
         pkg="routilux[cli]==$VERSION"
     fi
 
+    # Check if already installed
+    if pipx list 2>/dev/null | grep -q "routilux"; then
+        if [ -n "$FORCE" ]; then
+            info "Upgrading routilux with pipx..."
+            pipx upgrade routilux
+        else
+            success "routilux is already installed (use FORCE=1 to upgrade)"
+        fi
+        return 0
+    fi
+
+    info "Installing routilux with pipx..."
     pipx install "$pkg"
     success "routilux installed with pipx"
 }
 
 install_routilux_pip() {
     warn "pip install is not recommended. Consider using uv or pipx instead."
-    info "Installing routilux with pip..."
 
     local pkg="routilux[cli]"
     if [ -n "$VERSION" ]; then
         pkg="routilux[cli]==$VERSION"
     fi
 
-    $PYTHON -m pip install --user "$pkg"
+    local upgrade_flag=""
+    if [ -n "$FORCE" ] && $PYTHON -m pip show routilux &>/dev/null; then
+        upgrade_flag="--upgrade"
+    fi
+
+    info "Installing routilux with pip..."
+    $PYTHON -m pip install --user $upgrade_flag "$pkg"
     success "routilux installed with pip"
 }
 

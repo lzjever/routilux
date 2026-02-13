@@ -14,7 +14,7 @@ import logging
 import queue
 import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import ALL_COMPLETED, Future, ThreadPoolExecutor, wait
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -196,11 +196,17 @@ class WorkerExecutor:
                         self.task_queue.task_done()
                 elif isinstance(task, SlotActivationTask):
                     # Submit routine execution to global thread pool
-                    future = self.global_thread_pool.submit(self._execute_task, task)
+                    try:
+                        future = self.global_thread_pool.submit(self._execute_task, task)
+                    except Exception as e:
+                        # If submit fails, we must still call task_done() to avoid queue count error
+                        logger.error(f"Failed to submit task: {e}")
+                        self.task_queue.task_done()
+                        continue
 
-                    with self._lock:
-                        self.active_tasks.add(future)
-
+                    # CRITICAL: Register callback BEFORE adding to active_tasks
+                    # This prevents race condition where future completes between
+                    # adding to set and registering callback
                     def on_done(fut: Future = future) -> None:
                         with self._lock:
                             self.active_tasks.discard(fut)
@@ -210,6 +216,10 @@ class WorkerExecutor:
                             pass
 
                     future.add_done_callback(on_done)
+
+                    # Now safe to add to active_tasks - callback is already registered
+                    with self._lock:
+                        self.active_tasks.add(future)
                 else:
                     logger.warning(f"Unknown task type: {type(task).__name__}")
                     self.task_queue.task_done()
@@ -372,13 +382,12 @@ class WorkerExecutor:
         Args:
             task: Task to enqueue
         """
-        if getattr(self, "_paused", False):
-            with self._lock:
+        with self._lock:
+            if self._paused:
                 self.pending_tasks.append(task)
-        else:
-            with self._lock:
-                self._pending_task_count += 1
-            self.task_queue.put(task)
+                return
+            self._pending_task_count += 1
+        self.task_queue.put(task)
 
     def _check_timeout(self) -> bool:
         """Check if worker has timed out.
@@ -473,16 +482,36 @@ class WorkerExecutor:
             logger.warning(f"Exception in on_worker_stop hook: {e}", exc_info=True)
 
     def _cleanup(self) -> None:
-        """Cleanup resources."""
+        """Cleanup resources with proper task completion wait.
+
+        Uses concurrent.futures.wait() to ensure all tasks complete or timeout,
+        preventing resource leaks from incomplete task tracking.
+        """
         logger.debug(f"Cleaning up worker {self.worker_state.worker_id}")
 
-        # Wait for active tasks
+        # Get all pending tasks
         with self._lock:
-            for future in list(self.active_tasks):
-                try:
-                    future.result(timeout=1.0)
-                except Exception:
-                    pass
+            pending = list(self.active_tasks)
+
+        if not pending:
+            return
+
+        # Use wait() to ensure all tasks complete or timeout (30s total)
+        # This is more reliable than per-task 1s timeout
+        try:
+            done, not_done = wait(pending, timeout=30.0, return_when=ALL_COMPLETED)
+            if not_done:
+                logger.warning(
+                    f"{len(not_done)} tasks did not complete within 30s timeout, cancelling"
+                )
+                # Cancel any tasks that didn't complete
+                for future in not_done:
+                    future.cancel()
+        except Exception as e:
+            logger.warning(f"Error waiting for tasks to complete: {e}")
+
+        # Clear active tasks
+        with self._lock:
             self.active_tasks.clear()
 
         # Note: We cannot join the event loop thread from within itself

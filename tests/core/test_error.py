@@ -4,8 +4,9 @@ Unit tests for routilux.core.error module.
 Tests ErrorHandler class and ErrorStrategy enum.
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from routilux.core.error import ErrorHandler, ErrorStrategy
 
@@ -234,9 +235,7 @@ class TestErrorHandlerHandleError:
 
     def test_handle_error_retry_within_limit(self):
         """Test RETRY strategy returns True when within retry limit."""
-        handler = ErrorHandler(
-            strategy=ErrorStrategy.RETRY, max_retries=3, retry_delay=0.01
-        )
+        handler = ErrorHandler(strategy=ErrorStrategy.RETRY, max_retries=3, retry_delay=0.01)
         error = ValueError("test error")
 
         result = handler.handle_error(
@@ -251,29 +250,21 @@ class TestErrorHandlerHandleError:
 
     def test_handle_error_retry_exceeds_limit(self):
         """Test RETRY strategy returns False when retries exceeded."""
-        handler = ErrorHandler(
-            strategy=ErrorStrategy.RETRY, max_retries=2, retry_delay=0.01
-        )
+        handler = ErrorHandler(strategy=ErrorStrategy.RETRY, max_retries=2, retry_delay=0.01)
         error = ValueError("test error")
 
         # First retry
-        result1 = handler.handle_error(
-            error=error, routine=None, routine_id="test", flow=None
-        )
+        result1 = handler.handle_error(error=error, routine=None, routine_id="test", flow=None)
         assert result1 is True
         assert handler.retry_count == 1
 
         # Second retry
-        result2 = handler.handle_error(
-            error=error, routine=None, routine_id="test", flow=None
-        )
+        result2 = handler.handle_error(error=error, routine=None, routine_id="test", flow=None)
         assert result2 is True
         assert handler.retry_count == 2
 
         # Third call - should fail (max_retries exceeded)
-        result3 = handler.handle_error(
-            error=error, routine=None, routine_id="test", flow=None
-        )
+        result3 = handler.handle_error(error=error, routine=None, routine_id="test", flow=None)
         assert result3 is False
 
     def test_handle_error_retry_non_retryable_exception(self):
@@ -309,9 +300,7 @@ class TestErrorHandlerHandleError:
         # First retry
         handler.handle_error(error=error, routine=None, routine_id="test", flow=None)
         # Second call - exceeds limit
-        result = handler.handle_error(
-            error=error, routine=None, routine_id="test", flow=None
-        )
+        result = handler.handle_error(error=error, routine=None, routine_id="test", flow=None)
 
         assert result is False
 

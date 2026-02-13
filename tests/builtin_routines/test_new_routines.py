@@ -2,18 +2,18 @@
 Tests for new builtin routines.
 """
 
+
 import pytest
-import time
 
 from routilux.builtin_routines import (
     Aggregator,
     Batcher,
     Debouncer,
     Filter,
-    Splitter,
     Mapper,
-    SchemaValidator,
     RetryHandler,
+    SchemaValidator,
+    Splitter,
 )
 
 
@@ -23,8 +23,8 @@ class TestMapper:
     def test_mapper_creation(self):
         """Test Mapper can be created."""
         mapper = Mapper()
-        assert 'input' in mapper._slots
-        assert 'output' in mapper._events
+        assert "input" in mapper._slots
+        assert "output" in mapper._events
 
     def test_mapper_simple_rename(self):
         """Test simple field renaming."""
@@ -60,9 +60,9 @@ class TestSchemaValidator:
     def test_validator_creation(self):
         """Test SchemaValidator can be created."""
         validator = SchemaValidator()
-        assert 'input' in validator._slots
-        assert 'valid' in validator._events
-        assert 'invalid' in validator._events
+        assert "input" in validator._slots
+        assert "valid" in validator._events
+        assert "invalid" in validator._events
 
     def test_custom_validator(self):
         """Test custom validation function."""
@@ -88,9 +88,9 @@ class TestFilter:
     def test_filter_creation(self):
         """Test Filter can be created."""
         filter_routine = Filter()
-        assert 'input' in filter_routine._slots
-        assert 'passed' in filter_routine._events
-        assert 'rejected' in filter_routine._events
+        assert "input" in filter_routine._slots
+        assert "passed" in filter_routine._events
+        assert "rejected" in filter_routine._events
 
     def test_filter_callable_condition(self):
         """Test filter with callable condition."""
@@ -125,8 +125,8 @@ class TestAggregator:
     def test_aggregator_creation(self):
         """Test Aggregator can be created."""
         aggregator = Aggregator()
-        assert 'aggregated' in aggregator._events
-        assert 'timeout' in aggregator._events
+        assert "aggregated" in aggregator._events
+        assert "timeout" in aggregator._events
 
     def test_aggregator_setup_slots(self):
         """Test setting up aggregation slots."""
@@ -162,9 +162,9 @@ class TestBatcher:
     def test_batcher_creation(self):
         """Test Batcher can be created."""
         batcher = Batcher()
-        assert 'input' in batcher._slots
-        assert 'batch' in batcher._events
-        assert 'timeout' in batcher._events
+        assert "input" in batcher._slots
+        assert "batch" in batcher._events
+        assert "timeout" in batcher._events
 
     def test_batcher_config(self):
         """Test batcher configuration."""
@@ -186,8 +186,8 @@ class TestSplitter:
     def test_splitter_creation(self):
         """Test Splitter can be created."""
         splitter = Splitter()
-        assert 'input' in splitter._slots
-        assert 'item' in splitter._events
+        assert "input" in splitter._slots
+        assert "item" in splitter._events
 
     def test_split_list(self):
         """Test splitting a list."""
@@ -230,9 +230,9 @@ class TestDebouncer:
     def test_debouncer_creation(self):
         """Test Debouncer can be created."""
         debouncer = Debouncer()
-        assert 'input' in debouncer._slots
-        assert 'debounced' in debouncer._events
-        assert 'leading' in debouncer._events
+        assert "input" in debouncer._slots
+        assert "debounced" in debouncer._events
+        assert "leading" in debouncer._events
 
     def test_debouncer_config(self):
         """Test debouncer configuration."""
@@ -255,19 +255,15 @@ class TestRetryHandler:
     def test_retry_handler_creation(self):
         """Test RetryHandler can be created."""
         handler = RetryHandler()
-        assert 'input' in handler._slots
-        assert 'success' in handler._events
-        assert 'retry' in handler._events
-        assert 'exhausted' in handler._events
+        assert "input" in handler._slots
+        assert "success" in handler._events
+        assert "retry" in handler._events
+        assert "exhausted" in handler._events
 
     def test_retry_handler_config(self):
         """Test retry handler configuration."""
         handler = RetryHandler()
-        handler.set_config(
-            max_attempts=5,
-            backoff="exponential",
-            base_delay=0.5
-        )
+        handler.set_config(max_attempts=5, backoff="exponential", base_delay=0.5)
 
         assert handler.get_config("max_attempts") == 5
         assert handler.get_config("backoff") == "exponential"
@@ -328,11 +324,7 @@ class TestRetryHandler:
                 raise ValueError("Not yet")
             return "success"
 
-        result = handler.execute_with_retry(
-            eventually_succeed,
-            max_attempts=5,
-            base_delay=0.01
-        )
+        result = handler.execute_with_retry(eventually_succeed, max_attempts=5, base_delay=0.01)
         assert result == "success"
         assert attempts[0] == 3
 
@@ -344,8 +336,4 @@ class TestRetryHandler:
             raise ValueError("Always fails")
 
         with pytest.raises(ValueError, match="Always fails"):
-            handler.execute_with_retry(
-                always_fail,
-                max_attempts=3,
-                base_delay=0.01
-            )
+            handler.execute_with_retry(always_fail, max_attempts=3, base_delay=0.01)

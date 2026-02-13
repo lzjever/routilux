@@ -1,11 +1,10 @@
 """
 Test audit logging for HTTP server.
 """
+
 import json
 import os
 import sys
-
-import pytest
 from io import StringIO
 
 # Ensure project root is in sys.path
@@ -203,6 +202,7 @@ def test_global_audit_logger_enabled_by_default():
     """Global audit logger should be enabled by default."""
     # Clear the global instance to reset state
     import routilux.server.audit as audit_module
+
     audit_module._audit_logger = None
 
     # Ensure the env var is not set
@@ -218,6 +218,7 @@ def test_global_audit_logger_can_be_disabled():
     """Global audit logger should respect ROUTILUX_AUDIT_LOGGING_ENABLED=false."""
     # Clear the global instance to reset state
     import routilux.server.audit as audit_module
+
     audit_module._audit_logger = None
 
     # Disable audit logging

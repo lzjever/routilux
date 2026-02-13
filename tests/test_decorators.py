@@ -2,10 +2,8 @@
 Tests for the @routine decorator.
 """
 
-import pytest
 
-from routilux import routine, Flow, Runtime
-from routilux.core.context import set_current_worker_state, set_current_job
+from routilux import Flow, routine
 
 
 class TestRoutineDecorator:
@@ -13,6 +11,7 @@ class TestRoutineDecorator:
 
     def test_basic_routine_creation(self):
         """Test that @routine creates a valid Routine class."""
+
         @routine()
         def double(data):
             return data * 2
@@ -22,23 +21,25 @@ class TestRoutineDecorator:
 
         # Create instance
         instance = double()
-        assert hasattr(instance, '_slots')
-        assert hasattr(instance, '_events')
-        assert 'input' in instance._slots
-        assert 'output' in instance._events
+        assert hasattr(instance, "_slots")
+        assert hasattr(instance, "_events")
+        assert "input" in instance._slots
+        assert "output" in instance._events
 
     def test_custom_slot_event_names(self):
         """Test custom slot and event names."""
+
         @routine(input_slot="data_in", output_event="result")
         def process(data):
             return {"processed": data}
 
         instance = process()
-        assert 'data_in' in instance._slots
-        assert 'result' in instance._events
+        assert "data_in" in instance._slots
+        assert "result" in instance._events
 
     def test_routine_class_name(self):
         """Test that routine class has correct name."""
+
         @routine()
         def my_processor(data):
             return data
@@ -53,6 +54,7 @@ class TestRoutineDecorator:
 
     def test_routine_has_activation_policy(self):
         """Test that routine has activation policy set."""
+
         @routine()
         def simple(data):
             return data
@@ -67,6 +69,7 @@ class TestRoutineDecoratorIntegration:
 
     def test_routine_in_flow(self):
         """Test that decorated routine can be added to a Flow."""
+
         @routine()
         def add_one(data):
             return data + 1
@@ -80,6 +83,7 @@ class TestRoutineDecoratorIntegration:
 
     def test_chain_with_pipe(self):
         """Test chaining decorated routines with pipe()."""
+
         @routine()
         def step1(data):
             return data * 2

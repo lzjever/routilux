@@ -311,7 +311,8 @@ class JobContext:
 
     def start(self) -> None:
         """Mark job as running."""
-        self.status = "running"
+        with self._lock:
+            self.status = "running"
 
     def complete(self, status: str = "completed", error: str | None = None) -> None:
         """Mark job as completed and trigger hooks.
@@ -320,9 +321,10 @@ class JobContext:
             status: Final status ("completed" or "failed")
             error: Error message if failed
         """
-        self.status = status
-        self.error = error
-        self.completed_at = datetime.now()
+        with self._lock:
+            self.status = status
+            self.error = error
+            self.completed_at = datetime.now()
 
         # Trigger on_job_end hook
         import logging

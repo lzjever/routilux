@@ -5,8 +5,9 @@ Tests performance with hundreds of routines and complex connection patterns.
 """
 
 import time
+
 from routilux import Flow, Routine
-from routilux.core import Runtime, FlowRegistry
+from routilux.core import FlowRegistry, Runtime
 
 
 def create_processing_routine(name: str) -> Routine:
@@ -42,6 +43,7 @@ class TestLargeWorkflowBenchmark:
 
     def test_create_flow_with_100_routines(self, benchmark):
         """Benchmark creating a flow with 100 routines."""
+
         def create_large_flow():
             flow = Flow("large_workflow")
 

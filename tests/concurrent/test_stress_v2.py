@@ -5,15 +5,14 @@ These tests verify system stability under high load conditions.
 """
 
 import gc
-import time
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pytest
 
 from routilux import Flow, Routine, Runtime
-from routilux.core import FlowRegistry, WorkerState, JobStatus
-from routilux.core.context import set_current_job, set_current_worker_state
+from routilux.core import FlowRegistry, WorkerState
 
 
 class StressTestRoutine(Routine):
@@ -98,7 +97,7 @@ def test_runtime_high_throughput_post():
             timeout = 60.0
             WorkerState.wait_for_completion(flow, worker_state, timeout=timeout)
 
-        elapsed_wait = time.time() - start_wait
+        _ = time.time() - start_wait  # Track completion time
 
     # All posts should be fast
     assert elapsed_post < 10.0, f"Posting 1000 jobs took {elapsed_post:.2f}s"

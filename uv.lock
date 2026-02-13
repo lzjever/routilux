@@ -3372,6 +3372,7 @@ cli = [
     { name = "click", version = "8.1.8", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version < '3.10'" },
     { name = "click", version = "8.3.1", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version >= '3.10'" },
     { name = "pyyaml" },
+    { name = "rich" },
 ]
 
 [package.dev-dependencies]
@@ -3420,6 +3421,7 @@ docs = [
 requires-dist = [
     { name = "click", marker = "extra == 'cli'", specifier = ">=8.0" },
     { name = "pyyaml", marker = "extra == 'cli'", specifier = ">=6.0" },
+    { name = "rich", marker = "extra == 'cli'", specifier = ">=13.0.0" },
     { name = "serilux", specifier = ">=0.3.1" },
 ]
 provides-extras = ["cli"]

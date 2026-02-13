@@ -6,8 +6,8 @@ Tests for Flow class functionality using Runtime API for execution.
 
 import pytest
 
-from routilux import Flow, Routine, Runtime
-from routilux.core import FlowRegistry, WorkerState
+from routilux import Flow, Routine
+from routilux.core import FlowRegistry
 
 
 class TestFlowManagement:

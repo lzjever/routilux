@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from routilux.core.flow import Flow
     from routilux.core.worker import WorkerState
 
+from routilux.core.status import ExecutionStatus
+
 logger = logging.getLogger(__name__)
 
 # Global instance
@@ -118,14 +120,22 @@ class WorkerManager:
             timeout=effective_timeout,
         )
 
-        # Register and start
+        # CRITICAL: Start executor BEFORE registering
+        # This prevents race condition where executor is registered but start() fails
+        try:
+            executor.start()
+        except Exception:
+            # Start failed - ensure worker state reflects failure
+            worker_state.status = ExecutionStatus.FAILED
+            raise
+
+        # Register only after successful start
         with self._lock:
             if self._shutdown:
+                # Manager was shut down during start, cancel the executor
+                executor.cancel(reason="WorkerManager shut down during start")
                 raise RuntimeError("WorkerManager is shut down")
             self.running_workers[worker_state.worker_id] = executor
-
-        # Start execution (non-blocking)
-        executor.start()
 
         return worker_state
 
@@ -192,6 +202,8 @@ class WorkerManager:
             fast_cleanup: If True, skip waiting (for atexit cleanup)
         """
         with self._lock:
+            if self._shutdown:
+                return  # Prevent duplicate shutdown calls
             self._shutdown = True
             workers_to_cancel = list(self.running_workers.items())
 

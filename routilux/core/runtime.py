@@ -44,6 +44,16 @@ class Runtime(IEventHandler):
         - Routine activation checking (calls activation policies)
         - Job context binding (for per-task tracking)
 
+    Thread Safety:
+        This class uses multiple locks to protect shared state. To prevent deadlock,
+        locks MUST be acquired in the following order:
+
+        1. _worker_lock (protects _active_workers)
+        2. _jobs_lock (protects _active_jobs)
+
+        NEVER acquire these locks in a different order. When multiple locks are
+        needed, always use nested `with` statements in the correct order.
+
     Examples:
         >>> runtime = Runtime(thread_pool_size=10)
         >>> worker_state = runtime.exec("my_flow")
@@ -87,10 +97,6 @@ class Runtime(IEventHandler):
         self._worker_lock = threading.RLock()
         self._shutdown = False
         self._is_shutdown = False
-
-        # Track active routines: worker_id -> set[routine_id]
-        self._active_routines: dict[str, set[str]] = {}
-        self._active_routines_lock = threading.RLock()
 
         # Track active jobs by worker: worker_id -> dict[job_id -> JobContext]
         self._active_jobs: dict[str, dict[str, JobContext]] = {}
@@ -174,13 +180,12 @@ class Runtime(IEventHandler):
             worker_state=worker_state,
         )
 
-        # Register in active workers
+        # Register in active workers and initialize jobs dict
+        # Acquire locks in correct order: _worker_lock -> _jobs_lock
         with self._worker_lock:
             self._active_workers[worker_state.worker_id] = worker_state
-
-        # Initialize jobs dict for this worker
-        with self._jobs_lock:
-            self._active_jobs[worker_state.worker_id] = {}
+            with self._jobs_lock:
+                self._active_jobs[worker_state.worker_id] = {}
 
         return worker_state
 
@@ -604,60 +609,6 @@ class Runtime(IEventHandler):
             return flow._get_routine_id(routine)
         return None
 
-    def get_active_thread_count(self, job_id: str, routine_id: str) -> int:
-        """Get active thread count for a specific routine in a job.
-
-        Args:
-            job_id: Job identifier
-            routine_id: Routine identifier
-
-        Returns:
-            Number of active threads executing this routine (0 if not found)
-        """
-        # Find worker_id first with _jobs_lock, then check routines
-        with self._jobs_lock:
-            worker_id_found = None
-            for worker_id, jobs in self._active_jobs.items():
-                if job_id in jobs:
-                    worker_id_found = worker_id
-                    break
-
-        if worker_id_found is None:
-            return 0
-
-        # Check active routines with separate lock acquisition
-        with self._active_routines_lock:
-            active_routines = self._active_routines.get(worker_id_found, set())
-            return 1 if routine_id in active_routines else 0
-
-    def get_all_active_thread_counts(self, job_id: str) -> dict[str, int]:
-        """Get active thread counts for all routines in a job.
-
-        Args:
-            job_id: Job identifier
-
-        Returns:
-            Dictionary mapping routine_id to thread count
-        """
-        # Find worker_id first with _jobs_lock
-        with self._jobs_lock:
-            worker_id_found = None
-            for worker_id, jobs in self._active_jobs.items():
-                if job_id in jobs:
-                    worker_id_found = worker_id
-                    break
-
-        if worker_id_found is None:
-            return {}
-
-        # Check active routines with separate lock acquisition
-        with self._active_routines_lock:
-            active_routines = self._active_routines.get(worker_id_found, set())
-            return {
-                routine_id: 1 if routine_id in active_routines else 0
-                for routine_id in active_routines
-            }
-
     def get_job(self, job_id: str) -> JobContext | None:
         """Get job by ID.
 
@@ -686,26 +637,30 @@ class Runtime(IEventHandler):
         Returns:
             True if job was found and completed, False otherwise
         """
-        with self._jobs_lock:
-            for worker_id, worker_jobs in self._active_jobs.items():
-                if job_id in worker_jobs:
-                    job = worker_jobs[job_id]
-                    job.complete(status, error)
+        # Acquire locks in correct order: _worker_lock -> _jobs_lock
+        # This prevents deadlock when combined with other methods
+        with self._worker_lock:
+            with self._jobs_lock:
+                for worker_id, worker_jobs in self._active_jobs.items():
+                    if job_id in worker_jobs:
+                        job = worker_jobs[job_id]
+                        job.complete(status, error)
 
-                    # Increment worker counter
-                    worker = self._active_workers.get(worker_id)
-                    if worker:
-                        worker.increment_jobs_processed(status == "completed")
+                        # Increment worker counter - safe to access _active_workers
+                        # since we hold _worker_lock
+                        worker = self._active_workers.get(worker_id)
+                        if worker:
+                            worker.increment_jobs_processed(status == "completed")
 
-                    # Clear job output after completion (optional)
-                    from routilux.core.output import clear_job_output
+                        # Clear job output after completion (optional)
+                        from routilux.core.output import clear_job_output
 
-                    clear_job_output(job_id)
+                        clear_job_output(job_id)
 
-                    # Remove job from active jobs to prevent memory leak
-                    del worker_jobs[job_id]
+                        # Remove job from active jobs to prevent memory leak
+                        del worker_jobs[job_id]
 
-                    return True
+                        return True
         return False
 
     def list_jobs(self, worker_id: str | None = None) -> list[JobContext]:

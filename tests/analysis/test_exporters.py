@@ -2,7 +2,6 @@
 Tests for analysis exporters (routine_markdown, workflow_d2).
 """
 
-
 from routilux.analysis.exporters.routine_markdown import RoutineMarkdownFormatter
 from routilux.analysis.exporters.workflow_d2 import WorkflowD2Formatter
 

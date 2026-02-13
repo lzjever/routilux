@@ -2,10 +2,9 @@
 Tests for the Flow.pipe() method.
 """
 
-import pytest
 
 from routilux import Flow, Routine
-from routilux.builtin_routines import Mapper, Filter
+from routilux.builtin_routines import Mapper
 
 
 class TestFlowPipe:

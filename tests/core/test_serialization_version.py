@@ -6,7 +6,7 @@ deserialization validates version compatibility.
 
 import pytest
 
-from routilux.core import Flow, Routine, SERIALIZATION_VERSION, SUPPORTED_SERIALIZATION_VERSIONS
+from routilux.core import SERIALIZATION_VERSION, SUPPORTED_SERIALIZATION_VERSIONS, Flow, Routine
 from routilux.exceptions import SerializationError
 
 
@@ -35,7 +35,9 @@ def test_flow_deserialization_validates_version():
     unsupported_version = 999
     serialized["version"] = unsupported_version
 
-    with pytest.raises(SerializationError, match=f"Unsupported serialization version: {unsupported_version}"):
+    with pytest.raises(
+        SerializationError, match=f"Unsupported serialization version: {unsupported_version}"
+    ):
         flow.deserialize(serialized)
 
 

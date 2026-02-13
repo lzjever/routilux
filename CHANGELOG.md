@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-02-13
+
+### Fixed
+
+#### Critical Thread Safety Fixes (P0)
+
+- **SlotActivationTask task_done() not called** (executor.py): Added try-except wrapper around `global_thread_pool.submit()` to ensure `task_done()` is always called even when submit fails, preventing queue count errors
+- **JobContext.start()/complete() thread safety** (context.py): Added lock protection to `start()` and `complete()` methods to ensure thread-safe modification of status, error, and completed_at fields
+- **_clear_consumed_data() index error** (slot.py): Added boundary condition check when all data is consumed (`first_unconsumed >= len(queue)`) to properly clear the entire queue instead of leaving stale data
+- **enqueue_task() race condition** (executor.py): Moved `_paused` check inside the lock to eliminate the race window between checking pause state and acquiring the lock
+
+#### Stability Fixes (P1)
+
+- **shutdown() duplicate call protection** (manager.py): Added early return check to prevent multiple shutdown calls from causing thread pool errors
+- **emit() connected_slots iteration** (event.py): Analysis confirmed thread-safety is already ensured by `flow.get_connections_for_event()` which uses lock protection and returns a snapshot
+
+### Changed
+
+- **Removed unused _active_routines functionality** (runtime.py):
+  - Removed `_active_routines` dictionary and `_active_routines_lock`
+  - Removed `get_active_thread_count()` method (returned 0 or 1, never truly used)
+  - Removed `get_all_active_thread_counts()` method
+  - Updated Thread Safety documentation to reflect simplified lock order
+
+### Tests
+
+- Added `tests/concurrent/test_executor_cleanup.py` for executor cleanup tests
+- Added `tests/concurrent/test_lock_ordering.py` for lock ordering verification
+- Added `tests/concurrent/test_manager_registration.py` for manager registration timing tests
+
 ## [0.13.0] - 2026-02-13
 
 ### Added

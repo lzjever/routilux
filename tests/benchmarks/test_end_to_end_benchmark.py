@@ -5,8 +5,9 @@ These benchmarks test complete workflow execution with realistic data sizes.
 """
 
 import time
+
 from routilux import Flow, Routine
-from routilux.core import Runtime, FlowRegistry
+from routilux.core import FlowRegistry, Runtime
 
 
 def create_processing_routine(name: str) -> Routine:
@@ -42,6 +43,7 @@ class TestEndToEndBenchmark:
 
     def test_setup_flow_with_10_routines(self, benchmark):
         """Benchmark creating and connecting a flow with 10 routines."""
+
         def setup_flow():
             flow = Flow("linear_chain")
 
@@ -83,10 +85,7 @@ class TestEndToEndBenchmark:
         worker_state = runtime.exec("post_test")
 
         def post_job():
-            _, job = runtime.post(
-                "post_test", "r0", "input",
-                {"value": 1}
-            )
+            _, job = runtime.post("post_test", "r0", "input", {"value": 1})
             return job
 
         result = benchmark(post_job)
@@ -112,10 +111,7 @@ class TestEndToEndBenchmark:
         def create_jobs():
             jobs = []
             for i in range(50):
-                _, job = runtime.post(
-                    "parallel_test", "processor", "input",
-                    {"value": i}
-                )
+                _, job = runtime.post("parallel_test", "processor", "input", {"value": i})
                 jobs.append(job)
             return jobs
 
@@ -153,10 +149,7 @@ class TestEndToEndBenchmark:
         worker_state = runtime.exec("linear_chain_exec")
 
         def execute_chain():
-            _, job = runtime.post(
-                "linear_chain_exec", "r0", "input",
-                {"value": 1}
-            )
+            _, job = runtime.post("linear_chain_exec", "r0", "input", {"value": 1})
             # Wait for completion
             completed = wait_for_job_completion(runtime, job, timeout=5.0)
             # Mark as completed since jobs won't auto-complete without activation policies
@@ -191,10 +184,7 @@ class TestEndToEndBenchmark:
         def run_parallel_jobs():
             jobs = []
             for i in range(50):
-                _, job = runtime.post(
-                    "parallel_exec_test", "processor", "input",
-                    {"value": i}
-                )
+                _, job = runtime.post("parallel_exec_test", "processor", "input", {"value": i})
                 jobs.append(job)
 
             # Wait for all jobs to complete
@@ -202,9 +192,10 @@ class TestEndToEndBenchmark:
             start = time.time()
             while time.time() - start < timeout:
                 completed = sum(
-                    1 for j in jobs
-                    if runtime.get_job(j.job_id) and
-                    runtime.get_job(j.job_id).status in ("completed", "failed")
+                    1
+                    for j in jobs
+                    if runtime.get_job(j.job_id)
+                    and runtime.get_job(j.job_id).status in ("completed", "failed")
                 )
                 if completed == len(jobs):
                     break

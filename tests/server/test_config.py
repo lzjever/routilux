@@ -4,11 +4,9 @@ Test secure-by-default configuration for HTTP server.
 Tests that security is enabled by default and can only be explicitly disabled
 for development.
 """
+
 import os
 import sys
-
-import pytest
-
 
 # Ensure project root is in sys.path
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -25,7 +23,9 @@ def test_default_security_is_enabled():
 
     # Reload config module to pick up env changes
     import importlib
+
     from routilux.server import config
+
     importlib.reload(config)
 
     cfg = config.APIConfig()
@@ -40,7 +40,9 @@ def test_dev_mode_disables_security():
 
     # Import fresh to pick up env vars
     import importlib
+
     from routilux.server import config
+
     importlib.reload(config)
 
     cfg = config.APIConfig()
@@ -58,7 +60,9 @@ def test_production_env_enforces_security():
     os.environ["ROUTILUX_DEV_DISABLE_SECURITY"] = "false"  # Explicit
 
     import importlib
+
     from routilux.server import config
+
     importlib.reload(config)
 
     cfg = config.APIConfig()
@@ -82,7 +86,9 @@ def test_explicit_env_vars_override_defaults():
     os.environ["ROUTILUX_RATE_LIMIT_ENABLED"] = "false"
 
     import importlib
+
     from routilux.server import config
+
     importlib.reload(config)
 
     cfg = config.APIConfig()
@@ -105,7 +111,9 @@ def test_explicit_true_env_vars_work():
     os.environ["ROUTILUX_RATE_LIMIT_ENABLED"] = "true"
 
     import importlib
+
     from routilux.server import config
+
     importlib.reload(config)
 
     cfg = config.APIConfig()
@@ -135,7 +143,9 @@ def test_rate_limit_per_minute_validation():
         os.environ["ROUTILUX_RATE_LIMIT_PER_MINUTE"] = value
 
         import importlib
+
         from routilux.server import config
+
         importlib.reload(config)
 
         cfg = config.APIConfig()
@@ -159,7 +169,9 @@ def test_dev_mode_takes_precedence():
     os.environ["ROUTILUX_RATE_LIMIT_ENABLED"] = "true"
 
     import importlib
+
     from routilux.server import config
+
     importlib.reload(config)
 
     cfg = config.APIConfig()
@@ -179,7 +191,9 @@ def test_production_ignores_dev_disable_security():
     os.environ["ROUTILUX_DEV_DISABLE_SECURITY"] = "true"
 
     import importlib
+
     from routilux.server import config
+
     importlib.reload(config)
 
     cfg = config.APIConfig()
@@ -203,7 +217,9 @@ def test_environment_variable_env():
     os.environ["ENVIRONMENT"] = "production"
 
     import importlib
+
     from routilux.server import config
+
     importlib.reload(config)
 
     cfg = config.APIConfig()

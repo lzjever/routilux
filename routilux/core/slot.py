@@ -288,7 +288,11 @@ class Slot(Serializable):
         """Clear consumed data to free space."""
         with self._lock:
             first_unconsumed = self._last_consumed_index + 1
-            if first_unconsumed > 0:
+            if first_unconsumed >= len(self._queue):
+                # All data consumed, clear entire queue
+                self._queue = []
+                self._last_consumed_index = -1
+            elif first_unconsumed > 0:
                 self._queue = self._queue[first_unconsumed:]
                 self._last_consumed_index = -1
 

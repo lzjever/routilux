@@ -1,6 +1,5 @@
 """Tests for built-in routine registration."""
 
-import pytest
 
 
 def test_register_all_builtins_registers_all_routines():

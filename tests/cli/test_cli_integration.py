@@ -4,8 +4,8 @@ import os
 import tempfile
 from pathlib import Path
 
-from click.testing import CliRunner
 import pytest
+from click.testing import CliRunner
 
 
 @pytest.fixture
@@ -103,7 +103,7 @@ class TestCLIHelp:
 
         assert result.exit_code == 0
         assert "version" in result.output
-        assert "0.14" in result.output  # Check for version number
+        assert "0.15" in result.output  # Check for version number
 
     def test_help(self, runner):
         """Test that --help works."""

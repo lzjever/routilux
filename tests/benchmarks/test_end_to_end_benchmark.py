@@ -82,7 +82,7 @@ class TestEndToEndBenchmark:
 
         # Create runtime
         runtime = Runtime(thread_pool_size=4)
-        worker_state = runtime.exec("post_test")
+        _worker_state = runtime.exec("post_test")  # noqa: F841
 
         def post_job():
             _, job = runtime.post("post_test", "r0", "input", {"value": 1})
@@ -106,7 +106,7 @@ class TestEndToEndBenchmark:
         registry.register_by_name("parallel_test", flow)
 
         runtime = Runtime(thread_pool_size=10)
-        worker_state = runtime.exec("parallel_test")
+        _worker_state = runtime.exec("parallel_test")  # noqa: F841
 
         def create_jobs():
             jobs = []
@@ -146,7 +146,7 @@ class TestEndToEndBenchmark:
 
         # Create runtime
         runtime = Runtime(thread_pool_size=4)
-        worker_state = runtime.exec("linear_chain_exec")
+        _worker_state = runtime.exec("linear_chain_exec")  # noqa: F841
 
         def execute_chain():
             _, job = runtime.post("linear_chain_exec", "r0", "input", {"value": 1})
@@ -179,7 +179,7 @@ class TestEndToEndBenchmark:
         registry.register_by_name("parallel_exec_test", flow)
 
         runtime = Runtime(thread_pool_size=10)
-        worker_state = runtime.exec("parallel_exec_test")
+        _worker_state = runtime.exec("parallel_exec_test")  # noqa: F841
 
         def run_parallel_jobs():
             jobs = []

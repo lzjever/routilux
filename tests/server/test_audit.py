@@ -12,7 +12,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from routilux.server.audit import AuditLogger, get_audit_logger, hash_api_key
+from routilux.server.audit import AuditLogger, get_audit_logger, hash_api_key  # noqa: E402
 
 
 def test_audit_log_api_call():

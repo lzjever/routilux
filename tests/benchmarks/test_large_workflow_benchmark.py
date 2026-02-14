@@ -85,7 +85,7 @@ class TestLargeWorkflowBenchmark:
 
         # Set up outside benchmark
         runtime = Runtime(thread_pool_size=10)
-        worker_state = runtime.exec("large_workflow_post_test")
+        _worker_state = runtime.exec("large_workflow_post_test")  # noqa: F841
 
         def post_job():
             _, job = runtime.post("large_workflow_post_test", "r0", "input", {"value": 1})
@@ -136,7 +136,7 @@ class TestLargeWorkflowBenchmark:
         registry.register_by_name("large_workflow_exec", flow)
 
         runtime = Runtime(thread_pool_size=10)
-        worker_state = runtime.exec("large_workflow_exec")
+        _worker_state = runtime.exec("large_workflow_exec")  # noqa: F841
 
         def execute_large():
             _, job = runtime.post("large_workflow_exec", "r0", "input", {"value": 1})

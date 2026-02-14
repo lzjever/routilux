@@ -119,15 +119,10 @@ install_routilux_uv() {
         pkg="routilux[all]==$VERSION"
     fi
 
-    # Try upgrade first (if installed via uv)
-    if uv tool list 2>/dev/null | grep -q "routilux"; then
-        info "Upgrading routilux..."
-        uv tool upgrade routilux 2>/dev/null && success "Upgraded to latest version" && return 0
-    fi
-
-    # Install with --force to handle existing executable
-    info "Installing routilux..."
-    uv tool install --force "$pkg" 2>/dev/null
+    # Always use install --upgrade --force to ensure latest version
+    # uv tool upgrade has caching issues and may not detect new versions
+    info "Installing/upgrading routilux..."
+    uv tool install --upgrade --force "$pkg"
     success "Installed latest version"
 }
 
@@ -137,15 +132,9 @@ install_routilux_pipx() {
         pkg="routilux[all]==$VERSION"
     fi
 
-    # Try upgrade first
-    if pipx list 2>/dev/null | grep -q "routilux"; then
-        info "Upgrading routilux..."
-        pipx upgrade routilux 2>/dev/null && success "Upgraded to latest version" && return 0
-    fi
-
-    # Install with --force
-    info "Installing routilux..."
-    pipx install --force "$pkg" 2>/dev/null
+    # Always use install --force to ensure latest version
+    info "Installing/upgrading routilux..."
+    pipx install --force "$pkg"
     success "Installed latest version"
 }
 

@@ -286,9 +286,21 @@ def start_server(
     register_all_builtins(factory)
     print("Registered built-in routines")
 
-    # Gather routines directories
-    all_dirs = list(routines_dirs or [])
-    all_dirs.extend(get_default_routines_dirs())
+    # Gather routines directories (deduplicate by resolving to absolute paths)
+    all_dirs = []
+    seen_paths = set()
+
+    for d in (routines_dirs or []):
+        resolved = Path(d).resolve()
+        if str(resolved) not in seen_paths:
+            seen_paths.add(str(resolved))
+            all_dirs.append(d)
+
+    for d in get_default_routines_dirs():
+        resolved = Path(d).resolve()
+        if str(resolved) not in seen_paths:
+            seen_paths.add(str(resolved))
+            all_dirs.append(d)
 
     # Discover routines before starting server
     if all_dirs:

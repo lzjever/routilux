@@ -293,7 +293,7 @@ def start_server(
     # Discover routines before starting server
     if all_dirs:
         print(f"Discovering routines from: {all_dirs}")
-        factory = discover_routines(all_dirs, on_error="warn")
+        discover_routines(all_dirs, on_error="warn")  # Add to existing factory
         routines = factory.list_available()
         print(f"Registered {len(routines)} routines")
 
